@@ -1,7 +1,7 @@
 <header class="app-toolbar">
   <label class="domain-picker">
     Domain:
-    <select [value]="selectedDomain()" (change)="onDomainChange($event)">
+    <select name="domain" [value]="selectedDomain()" (change)="onDomainChange($event)">
       @for (option of domainOptions; track option.value) {
         <option [value]="option.value" [disabled]="!option.enabled">
           {{ option.label }}{{ option.enabled ? '' : ' (coming soon)' }}
@@ -11,8 +11,13 @@
   </label>
 
   @if (currentUser()) {
+    @if (showBackToTop()) {
+      <button type="button" class="back-to-top" (click)="scrollToTop()">
+        <span aria-hidden="true">↑</span> Back to top
+      </button>
+    }
     <form class="search-form" [formGroup]="searchForm" (ngSubmit)="submitSearch()">
-      <input type="text" formControlName="term" placeholder="Search movies…" />
+      <input type="text" name="search-term" formControlName="term" placeholder="Search movies…" />
       <button type="submit">Search</button>
     </form>
   }

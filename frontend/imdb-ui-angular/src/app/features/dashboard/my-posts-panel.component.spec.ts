@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { Router, provideRouter } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import {
   HttpTestingController,
@@ -16,7 +17,11 @@ describe('MyPostsPanelComponent', () => {
     localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [MyPostsPanelComponent],
-      providers: [provideHttpClient(withInterceptors([errorInterceptor])), provideHttpClientTesting()],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(withInterceptors([errorInterceptor])),
+        provideHttpClientTesting(),
+      ],
     }).compileComponents();
     httpMock = TestBed.inject(HttpTestingController);
   });
@@ -365,6 +370,70 @@ describe('MyPostsPanelComponent', () => {
       TestBed.tick();
 
       httpMock.expectNone(() => true);
+    });
+  });
+
+  describe('drilling down into a post/reply', () => {
+    function createWithPost(bodyText: string, parentPostId: number | null) {
+      localStorage.setItem(
+        'imdb-ui-angular.currentUser',
+        JSON.stringify({ id: 1, username: 'jdoe', email: 'jdoe@example.com', firstName: null, lastName: null }),
+      );
+      const fixture = TestBed.createComponent(MyPostsPanelComponent);
+      fixture.detectChanges();
+
+      httpMock.expectOne((r) => r.url === `${API_BASE_URL}/users/1/posts`).flush({
+        content: [
+          { id: 42, resourceId: 401, userId: 1, username: 'jdoe', parentPostId, bodyText, data: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
+        ],
+        totalElements: 1,
+        totalPages: 1,
+        number: 0,
+        size: 20,
+      });
+      fixture.detectChanges();
+      // Movie groups are collapsed by default — expand the only one here
+      // (whichever of "My Posts"/"My Replies" actually has content) so the
+      // post/reply entry renders.
+      (fixture.nativeElement.querySelector('.tree-toggle') as HTMLElement).click();
+      fixture.detectChanges();
+      return fixture;
+    }
+
+    it('navigates to the resource page with the post id to highlight, no parent', () => {
+      const fixture = createWithPost('A top-level post.', null);
+      const router = TestBed.inject(Router);
+      // provideRouter([]) has no matching routes — stub the real navigation
+      // away so it doesn't reject; only the call itself is under test here.
+      const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+      (fixture.nativeElement.querySelector('.post-entry') as HTMLElement).click();
+
+      expect(navigateSpy).toHaveBeenCalledWith(['/resources', 401], {
+        queryParams: { highlight: 42, parent: null },
+      });
+    });
+
+    it('includes the parent post id for a reply, so its thread can be expanded', () => {
+      const fixture = createWithPost('A reply.', 7);
+      const router = TestBed.inject(Router);
+      const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+      (fixture.nativeElement.querySelector('.post-entry') as HTMLElement).click();
+
+      expect(navigateSpy).toHaveBeenCalledWith(['/resources', 401], {
+        queryParams: { highlight: 42, parent: 7 },
+      });
+    });
+
+    it('clicking the "… more" toggle does not also trigger navigation', () => {
+      const fixture = createWithPost('x'.repeat(200), null);
+      const router = TestBed.inject(Router);
+      const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+      (fixture.nativeElement.querySelector('.body-toggle') as HTMLElement).click();
+
+      expect(navigateSpy).not.toHaveBeenCalled();
     });
   });
 });

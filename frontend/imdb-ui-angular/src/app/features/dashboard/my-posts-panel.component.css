@@ -119,6 +119,21 @@ h2 {
   border-bottom: none;
 }
 
+.post-entry {
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--transition-fast);
+}
+
+.post-entry:hover {
+  background: var(--color-surface-alt);
+}
+
+.post-entry:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
 .tree-children li p {
   margin: 0 0 0.25rem;
 }

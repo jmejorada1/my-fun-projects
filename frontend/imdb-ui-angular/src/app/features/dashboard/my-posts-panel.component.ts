@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { Router } from '@angular/router';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { skip } from 'rxjs';
 import { AuthService } from '../../core/auth.service';
@@ -62,6 +63,7 @@ export class MyPostsPanelComponent {
   private readonly auth = inject(AuthService);
   private readonly postService = inject(PostService);
   private readonly postActivity = inject(PostActivityService);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly posts = signal<Post[]>([]);
@@ -138,6 +140,19 @@ export class MyPostsPanelComponent {
 
   toggleBodyExpand(postId: number): void {
     this.expandedBodyIds.update((ids) => toggled(ids, postId));
+  }
+
+  /**
+   * Drill-down: jumps to the movie's resource-detail page and tells it
+   * which row to scroll to and briefly highlight. A reply isn't its own row
+   * in that page's table (it only shows up once its parent's thread is
+   * expanded), so `parent` carries the top-level post to expand — null for
+   * a plain top-level post, where the post's own row already exists.
+   */
+  goToPost(post: Post): void {
+    this.router.navigate(['/resources', post.resourceId], {
+      queryParams: { highlight: post.id, parent: post.parentPostId },
+    });
   }
 
   private load(userId: number): void {

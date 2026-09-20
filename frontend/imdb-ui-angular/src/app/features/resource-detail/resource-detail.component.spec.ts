@@ -5,7 +5,7 @@ import {
   HttpTestingController,
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
-import { of } from 'rxjs';
+import { Subject, of } from 'rxjs';
 import { ResourceDetailComponent } from './resource-detail.component';
 import { API_BASE_URL } from '../../core/api-config';
 import { errorInterceptor } from '../../core/error.interceptor';
@@ -38,6 +38,7 @@ describe('ResourceDetailComponent', () => {
   async function createComponent(
     topLevelPosts: unknown[] = DEFAULT_TOP_LEVEL_POSTS,
     postTypes: unknown[] = [{ id: 5, name: 'racism' }],
+    queryParams: Record<string, string> = {},
   ) {
     await TestBed.configureTestingModule({
       imports: [ResourceDetailComponent],
@@ -45,11 +46,21 @@ describe('ResourceDetailComponent', () => {
         provideRouter([]),
         provideHttpClient(withInterceptors([errorInterceptor])),
         provideHttpClientTesting(),
-        { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ id: '1' })) } },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            paramMap: of(convertToParamMap({ id: '1' })),
+            queryParamMap: of(convertToParamMap(queryParams)),
+          },
+        },
       ],
     }).compileComponents();
     httpMock = TestBed.inject(HttpTestingController);
     router = TestBed.inject(Router);
+    // provideRouter([]) has no matching routes — a highlight query param
+    // triggers a real navigate() call (to clear the query params
+    // afterward) that would otherwise reject with "cannot match routes".
+    vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     localStorage.setItem(
       'imdb-ui-angular.currentUser',
@@ -783,6 +794,115 @@ describe('ResourceDetailComponent', () => {
       httpMock.expectOne(`${API_BASE_URL}/posts`).flush({ detail: 'boom' }, { status: 500, statusText: 'Server Error' });
 
       expect(notifySpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('drilling down via highlight/parent query params', () => {
+    it('highlights a top-level post named in the highlight query param', async () => {
+      const fixture = await createComponent(DEFAULT_TOP_LEVEL_POSTS, undefined, { highlight: '42' });
+
+      expect(fixture.componentInstance.highlightedPostId()).toBe(42);
+    });
+
+    it('expands the parent thread and highlights the reply when a parent id is given', async () => {
+      const fixture = await createComponent(DEFAULT_TOP_LEVEL_POSTS, undefined, { highlight: '99', parent: '42' });
+      httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/42/replies` && r.method === 'GET').flush({
+        content: [], totalElements: 0, totalPages: 0, number: 0, size: 50,
+      });
+
+      expect(fixture.componentInstance.isExpanded(42)).toBe(true);
+      expect(fixture.componentInstance.highlightedPostId()).toBe(99);
+    });
+
+    it('clears the highlight a few seconds later', async () => {
+      vi.useFakeTimers();
+      try {
+        const fixture = await createComponent(DEFAULT_TOP_LEVEL_POSTS, undefined, { highlight: '42' });
+        expect(fixture.componentInstance.highlightedPostId()).toBe(42);
+
+        vi.advanceTimersByTime(3000);
+
+        expect(fixture.componentInstance.highlightedPostId()).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('re-fetches a larger page when the highlight target is missing from the default (20-item) page', async () => {
+      const fixture = await createComponent(DEFAULT_TOP_LEVEL_POSTS, undefined, { highlight: '999' });
+
+      const req = httpMock.expectOne(
+        (r) => r.url === `${API_BASE_URL}/resources/1/posts` && r.params.get('size') === '200',
+      );
+      req.flush({
+        content: [{ ...DEFAULT_TOP_LEVEL_POSTS[0], id: 999, bodyText: 'Found on the larger page.' }],
+        totalElements: 1,
+        totalPages: 1,
+        number: 0,
+        size: 200,
+      });
+
+      expect(fixture.componentInstance.posts().some((p) => p.id === 999)).toBe(true);
+      expect(fixture.componentInstance.highlightedPostId()).toBe(999);
+    });
+
+    it('does nothing when there is no highlight query param', async () => {
+      const fixture = await createComponent();
+
+      expect(fixture.componentInstance.highlightedPostId()).toBeNull();
+      httpMock.expectNone((r) => r.params.get('size') === '200');
+    });
+
+    it('re-highlights on a second drill-down without a resource id change (regression)', async () => {
+      // Clicking another post/reply for the movie you're already viewing
+      // only changes query params — the path's :id segment stays the same,
+      // and paramMap does not re-emit for that. queryParamMap must be its
+      // own subscription, not read once off paramMap's snapshot, or this
+      // second highlight silently does nothing.
+      const queryParamMap$ = new Subject<ReturnType<typeof convertToParamMap>>();
+      await TestBed.configureTestingModule({
+        imports: [ResourceDetailComponent],
+        providers: [
+          provideRouter([]),
+          provideHttpClient(withInterceptors([errorInterceptor])),
+          provideHttpClientTesting(),
+          {
+            provide: ActivatedRoute,
+            useValue: { paramMap: of(convertToParamMap({ id: '1' })), queryParamMap: queryParamMap$ },
+          },
+        ],
+      }).compileComponents();
+      const localHttpMock = TestBed.inject(HttpTestingController);
+      vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      localStorage.setItem(
+        'imdb-ui-angular.currentUser',
+        JSON.stringify({ id: 1, username: 'jdoe', email: 'jdoe@example.com', firstName: null, lastName: null }),
+      );
+
+      const fixture = TestBed.createComponent(ResourceDetailComponent);
+      fixture.detectChanges();
+      localHttpMock.expectOne(`${API_BASE_URL}/post-types`).flush([{ id: 5, name: 'racism' }]);
+      localHttpMock.expectOne((r) => r.url === `${API_BASE_URL}/resources/1`).flush(RESOURCE);
+      localHttpMock.expectOne((r) => r.url === `${API_BASE_URL}/resources/1/posts`).flush({
+        content: DEFAULT_TOP_LEVEL_POSTS,
+        totalElements: 1,
+        totalPages: 1,
+        number: 0,
+        size: 20,
+      });
+      fixture.detectChanges();
+
+      queryParamMap$.next(convertToParamMap({ highlight: '42' }));
+      TestBed.tick(); // flush the highlight-applying effect
+      expect(fixture.componentInstance.highlightedPostId()).toBe(42);
+
+      // A second drill-down target on the same already-loaded resource.
+      queryParamMap$.next(convertToParamMap({}));
+      queryParamMap$.next(convertToParamMap({ highlight: '42' }));
+      TestBed.tick();
+      expect(fixture.componentInstance.highlightedPostId()).toBe(42);
+
+      localHttpMock.verify();
     });
   });
 });

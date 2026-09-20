@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   AbstractControl,
   FormControl,
@@ -20,6 +20,7 @@ import { Resource, ResourceService } from '../../api/resource.service';
 import { PostType } from '../../api/post-flag.service';
 import { PostTypeService } from '../../api/post-type.service';
 import { AutofocusDirective } from '../../shared/autofocus.directive';
+import { ScrollIntoViewOnDirective } from '../../shared/scroll-into-view-on.directive';
 
 /**
  * One row of the per-movie flag summary. `averageScore` is `null` for
@@ -41,6 +42,9 @@ const MAX_POST_COLUMN_PX = 640;
 const DEFAULT_POST_COLUMN_PX = 320;
 const POST_COLUMN_STORAGE_KEY = 'imdb-ui-angular.post-column-width';
 const COLUMN_KEYBOARD_STEP_PX = 20;
+
+// How long a drilled-into post/reply row stays visually highlighted.
+const HIGHLIGHT_DURATION_MS = 2500;
 
 // Matches the CSS `line-clamp: 3` on `.body-text--clamped`.
 const CLAMPED_LINES = 3;
@@ -80,13 +84,14 @@ function clampPostColumnWidth(px: number): number {
  */
 @Component({
   selector: 'app-resource-detail',
-  imports: [DatePipe, DecimalPipe, RouterLink, ReactiveFormsModule, AutofocusDirective],
+  imports: [DatePipe, DecimalPipe, RouterLink, ReactiveFormsModule, AutofocusDirective, ScrollIntoViewOnDirective],
   templateUrl: './resource-detail.component.html',
   styleUrl: './resource-detail.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ResourceDetailComponent {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly resourceService = inject(ResourceService);
   private readonly postService = inject(PostService);
   private readonly postTypeService = inject(PostTypeService);
@@ -169,6 +174,15 @@ export class ResourceDetailComponent {
   private columnDragStartX = 0;
   private columnDragStartWidth = 0;
 
+  // Drilling in from the "My Posts" panel: briefly highlights and scrolls
+  // to one specific post/reply row, then clears itself.
+  readonly highlightedPostId = signal<number | null>(null);
+  // Set from a highlight/parent query param, consumed once posts have
+  // finished loading (see the effect below) — kept separate from
+  // highlightedPostId itself since applying it may need a network round
+  // trip first (ensureHighlightTargetLoaded's larger-page fallback).
+  private readonly pendingHighlight = signal<{ postId: number; parentId: number | null } | null>(null);
+
   constructor() {
     this.route.paramMap
       .pipe(
@@ -176,6 +190,34 @@ export class ResourceDetailComponent {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((id) => this.load(id));
+
+    // A *separate* subscription from paramMap above: clicking another
+    // post/reply for the movie you're already viewing only changes query
+    // params, not the path's :id segment, and paramMap does not re-emit for
+    // that (Angular only re-emits it on a genuine path-param change) — so
+    // without this, drilling into a second post on an already-open movie
+    // page would silently do nothing.
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((queryParams) => {
+      if (!queryParams.has('highlight')) {
+        // Also fires (harmlessly) from this component's own cleanup
+        // navigation below, once the params it's clearing are gone.
+        return;
+      }
+      const postId = Number(queryParams.get('highlight'));
+      const parentId = queryParams.has('parent') ? Number(queryParams.get('parent')) : null;
+      this.pendingHighlight.set({ postId, parentId });
+    });
+
+    effect(() => {
+      const pending = this.pendingHighlight();
+      // Waits for the current resource's posts to finish loading — covers
+      // both a fresh navigation (loading starts true) and re-highlighting
+      // on an already-loaded page (loading is already false, applies at once).
+      if (pending && !this.loading()) {
+        this.pendingHighlight.set(null);
+        this.ensureHighlightTargetLoaded(this.resourceId, pending.postId, pending.parentId);
+      }
+    });
 
     this.postTypeService
       .listAll()
@@ -471,6 +513,7 @@ export class ResourceDetailComponent {
     this.resourceId = id;
     this.loading.set(true);
     this.loadError.set(null);
+    this.highlightedPostId.set(null);
 
     this.resourceService
       .get(id)
@@ -495,6 +538,54 @@ export class ResourceDetailComponent {
           this.loading.set(false);
         },
       });
+  }
+
+  /**
+   * The default page is only the 20 most recent top-level posts, which can
+   * miss a drill-down target on a busy movie (either the target itself, for
+   * a top-level post, or its parent, for a reply). Re-fetch a much larger
+   * page — matching the "just get basically everything" convention
+   * rankings-panel already uses for its own severity check — rather than
+   * silently doing nothing.
+   */
+  private ensureHighlightTargetLoaded(resourceId: number, postId: number, parentId: number | null): void {
+    const idThatMustBeLoaded = parentId ?? postId;
+    if (this.posts().some((p) => p.id === idThatMustBeLoaded)) {
+      this.highlightPost(postId, parentId);
+      return;
+    }
+    this.postService
+      .listTopLevel(resourceId, 0, 200)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (page) => {
+          this.posts.set(page.content);
+          this.highlightPost(postId, parentId);
+        },
+        // Best-effort — if it's still not there, just skip the highlight
+        // rather than leaving the page stuck waiting for one.
+        error: () => {},
+      });
+  }
+
+  /**
+   * A reply isn't in `posts` (it's fetched lazily per-post), so a reply
+   * target expands its parent's thread first — the row then mounts once
+   * replies finish loading, and appScrollIntoViewOn picks it up from there.
+   */
+  private highlightPost(postId: number, parentId: number | null): void {
+    if (parentId !== null && !this.isExpanded(parentId)) {
+      this.toggleExpand(parentId);
+    }
+    this.highlightedPostId.set(postId);
+    const timeoutId = setTimeout(() => this.highlightedPostId.set(null), HIGHLIGHT_DURATION_MS);
+    this.destroyRef.onDestroy(() => clearTimeout(timeoutId));
+
+    // Drop the highlight/parent query params so a refresh doesn't
+    // re-trigger this and the URL doesn't stay cluttered. Done here (async,
+    // well after the original navigation settled) rather than synchronously
+    // inside the paramMap subscriber that's still resolving it.
+    this.router.navigate(['/resources', this.resourceId], { replaceUrl: true });
   }
 }
 

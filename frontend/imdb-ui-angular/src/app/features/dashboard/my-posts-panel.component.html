@@ -25,10 +25,17 @@
               @if (isPostGroupExpanded(group.resourceId)) {
                 <ul class="tree-children">
                   @for (post of group.posts; track post.id) {
-                    <li>
+                    <li
+                      class="post-entry"
+                      tabindex="0"
+                      role="button"
+                      title="Jump to this post on its movie's page"
+                      (click)="goToPost(post)"
+                      (keydown.enter)="goToPost(post)"
+                    >
                       <p class="body-text" [class.body-text--clamped]="isLongPost(post.bodyText) && !isBodyExpanded(post.id)">{{ post.bodyText }}</p>
                       @if (isLongPost(post.bodyText)) {
-                        <button type="button" class="link-button body-toggle" (click)="toggleBodyExpand(post.id)">
+                        <button type="button" class="link-button body-toggle" (click)="toggleBodyExpand(post.id); $event.stopPropagation()">
                           {{ isBodyExpanded(post.id) ? 'Show less' : '… more' }}
                         </button>
                       }
@@ -66,10 +73,17 @@
               @if (isReplyGroupExpanded(group.resourceId)) {
                 <ul class="tree-children">
                   @for (post of group.posts; track post.id) {
-                    <li>
+                    <li
+                      class="post-entry"
+                      tabindex="0"
+                      role="button"
+                      title="Jump to this post on its movie's page"
+                      (click)="goToPost(post)"
+                      (keydown.enter)="goToPost(post)"
+                    >
                       <p class="body-text" [class.body-text--clamped]="isLongPost(post.bodyText) && !isBodyExpanded(post.id)">{{ post.bodyText }}</p>
                       @if (isLongPost(post.bodyText)) {
-                        <button type="button" class="link-button body-toggle" (click)="toggleBodyExpand(post.id)">
+                        <button type="button" class="link-button body-toggle" (click)="toggleBodyExpand(post.id); $event.stopPropagation()">
                           {{ isBodyExpanded(post.id) ? 'Show less' : '… more' }}
                         </button>
                       }

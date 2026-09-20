@@ -246,6 +246,19 @@ button.sort-button:focus-visible {
   background: var(--color-surface-alt);
 }
 
+/* Drilled in from the "My Posts" panel — briefly flashes, then fades back
+   out over a longer, gentler transition than the quick hover one above. */
+.row-highlighted {
+  background: var(--color-severity-yellow-bg);
+  transition: background-color 1.2s ease-out;
+}
+
+/* Repeating the class outweighs .post-row:hover's specificity, so hovering
+   a highlighted row doesn't flip it back to the plain hover color. */
+.row-highlighted.row-highlighted:hover {
+  background: var(--color-severity-yellow-bg);
+}
+
 /* Rotates into a "expanded" caret purely with CSS — no extra glyph swap needed. */
 .expand-icon {
   display: inline-block;
@@ -263,7 +276,10 @@ button.sort-button:focus-visible {
   font-size: 0.75rem;
 }
 
-.detail-row td {
+/* Direct child only — a plain descendant selector here would also paint
+   the nested replies-table's own <td> cells, masking things like a reply
+   row's .row-highlighted background underneath. */
+.detail-row > td {
   background: var(--color-surface-alt);
 }
 

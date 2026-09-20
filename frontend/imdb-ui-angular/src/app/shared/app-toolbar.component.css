@@ -91,3 +91,22 @@
   color: var(--color-primary-hover);
   text-decoration: underline;
 }
+
+.back-to-top {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  padding: 0.3rem 0.8rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.back-to-top:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+}
