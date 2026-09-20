@@ -9,6 +9,41 @@ h2 {
   border-bottom: 2px solid var(--color-primary-light);
 }
 
+.section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* :not(:disabled) isn't semantically needed (this button is never disabled)
+   — it's there so this beats the global button:hover:not(:disabled) rule's
+   specificity and actually resets the background, matching the fix used in
+   resource-detail.component.css. */
+.section-toggle:hover:not(:disabled),
+.section-toggle:focus-visible {
+  background: none;
+  color: var(--color-primary);
+}
+
+.section-caret {
+  display: inline-block;
+  color: var(--color-primary);
+  font-size: 0.8rem;
+  transition: transform var(--transition-fast);
+}
+
+.section-caret--open {
+  transform: rotate(90deg);
+}
+
 .tree {
   list-style: none;
   padding: 0;
@@ -86,6 +121,41 @@ h2 {
 
 .tree-children li p {
   margin: 0 0 0.25rem;
+}
+
+.body-text--clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
+.body-toggle {
+  display: block;
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+}
+
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-primary);
+  font-size: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* :not(:disabled) isn't semantically needed (this button is never disabled)
+   — it's there so this beats the global button:hover:not(:disabled) rule's
+   specificity and actually resets the background, matching the fix used in
+   resource-detail.component.css. */
+.link-button:hover:not(:disabled) {
+  background: none;
+  color: var(--color-primary-hover);
+  text-decoration: underline;
 }
 
 time {

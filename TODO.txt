@@ -15,15 +15,35 @@
    X-- better css
    X-- sortable tables (descending first)
    X-- make post column resizable
+   X-- make my posts and my replies collaosable
+   X-- add "...more" to left panel
+   
+   X-- BUG: When i click reply change focus to text box.
+   X-- BUG: pane is not updated when adding new replies
+   X-- also add a cancel reply button (red)?
+   
    -- drill down capabilities on side panels
-   -- BUG: When i click reply change focus to text box.
+   
+   -- Scrollable table header?
+   -- When a user scrolls down, can you maintain "back to search" and "back to top" links?
    -- make search ajaxable
-   -- make my posts and my replies collaosable
+   -- BUG: on multi text, click reply doesnt scroll down to text box.
+   -- Add back/forward buttons
 
+   -- Load imdb data, but ignore when primaryTitle is prefixed with Episode #   
 
    -- restructure code to be easily configurable by domain.
+   -- organize app/api package
 
 
    --- LLM Service API???
 
    
+
+
+   TODO application:
+      - Resource is todo item
+      - post-categories:
+                Waiting
+                In-Progress
+                Done

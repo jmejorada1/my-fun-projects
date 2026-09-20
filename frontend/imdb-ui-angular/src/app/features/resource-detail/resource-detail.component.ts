@@ -1,20 +1,25 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  AbstractControl,
+  FormControl,
+  FormGroup,
+  ReactiveFormsModule,
+  ValidationErrors,
+  Validators,
+} from '@angular/forms';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 import { AuthService } from '../../core/auth.service';
 import { AppHttpError } from '../../core/error.interceptor';
-import {
-  NO_BIGOTRY_TYPE_NAME,
-  SEVERE_SCORE_THRESHOLD,
-  flagSeverityClass as computeFlagSeverityClass,
-} from '../../core/post-type.constants';
+import { PostActivityService } from '../../core/post-activity.service';
+import { NO_BIGOTRY_TYPE_NAME, flagSeverityClass as computeFlagSeverityClass } from '../../core/post-type.constants';
 import { Post, PostService } from '../../api/post.service';
 import { Resource, ResourceService } from '../../api/resource.service';
 import { PostType } from '../../api/post-flag.service';
 import { PostTypeService } from '../../api/post-type.service';
+import { AutofocusDirective } from '../../shared/autofocus.directive';
 
 /**
  * One row of the per-movie flag summary. `averageScore` is `null` for
@@ -44,6 +49,11 @@ const CLAMPED_LINES = 3;
 // resizable Post column instead of using one fixed, width-blind threshold.
 const AVG_CHAR_WIDTH_PX = 6;
 
+/** Validators.required alone treats "   " as non-empty — this rejects whitespace-only text too. */
+function requiredNonBlank(control: AbstractControl<string>): ValidationErrors | null {
+  return control.value?.trim().length ? null : { required: true };
+}
+
 function loadStoredPostColumnWidth(): number | null {
   try {
     const raw = localStorage.getItem(POST_COLUMN_STORAGE_KEY);
@@ -70,7 +80,7 @@ function clampPostColumnWidth(px: number): number {
  */
 @Component({
   selector: 'app-resource-detail',
-  imports: [DatePipe, DecimalPipe, RouterLink, ReactiveFormsModule],
+  imports: [DatePipe, DecimalPipe, RouterLink, ReactiveFormsModule, AutofocusDirective],
   templateUrl: './resource-detail.component.html',
   styleUrl: './resource-detail.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -81,6 +91,7 @@ export class ResourceDetailComponent {
   private readonly postService = inject(PostService);
   private readonly postTypeService = inject(PostTypeService);
   private readonly auth = inject(AuthService);
+  private readonly postActivity = inject(PostActivityService);
   private readonly destroyRef = inject(DestroyRef);
 
   private resourceId = 0;
@@ -104,30 +115,16 @@ export class ResourceDetailComponent {
   });
 
   readonly form = new FormGroup({
-    bodyText: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
-    postTypeId: new FormControl<number | null>(null),
-    score: new FormControl<number | null>(null),
+    bodyText: new FormControl('', { nonNullable: true, validators: [requiredNonBlank] }),
+    postTypeId: new FormControl<number | null>(null, { validators: [Validators.required] }),
+    score: new FormControl<number | null>(null, { validators: [Validators.required] }),
   });
   readonly selectedPostTypeId = toSignal(this.form.controls.postTypeId.valueChanges, { initialValue: null });
   readonly isNoBigotrySelected = computed(() => {
     const id = this.selectedPostTypeId();
     return id !== null && this.postTypes().find((t) => t.id === id)?.name === NO_BIGOTRY_TYPE_NAME;
   });
-  /**
-   * Purely a frontend rule — the backend's post_type list has no concept of
-   * "no-bigotry" or of one category depending on another's flags, it's
-   * just lookup data. This resource's already-loaded top-level posts (the
-   * only kind that can carry a flag through this UI — replies have no
-   * category/score fields) are enough to decide it without a new endpoint.
-   */
-  readonly hasSevereFlag = computed(() =>
-    this.posts().some((post) => post.flags.some((flag) => flag.score >= SEVERE_SCORE_THRESHOLD)),
-  );
-  readonly visiblePostTypes = computed(() => {
-    const types = this.postTypes();
-    return this.hasSevereFlag() ? types.filter((t) => t.name !== NO_BIGOTRY_TYPE_NAME) : types;
-  });
-  /** This movie's flags grouped by category — same top-level-posts-only data as hasSevereFlag. */
+  /** This movie's flags grouped by category — same top-level-posts-only data used elsewhere on this page. */
   readonly categorySummary = computed<CategorySummaryEntry[]>(() => {
     const totals = new Map<string, { total: number; count: number }>();
     for (const post of this.posts()) {
@@ -185,7 +182,8 @@ export class ResourceDetailComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (types) => this.postTypes.set(types),
-        // Not fatal — plain-text posting still works without the flag dropdown.
+        // A category is required to post at all, so an empty list here just
+        // means the form can't be submitted until it loads successfully.
         error: () => this.postTypes.set([]),
       });
 
@@ -203,15 +201,6 @@ export class ResourceDetailComponent {
         scoreControl.setValue(null);
       }
     });
-
-    // If a newly-added post makes this movie ineligible for "No Bigotry"
-    // while it's still selected (e.g. two posts submitted back to back),
-    // clear the now-hidden selection rather than silently submitting it.
-    effect(() => {
-      if (this.hasSevereFlag() && this.isNoBigotrySelected()) {
-        this.form.controls.postTypeId.setValue(null);
-      }
-    });
   }
 
   submit(): void {
@@ -221,11 +210,11 @@ export class ResourceDetailComponent {
       return;
     }
 
+    // postTypeId and score are both required (form.invalid catches a
+    // missing one above), except when score is disabled — the "No Bigotry"
+    // auto-set-to-0 case — where getRawValue() still returns its real
+    // value even though a disabled control is excluded from form.invalid.
     const { bodyText, postTypeId, score } = this.form.getRawValue();
-    if ((postTypeId == null) !== (score == null)) {
-      this.submitError.set('Pick a category and a score together, or leave both blank.');
-      return;
-    }
 
     this.submitting.set(true);
     this.submitError.set(null);
@@ -233,7 +222,7 @@ export class ResourceDetailComponent {
       .create({
         username: user.username,
         resourceId: this.resourceId,
-        bodyText,
+        bodyText: bodyText.trim(),
         postTypeId: postTypeId ?? undefined,
         score: score ?? undefined,
       })
@@ -246,6 +235,9 @@ export class ResourceDetailComponent {
           const flags = response.flag ? [response.flag] : [];
           this.posts.update((posts) => [...posts, { ...response.post, flags }]);
           this.form.reset({ bodyText: '', postTypeId: null, score: null });
+          // The side panels (my-posts-panel, rankings-panel) load once and
+          // stay mounted across navigation — nudge them to refetch.
+          this.postActivity.notifyPostOrReplyCreated();
         },
         error: (err: unknown) => {
           this.submitError.set(err instanceof AppHttpError ? err.message : 'Failed to create post.');
@@ -343,10 +335,16 @@ export class ResourceDetailComponent {
   getReplyControl(postId: number): FormControl<string> {
     let control = this.replyControls.get(postId);
     if (!control) {
-      control = new FormControl('', { nonNullable: true, validators: [Validators.required] });
+      control = new FormControl('', { nonNullable: true, validators: [requiredNonBlank] });
       this.replyControls.set(postId, control);
     }
     return control;
+  }
+
+  /** True once the user has tried to submit a blank reply — drives the inline error message. */
+  isReplyInvalid(postId: number): boolean {
+    const control = this.getReplyControl(postId);
+    return control.invalid && control.touched;
   }
 
   repliesFor(postId: number): Post[] {
@@ -439,7 +437,7 @@ export class ResourceDetailComponent {
     this.replySubmittingPostId.set(postId);
     this.replyError.set(null);
     this.postService
-      .reply(postId, { userId: user.id, bodyText: control.value })
+      .reply(postId, { userId: user.id, bodyText: control.value.trim() })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (reply) => {
@@ -460,6 +458,7 @@ export class ResourceDetailComponent {
           this.openReplyPostId.set(null);
           this.replySubmittingPostId.set(null);
           // Reply — stay on this page, no navigation.
+          this.postActivity.notifyPostOrReplyCreated();
         },
         error: (err: unknown) => {
           this.replyError.set(err instanceof AppHttpError ? err.message : 'Failed to post reply.');

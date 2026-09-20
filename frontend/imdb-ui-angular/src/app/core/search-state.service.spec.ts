@@ -53,4 +53,24 @@ describe('SearchStateService', () => {
     expect(service.loading()).toBe(false);
     expect(service.errorMessage()).toBe('boom');
   });
+
+  it('clear() resets back to the pre-search state without calling the backend', () => {
+    service.search('shawshank');
+    httpMock.expectOne((r) => r.url === `${API_BASE_URL}/resources`).flush({
+      content: [{ id: 1, name: 'tt1', displayName: 'The Shawshank Redemption', category: { id: 1, name: 'movie', displayName: 'Movie' } }],
+      totalElements: 1,
+      totalPages: 1,
+      number: 0,
+      size: 20,
+    });
+    expect(service.results().length).toBe(1);
+
+    service.clear();
+
+    expect(service.results()).toEqual([]);
+    expect(service.errorMessage()).toBeNull();
+    expect(service.hasSearched()).toBe(false);
+    expect(service.loading()).toBe(false);
+    httpMock.expectNone(() => true);
+  });
 });

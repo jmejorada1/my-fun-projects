@@ -9,6 +9,7 @@ import { of } from 'rxjs';
 import { ResourceDetailComponent } from './resource-detail.component';
 import { API_BASE_URL } from '../../core/api-config';
 import { errorInterceptor } from '../../core/error.interceptor';
+import { PostActivityService } from '../../core/post-activity.service';
 
 const RESOURCE = {
   id: 1,
@@ -227,50 +228,81 @@ describe('ResourceDetailComponent', () => {
     expect(fixture.componentInstance.form.controls.score.value).toBeNull();
   });
 
-  it('hides "No Bigotry" from the category dropdown when the movie has a flag with severity >= 3', async () => {
-    // DEFAULT_TOP_LEVEL_POSTS carries a racism flag scored 4.
+  it('always shows "No Bigotry" in the category dropdown, even when the movie has a severe flag', async () => {
+    // DEFAULT_TOP_LEVEL_POSTS carries a racism flag scored 4 — "No Bigotry"
+    // must still be selectable; only the rankings panel excludes a movie
+    // from its own "No Bigotry" ranking for having a severe flag elsewhere.
     const fixture = await createComponent(undefined, [{ id: 5, name: 'racism' }, { id: 6, name: 'no-bigotry' }]);
 
-    expect(fixture.componentInstance.hasSevereFlag()).toBe(true);
-    expect(fixture.componentInstance.visiblePostTypes().map((t) => t.name)).toEqual(['racism']);
     const options = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll('select[formControlName="postTypeId"] option'),
     ).map((o) => o.textContent?.trim());
-    expect(options).not.toContain('no-bigotry');
+    expect(options).toContain('no-bigotry');
   });
 
-  it('shows "No Bigotry" in the category dropdown when the movie has no severe flags', async () => {
-    const fixture = await createComponent([], [{ id: 5, name: 'racism' }, { id: 6, name: 'no-bigotry' }]);
+  it('requires a category to be picked before submitting', async () => {
+    const fixture = await createComponent();
+    fixture.componentInstance.form.setValue({ bodyText: 'hello', postTypeId: null, score: null });
 
-    expect(fixture.componentInstance.hasSevereFlag()).toBe(false);
-    expect(fixture.componentInstance.visiblePostTypes().map((t) => t.name)).toEqual(['racism', 'no-bigotry']);
+    fixture.componentInstance.submit();
+
+    httpMock.expectNone((r) => r.url === `${API_BASE_URL}/posts`);
+    expect(fixture.componentInstance.form.invalid).toBe(true);
   });
 
-  it('clears an already-selected "No Bigotry" if a new severe flag makes it newly ineligible', async () => {
-    const fixture = await createComponent([], [{ id: 5, name: 'racism' }, { id: 6, name: 'no-bigotry' }]);
-
-    fixture.componentInstance.form.controls.postTypeId.setValue(6);
-    fixture.detectChanges();
-    expect(fixture.componentInstance.isNoBigotrySelected()).toBe(true);
-
-    // Simulate a severe flag having just been loaded/added for this movie.
-    fixture.componentInstance.posts.set([
-      { id: 99, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'Bad.', data: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', flags: [{ id: 2, postId: 99, postType: { id: 5, name: 'racism' }, score: 5, createdAt: '', updatedAt: '' }], replyCount: 0, resourceDisplayName: 'Carmencita' },
-    ]);
-    fixture.detectChanges();
-
-    expect(fixture.componentInstance.selectedPostTypeId()).toBeNull();
-    expect(fixture.componentInstance.isNoBigotrySelected()).toBe(false);
-  });
-
-  it('rejects a category without a score', async () => {
+  it('requires a severity to be picked once a (non-"No Bigotry") category is chosen', async () => {
     const fixture = await createComponent();
     fixture.componentInstance.form.setValue({ bodyText: 'hello', postTypeId: 5, score: null });
 
     fixture.componentInstance.submit();
 
     httpMock.expectNone((r) => r.url === `${API_BASE_URL}/posts`);
-    expect(fixture.componentInstance.submitError()).toContain('together');
+    expect(fixture.componentInstance.form.invalid).toBe(true);
+  });
+
+  it('rejects a whitespace-only post body', async () => {
+    const fixture = await createComponent();
+    fixture.componentInstance.form.setValue({ bodyText: '   ', postTypeId: 5, score: 4 });
+
+    fixture.componentInstance.submit();
+
+    httpMock.expectNone((r) => r.url === `${API_BASE_URL}/posts`);
+    expect(fixture.componentInstance.form.controls.bodyText.invalid).toBe(true);
+  });
+
+  it('trims the post body before sending it to the backend', async () => {
+    const fixture = await createComponent();
+    fixture.componentInstance.form.setValue({ bodyText: '  Worth flagging.  ', postTypeId: 5, score: 4 });
+
+    fixture.componentInstance.submit();
+
+    const req = httpMock.expectOne(`${API_BASE_URL}/posts`);
+    expect(req.request.body.bodyText).toBe('Worth flagging.');
+    req.flush({
+      post: { id: 99, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'Worth flagging.', data: null, createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
+      flag: { id: 1, postId: 99, postType: { id: 5, name: 'racism' }, score: 4 },
+    });
+  });
+
+  it('shows inline errors only after a blocked submit attempt, and clears them once fixed', async () => {
+    const fixture = await createComponent([], []);
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.textContent).not.toContain('Write something before posting.');
+    expect(el.textContent).not.toContain('Choose a category.');
+
+    fixture.componentInstance.submit();
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('Write something before posting.');
+    expect(el.textContent).toContain('Choose a category.');
+
+    fixture.componentInstance.form.controls.bodyText.setValue('Now filled in.');
+    fixture.detectChanges();
+
+    expect(el.textContent).not.toContain('Write something before posting.');
+    // Category is still unset — that error should remain.
+    expect(el.textContent).toContain('Choose a category.');
   });
 
   it('creates a top-level post via the unified endpoint and stays on the page, showing it immediately', async () => {
@@ -304,9 +336,9 @@ describe('ResourceDetailComponent', () => {
   });
 
   it('treats score 0 (neutral) as provided, not as missing', async () => {
-    // Regression guard: the pairing check must compare against null, not
-    // truthiness — `0` is a valid, falsy score (design-spec.md decision #12
-    // equivalent on the backend) and must not be rejected as "missing."
+    // Regression guard: Validators.required must not treat a valid, falsy
+    // `0` score as "missing" (design-spec.md decision #12 equivalent on the
+    // backend) the way a naive truthiness check would.
     const fixture = await createComponent();
     fixture.componentInstance.form.setValue({ bodyText: 'Neutral on this one.', postTypeId: 5, score: 0 });
 
@@ -325,24 +357,6 @@ describe('ResourceDetailComponent', () => {
       post: { id: 101, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'Neutral on this one.', data: null, createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
       flag: { id: 2, postId: 101, postType: { id: 5, name: 'racism' }, score: 0 },
     });
-  });
-
-  it('creates a plain top-level post with no flag when neither field is set', async () => {
-    const fixture = await createComponent();
-    const navigateSpy = vi.spyOn(router, 'navigateByUrl');
-    fixture.componentInstance.form.setValue({ bodyText: 'Just a comment.', postTypeId: null, score: null });
-
-    fixture.componentInstance.submit();
-
-    const req = httpMock.expectOne(`${API_BASE_URL}/posts`);
-    expect(req.request.body).toEqual({ username: 'jdoe', resourceId: 1, bodyText: 'Just a comment.' });
-    req.flush({
-      post: { id: 100, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'Just a comment.', data: null, createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
-      flag: null,
-    });
-
-    expect(navigateSpy).not.toHaveBeenCalled();
-    expect(fixture.componentInstance.posts().find((p) => p.id === 100)?.flags).toEqual([]);
   });
 
   it('posts a reply to an existing post and stays on the page — no navigation', async () => {
@@ -382,6 +396,37 @@ describe('ResourceDetailComponent', () => {
     expect(fixture.componentInstance.repliesFor(42)[0].bodyText).toBe('I agree.');
     // The reply form collapses back after a successful post.
     expect(fixture.componentInstance.openReplyPostId()).toBeNull();
+  });
+
+  it('focuses the reply textarea when the reply form opens', async () => {
+    const fixture = await createComponent();
+
+    fixture.componentInstance.toggleReply(42);
+    httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/42/replies` && r.method === 'GET').flush({
+      content: [], totalElements: 0, totalPages: 0, number: 0, size: 50,
+    });
+    fixture.detectChanges();
+
+    const textarea = (fixture.nativeElement as HTMLElement).querySelector('.reply-form textarea');
+    expect(document.activeElement).toBe(textarea);
+  });
+
+  it('closes the reply form via the "Cancel Reply" button', async () => {
+    const fixture = await createComponent();
+
+    fixture.componentInstance.toggleReply(42);
+    httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/42/replies` && r.method === 'GET').flush({
+      content: [], totalElements: 0, totalPages: 0, number: 0, size: 50,
+    });
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.reply-form')).toBeTruthy();
+
+    (el.querySelector('.cancel-reply-button') as HTMLElement).click();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.openReplyPostId()).toBeNull();
+    expect(el.querySelector('.reply-form')).toBeNull();
   });
 
   it('bumps replyCount locally so the expand caret appears without a page reload', async () => {
@@ -425,6 +470,54 @@ describe('ResourceDetailComponent', () => {
     fixture.componentInstance.submitReply(42);
 
     httpMock.expectNone((r) => r.url === `${API_BASE_URL}/posts/42/replies` && r.method === 'POST');
+  });
+
+  it('does not submit a whitespace-only reply', async () => {
+    const fixture = await createComponent();
+
+    fixture.componentInstance.toggleReply(42);
+    httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/42/replies` && r.method === 'GET').flush({
+      content: [], totalElements: 0, totalPages: 0, number: 0, size: 50,
+    });
+    fixture.componentInstance.getReplyControl(42).setValue('   ');
+    fixture.componentInstance.submitReply(42);
+
+    httpMock.expectNone((r) => r.url === `${API_BASE_URL}/posts/42/replies` && r.method === 'POST');
+    expect(fixture.componentInstance.isReplyInvalid(42)).toBe(true);
+  });
+
+  it('trims a reply before sending it to the backend', async () => {
+    const fixture = await createComponent();
+
+    fixture.componentInstance.toggleReply(42);
+    httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/42/replies` && r.method === 'GET').flush({
+      content: [], totalElements: 0, totalPages: 0, number: 0, size: 50,
+    });
+    fixture.componentInstance.getReplyControl(42).setValue('  I agree.  ');
+    fixture.componentInstance.submitReply(42);
+
+    const req = httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/42/replies` && r.method === 'POST');
+    expect(req.request.body.bodyText).toBe('I agree.');
+  });
+
+  it('shows the reply error inline only after a blocked submit attempt', async () => {
+    const fixture = await createComponent();
+
+    fixture.componentInstance.toggleReply(42);
+    httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/42/replies` && r.method === 'GET').flush({
+      content: [], totalElements: 0, totalPages: 0, number: 0, size: 50,
+    });
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).not.toContain('Write something before posting a reply.');
+
+    fixture.componentInstance.submitReply(42);
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Write something before posting a reply.');
+
+    fixture.componentInstance.getReplyControl(42).setValue('Now filled in.');
+    fixture.detectChanges();
+    expect(el.textContent).not.toContain('Write something before posting a reply.');
   });
 
   it('expanding a post row fetches and displays its existing replies', async () => {
@@ -645,6 +738,51 @@ describe('ResourceDetailComponent', () => {
       const fixture = await createComponent();
 
       expect(fixture.componentInstance.postColumnWidth()).toBe(500);
+    });
+  });
+
+  describe('notifying the side panels', () => {
+    it('notifies PostActivityService after creating a top-level post', async () => {
+      const fixture = await createComponent();
+      const notifySpy = vi.spyOn(TestBed.inject(PostActivityService), 'notifyPostOrReplyCreated');
+      fixture.componentInstance.form.setValue({ bodyText: 'Worth flagging.', postTypeId: 5, score: 4 });
+
+      fixture.componentInstance.submit();
+      httpMock.expectOne(`${API_BASE_URL}/posts`).flush({
+        post: { id: 99, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'Worth flagging.', data: null, createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
+        flag: { id: 1, postId: 99, postType: { id: 5, name: 'racism' }, score: 4 },
+      });
+
+      expect(notifySpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('notifies PostActivityService after posting a reply', async () => {
+      const fixture = await createComponent();
+      const notifySpy = vi.spyOn(TestBed.inject(PostActivityService), 'notifyPostOrReplyCreated');
+
+      fixture.componentInstance.toggleReply(42);
+      httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/42/replies` && r.method === 'GET').flush({
+        content: [], totalElements: 0, totalPages: 0, number: 0, size: 50,
+      });
+      fixture.componentInstance.getReplyControl(42).setValue('I agree.');
+      fixture.componentInstance.submitReply(42);
+      httpMock.expectOne(`${API_BASE_URL}/posts/42/replies`).flush({
+        id: 200, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: 42, bodyText: 'I agree.', data: null,
+        createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita',
+      });
+
+      expect(notifySpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not notify on a failed post submission', async () => {
+      const fixture = await createComponent();
+      const notifySpy = vi.spyOn(TestBed.inject(PostActivityService), 'notifyPostOrReplyCreated');
+      fixture.componentInstance.form.setValue({ bodyText: 'Worth flagging.', postTypeId: 5, score: 4 });
+
+      fixture.componentInstance.submit();
+      httpMock.expectOne(`${API_BASE_URL}/posts`).flush({ detail: 'boom' }, { status: 500, statusText: 'Server Error' });
+
+      expect(notifySpy).not.toHaveBeenCalled();
     });
   });
 });

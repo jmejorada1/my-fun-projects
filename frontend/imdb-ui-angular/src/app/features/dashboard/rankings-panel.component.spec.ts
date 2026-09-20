@@ -7,6 +7,7 @@ import {
 import { RankingsPanelComponent } from './rankings-panel.component';
 import { API_BASE_URL } from '../../core/api-config';
 import { errorInterceptor } from '../../core/error.interceptor';
+import { PostActivityService } from '../../core/post-activity.service';
 
 describe('RankingsPanelComponent', () => {
   let httpMock: HttpTestingController;
@@ -115,5 +116,29 @@ describe('RankingsPanelComponent', () => {
       .flush({ detail: 'boom' }, { status: 500, statusText: 'Server Error' });
 
     expect(fixture.componentInstance.errorMessage()).toBe('boom');
+  });
+
+  it('refetches when notified of a new post/reply elsewhere in the app', () => {
+    const fixture = TestBed.createComponent(RankingsPanelComponent);
+    // Flushes toObservable()'s initial replay of the signal's current value
+    // — otherwise it and the real change below would coalesce into a single
+    // effect run by the time the first tick() happens, and skip(1) would
+    // swallow the wrong (only) emission.
+    TestBed.tick();
+
+    httpMock.expectOne(`${API_BASE_URL}/rankings`).flush([{ postType: { id: 1, name: 'racism' }, resources: [] }]);
+    expect(fixture.componentInstance.rankings()[0].resources).toEqual([]);
+
+    TestBed.inject(PostActivityService).notifyPostOrReplyCreated();
+    TestBed.tick(); // flush the effect toObservable() uses internally
+
+    httpMock.expectOne(`${API_BASE_URL}/rankings`).flush([
+      {
+        postType: { id: 1, name: 'racism' },
+        resources: [{ resource: { id: 1, name: 'tt1', displayName: 'A Movie' }, averageScore: 5, flagCount: 1 }],
+      },
+    ]);
+
+    expect(fixture.componentInstance.rankings()[0].resources.length).toBe(1);
   });
 });

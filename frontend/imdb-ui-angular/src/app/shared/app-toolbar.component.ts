@@ -40,7 +40,15 @@ export class AppToolbarComponent {
   }
 
   submitSearch(): void {
-    this.searchState.search(this.searchForm.controls.term.value);
+    const term = this.searchForm.controls.term.value.trim();
+    if (term) {
+      this.searchState.search(term);
+    } else {
+      // A blank submit isn't "search for nothing" — it's "I'm done
+      // searching," so clear back to the pre-search state instead of
+      // hitting the backend with an empty query.
+      this.searchState.clear();
+    }
     // Results only render on the dashboard's center panel — get there if
     // we aren't already, without disturbing an in-progress search.
     if (this.router.url !== '/') {

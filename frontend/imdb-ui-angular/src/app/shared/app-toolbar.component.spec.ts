@@ -156,11 +156,40 @@ describe('AppToolbarComponent', () => {
       const fixture = TestBed.createComponent(AppToolbarComponent);
       fixture.detectChanges();
       const navigateSpy = vi.spyOn(TestBed.inject(Router), 'navigateByUrl');
+      fixture.componentInstance.searchForm.controls.term.setValue('carmencita');
 
       fixture.componentInstance.submitSearch();
 
       expect(navigateSpy).not.toHaveBeenCalled();
       httpMock.expectOne(() => true).flush({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 20 });
+    });
+
+    it('clears search state instead of hitting the backend when the term is blank', () => {
+      const fixture = TestBed.createComponent(AppToolbarComponent);
+      fixture.detectChanges();
+      const searchState = TestBed.inject(SearchStateService);
+      const searchSpy = vi.spyOn(searchState, 'search');
+      const clearSpy = vi.spyOn(searchState, 'clear');
+      fixture.componentInstance.searchForm.controls.term.setValue('');
+
+      fixture.componentInstance.submitSearch();
+
+      expect(searchSpy).not.toHaveBeenCalled();
+      expect(clearSpy).toHaveBeenCalled();
+      httpMock.expectNone(() => true);
+    });
+
+    it('clears search state for a whitespace-only term too', () => {
+      const fixture = TestBed.createComponent(AppToolbarComponent);
+      fixture.detectChanges();
+      const searchState = TestBed.inject(SearchStateService);
+      const searchSpy = vi.spyOn(searchState, 'search');
+      fixture.componentInstance.searchForm.controls.term.setValue('   ');
+
+      fixture.componentInstance.submitSearch();
+
+      expect(searchSpy).not.toHaveBeenCalled();
+      httpMock.expectNone(() => true);
     });
   });
 });

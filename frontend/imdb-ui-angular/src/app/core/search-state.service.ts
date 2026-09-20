@@ -32,4 +32,12 @@ export class SearchStateService {
       },
     });
   }
+
+  /** Back to the pre-search state — used when the search box is submitted empty. */
+  clear(): void {
+    this.results.set([]);
+    this.errorMessage.set(null);
+    this.hasSearched.set(false);
+    this.loading.set(false);
+  }
 }

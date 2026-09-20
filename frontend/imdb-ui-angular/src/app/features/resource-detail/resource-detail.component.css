@@ -347,6 +347,24 @@ button.sort-button:focus-visible {
   margin-top: 0.5rem;
 }
 
+.reply-form-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.cancel-reply-button {
+  background: var(--color-danger);
+}
+
+/* button + :not(:disabled) beats the global button:hover:not(:disabled)
+   rule's specificity and actually applies the darker red, the same trick
+   .link-button and .sort-button use elsewhere in this file. */
+button.cancel-reply-button:hover:not(:disabled),
+button.cancel-reply-button:active:not(:disabled),
+button.cancel-reply-button:focus-visible {
+  background: var(--color-severity-red-text);
+}
+
 .new-post form {
   display: flex;
   flex-direction: column;
