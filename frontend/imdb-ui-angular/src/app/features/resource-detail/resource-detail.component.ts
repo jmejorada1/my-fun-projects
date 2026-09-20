@@ -10,7 +10,7 @@ import {
   Validators,
 } from '@angular/forms';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { map } from 'rxjs';
+import { forkJoin, map } from 'rxjs';
 import { AuthService } from '../../core/auth.service';
 import { AppHttpError } from '../../core/error.interceptor';
 import { PostActivityService } from '../../core/post-activity.service';
@@ -21,6 +21,7 @@ import { PostType } from '../../api/post-flag.service';
 import { PostTypeService } from '../../api/post-type.service';
 import { AutofocusDirective } from '../../shared/autofocus.directive';
 import { ScrollIntoViewOnDirective } from '../../shared/scroll-into-view-on.directive';
+import { AutoOpenDialogDirective } from '../../shared/auto-open-dialog.directive';
 
 /**
  * One row of the per-movie flag summary. `averageScore` is `null` for
@@ -84,7 +85,15 @@ function clampPostColumnWidth(px: number): number {
  */
 @Component({
   selector: 'app-resource-detail',
-  imports: [DatePipe, DecimalPipe, RouterLink, ReactiveFormsModule, AutofocusDirective, ScrollIntoViewOnDirective],
+  imports: [
+    DatePipe,
+    DecimalPipe,
+    RouterLink,
+    ReactiveFormsModule,
+    AutofocusDirective,
+    ScrollIntoViewOnDirective,
+    AutoOpenDialogDirective,
+  ],
   templateUrl: './resource-detail.component.html',
   styleUrl: './resource-detail.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -150,6 +159,21 @@ export class ResourceDetailComponent {
   });
   readonly submitting = signal(false);
   readonly submitError = signal<string | null>(null);
+
+  // Posting a "No Bigotry" flag surfaces the same user's own prior
+  // (now-contradictory) severity-flagged posts on this movie, and vice
+  // versa — posting a severity flag surfaces their prior "no-bigotry"
+  // posts. The two sides are mutually exclusive: either the prior posts go
+  // (confirmRemoveConflictingPosts), or the new one does
+  // (keepPreviousFlags) — never both left standing. conflictDirection just
+  // picks the dialog copy.
+  readonly conflictingPosts = signal<Post[]>([]);
+  readonly conflictDirection = signal<'to-no-bigotry' | 'to-severity' | null>(null);
+  readonly removingConflicts = signal(false);
+  readonly conflictRemovalError = signal<string | null>(null);
+  // The post that was just created and triggered the dialog — deleted if
+  // the user opts to keep their prior flags instead of it.
+  private conflictNewPostId: number | null = null;
 
   // Replies: keyed by the post they're replying to. Only one reply form
   // open at a time, kept simple since there's no requirement yet for
@@ -280,6 +304,11 @@ export class ResourceDetailComponent {
           // The side panels (my-posts-panel, rankings-panel) load once and
           // stay mounted across navigation — nudge them to refetch.
           this.postActivity.notifyPostOrReplyCreated();
+
+          if (response.flag) {
+            const direction = response.flag.postType.name === NO_BIGOTRY_TYPE_NAME ? 'to-no-bigotry' : 'to-severity';
+            this.checkForConflictingPosts(response.post.userId, response.post.id, direction);
+          }
         },
         error: (err: unknown) => {
           this.submitError.set(err instanceof AppHttpError ? err.message : 'Failed to create post.');
@@ -587,6 +616,138 @@ export class ResourceDetailComponent {
     // inside the paramMap subscriber that's still resolving it.
     this.router.navigate(['/resources', this.resourceId], { replaceUrl: true });
   }
+
+  /**
+   * The default page (20 most recent) may not include everything this user
+   * has ever posted on this movie — fetch a much larger page (the same
+   * "just get basically everything" convention used elsewhere) so the
+   * conflict list is actually complete, not just "whatever happened to be
+   * loaded already."
+   */
+  private checkForConflictingPosts(
+    userId: number,
+    excludePostId: number,
+    direction: 'to-no-bigotry' | 'to-severity',
+  ): void {
+    this.postService
+      .listTopLevel(this.resourceId, 0, 200)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (page) => {
+          const isConflicting =
+            direction === 'to-no-bigotry' ? hasNonNoBigotryFlag : hasNoBigotryFlag;
+          const conflicts = findConflictingPosts(page.content, userId, excludePostId, isConflicting);
+          if (conflicts.length > 0) {
+            this.conflictDirection.set(direction);
+            this.conflictingPosts.set(conflicts);
+            this.conflictNewPostId = excludePostId;
+          }
+        },
+        // Best-effort — the new post already succeeded either way; if this
+        // check itself fails, just skip the prompt rather than block on it.
+        error: () => {},
+      });
+  }
+
+  /**
+   * The other half of the mutually-exclusive choice: keeps the prior posts
+   * standing and deletes the one just created instead (also cascading to
+   * any reply it may have already picked up in the meantime).
+   */
+  keepPreviousFlags(): void {
+    const user = this.auth.currentUser();
+    const newPostId = this.conflictNewPostId;
+    if (!user || newPostId === null || this.removingConflicts()) {
+      return;
+    }
+
+    this.removingConflicts.set(true);
+    this.conflictRemovalError.set(null);
+    this.postService
+      .delete(newPostId, user.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.posts.update((all) => all.filter((post) => post.id !== newPostId));
+          this.closeConflictDialog();
+          this.postActivity.notifyPostOrReplyCreated();
+        },
+        error: (err: unknown) => {
+          this.conflictRemovalError.set(
+            err instanceof AppHttpError ? err.message : 'Failed to discard the new post.',
+          );
+          this.removingConflicts.set(false);
+        },
+      });
+  }
+
+  private closeConflictDialog(): void {
+    this.conflictingPosts.set([]);
+    this.conflictDirection.set(null);
+    this.conflictNewPostId = null;
+    this.removingConflicts.set(false);
+    this.conflictRemovalError.set(null);
+  }
+
+  /**
+   * Deletes every listed post in one batch. Each DELETE cascades server-side
+   * to that post's entire reply subtree — including replies from other
+   * users, since the cascade walks the reply tree, not authorship (the
+   * dialog says as much before this is ever called).
+   */
+  confirmRemoveConflictingPosts(): void {
+    const user = this.auth.currentUser();
+    const posts = this.conflictingPosts();
+    if (!user || posts.length === 0 || this.removingConflicts()) {
+      return;
+    }
+
+    this.removingConflicts.set(true);
+    this.conflictRemovalError.set(null);
+    forkJoin(posts.map((post) => this.postService.delete(post.id, user.id)))
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          const removedIds = new Set(posts.map((post) => post.id));
+          this.posts.update((all) => all.filter((post) => !removedIds.has(post.id)));
+          this.closeConflictDialog();
+          // Rankings/side panels may have depended on the flags that just
+          // disappeared with these posts.
+          this.postActivity.notifyPostOrReplyCreated();
+        },
+        error: (err: unknown) => {
+          this.conflictRemovalError.set(
+            err instanceof AppHttpError ? err.message : 'Failed to remove one or more posts.',
+          );
+          this.removingConflicts.set(false);
+        },
+      });
+  }
+}
+
+/** Any score counts, including 0 (neutral): it's the *category* that contradicts "no bigotry," not the severity. */
+function hasNonNoBigotryFlag(post: Post): boolean {
+  return post.flags.some((flag) => flag.postType.name !== NO_BIGOTRY_TYPE_NAME);
+}
+
+function hasNoBigotryFlag(post: Post): boolean {
+  return post.flags.some((flag) => flag.postType.name === NO_BIGOTRY_TYPE_NAME);
+}
+
+/**
+ * This user's other top-level posts on this movie that now contradict the
+ * flag they just posted — either their prior severity-flagged posts (after
+ * posting "no-bigotry") or their prior "no-bigotry" posts (after posting a
+ * severity flag), depending on `isConflicting`. Candidates to offer
+ * removing, not removed automatically.
+ */
+function findConflictingPosts(
+  posts: Post[],
+  userId: number,
+  excludePostId: number,
+  isConflicting: (post: Post) => boolean,
+): Post[] {
+  return posts.filter((post) => post.userId === userId && post.id !== excludePostId && isConflicting(post));
 }
 
 /**

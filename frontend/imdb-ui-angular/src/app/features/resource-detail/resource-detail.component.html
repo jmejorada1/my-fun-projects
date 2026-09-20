@@ -260,4 +260,92 @@
       </table>
     }
   </section>
+
+  @if (conflictingPosts().length > 0) {
+    <dialog class="conflict-dialog" appAutoOpenDialog (cancel)="keepPreviousFlags()">
+      <h2>That contradicts what you posted before</h2>
+      <p class="muted">
+        @if (conflictDirection() === 'to-no-bigotry') {
+          You just flagged this movie "no-bigotry," but you have
+        } @else {
+          You just flagged this movie for bigotry, but you have
+        }
+        {{ conflictingPosts().length }} other {{ conflictingPosts().length === 1 ? 'post' : 'posts' }} here
+        @if (conflictDirection() === 'to-no-bigotry') {
+          with a bigotry flag.
+        } @else {
+          flagged "no-bigotry."
+        }
+        Both can't stand — either remove {{ conflictingPosts().length === 1 ? 'that post' : 'those posts' }}
+        below, or keep {{ conflictingPosts().length === 1 ? 'it' : 'them' }} and the post you just wrote
+        will be discarded instead. Removing a post takes any replies with it too — including replies
+        from other users.
+      </p>
+
+      <ul class="conflict-list">
+        @for (post of conflictingPosts(); track post.id) {
+          <li class="conflict-item">
+            <button
+              type="button"
+              class="conflict-item-header"
+              (click)="toggleExpand(post.id)"
+              [attr.aria-expanded]="isExpanded(post.id)"
+            >
+              @if (post.replyCount > 0) {
+                <span class="expand-icon" [class.expand-icon--open]="isExpanded(post.id)">▸</span>
+              }
+              <span class="body-text" [class.body-text--clamped]="!isExpanded(post.id)">{{ post.bodyText }}</span>
+            </button>
+            <div class="conflict-item-meta">
+              @for (flag of post.flags; track flag.id) {
+                <span class="flag-badge" [class]="flagSeverityClass(flag.postType.name, flag.score)">
+                  {{ flag.postType.name }} ({{ flag.score }})
+                </span>
+              }
+              <time>{{ post.createdAt | date: 'medium' }}</time>
+              @if (post.replyCount > 0) {
+                <span class="muted"
+                  >{{ post.replyCount }} {{ post.replyCount === 1 ? 'reply' : 'replies' }} will also be
+                  removed</span
+                >
+              }
+            </div>
+            @if (isExpanded(post.id)) {
+              @if (repliesLoading(post.id)) {
+                <p class="muted">Loading replies…</p>
+              } @else if (repliesFor(post.id).length > 0) {
+                <ul class="conflict-replies">
+                  @for (reply of repliesFor(post.id); track reply.id) {
+                    <li><span class="muted">{{ reply.username }}:</span> {{ reply.bodyText }}</li>
+                  }
+                </ul>
+              }
+            }
+          </li>
+        }
+      </ul>
+
+      @if (conflictRemovalError()) {
+        <p class="field-error">{{ conflictRemovalError() }}</p>
+      }
+
+      <div class="conflict-dialog-actions">
+        <button type="button" (click)="keepPreviousFlags()" [disabled]="removingConflicts()">
+          {{ removingConflicts() ? 'Discarding…' : 'Keep previous, discard new post' }}
+        </button>
+        <button
+          type="button"
+          class="danger-button"
+          (click)="confirmRemoveConflictingPosts()"
+          [disabled]="removingConflicts()"
+        >
+          {{
+            removingConflicts()
+              ? 'Removing…'
+              : 'Remove ' + conflictingPosts().length + (conflictingPosts().length === 1 ? ' post' : ' posts')
+          }}
+        </button>
+      </div>
+    </dialog>
+  }
 }

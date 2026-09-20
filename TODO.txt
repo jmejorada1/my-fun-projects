@@ -23,7 +23,7 @@
    X-- also add a cancel reply button (red)?
    X-- drill down capabilities on side panels
    
-   -- when adding no-bigotry, and then remove previous severity cards from user. But warn user first, with a floatable window that shows all the cards that will be removed. Allow them to drill down and view each comment.
+   -- when user adds a no-bigotry card on a resource, then can you remove previous severity cards from user if user agrees? In other words warn user first, with a floatable window that shows all the cards that will be removed in a clickable list. Allow them to drill down and view each post/reply before agreeing to delete cards, and add the no-bigotry card.
 
 
    -- Scrollable table header?
@@ -45,7 +45,11 @@
         -- Add an LLM summarizing the search results
 
    
-
+** New IMDB domain imdb-standart-reviews
+    - skip it
+    - It was okay
+    - I enjoyed it
+    - I loved it, 
 
 ** New TODO application:
       - Resource is todo item

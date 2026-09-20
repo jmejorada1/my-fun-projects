@@ -86,6 +86,18 @@ describe('ResourceDetailComponent', () => {
     return fixture;
   }
 
+  /**
+   * Posting any flag (not just "no-bigotry") now triggers a background
+   * conflict check (GET .../posts?size=200) — tests that create a flagged
+   * post but aren't exercising that feature just need to drain it so
+   * httpMock.verify() in afterEach doesn't see it as a leftover request.
+   */
+  function flushConflictCheck(content: unknown[] = []): void {
+    httpMock
+      .expectOne((r) => r.url === `${API_BASE_URL}/resources/1/posts` && r.params.get('size') === '200')
+      .flush({ content, totalElements: content.length, totalPages: 1, number: 0, size: 200 });
+  }
+
   beforeEach(() => localStorage.clear());
 
   afterEach(() => httpMock.verify());
@@ -293,6 +305,7 @@ describe('ResourceDetailComponent', () => {
       post: { id: 99, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'Worth flagging.', data: null, createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
       flag: { id: 1, postId: 99, postType: { id: 5, name: 'racism' }, score: 4 },
     });
+    flushConflictCheck(DEFAULT_TOP_LEVEL_POSTS);
   });
 
   it('shows inline errors only after a blocked submit attempt, and clears them once fixed', async () => {
@@ -335,6 +348,7 @@ describe('ResourceDetailComponent', () => {
       post: { id: 99, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'Worth flagging.', data: null, createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
       flag: { id: 1, postId: 99, postType: { id: 5, name: 'racism' }, score: 4 },
     });
+    flushConflictCheck(DEFAULT_TOP_LEVEL_POSTS);
     fixture.detectChanges();
 
     expect(navigateSpy).not.toHaveBeenCalled();
@@ -368,6 +382,7 @@ describe('ResourceDetailComponent', () => {
       post: { id: 101, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'Neutral on this one.', data: null, createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
       flag: { id: 2, postId: 101, postType: { id: 5, name: 'racism' }, score: 0 },
     });
+    flushConflictCheck(DEFAULT_TOP_LEVEL_POSTS);
   });
 
   it('posts a reply to an existing post and stays on the page — no navigation', async () => {
@@ -763,6 +778,7 @@ describe('ResourceDetailComponent', () => {
         post: { id: 99, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'Worth flagging.', data: null, createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
         flag: { id: 1, postId: 99, postType: { id: 5, name: 'racism' }, score: 4 },
       });
+      flushConflictCheck(DEFAULT_TOP_LEVEL_POSTS);
 
       expect(notifySpy).toHaveBeenCalledTimes(1);
     });
@@ -903,6 +919,170 @@ describe('ResourceDetailComponent', () => {
       expect(fixture.componentInstance.highlightedPostId()).toBe(42);
 
       localHttpMock.verify();
+    });
+  });
+
+  describe('offering to remove conflicting severity posts after a "no-bigotry" post', () => {
+    const NO_BIGOTRY_TYPES = [{ id: 5, name: 'racism' }, { id: 6, name: 'no-bigotry' }];
+    const PRIOR_RACIST_POST = {
+      id: 10, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'My old racist take.', data: null,
+      createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
+      flags: [{ id: 1, postId: 10, postType: { id: 5, name: 'racism' }, score: 4, createdAt: '', updatedAt: '' }],
+      replyCount: 1, resourceDisplayName: 'Carmencita',
+    };
+    const OTHER_USER_RACIST_POST = {
+      id: 11, resourceId: 1, userId: 9, username: 'other-user', parentPostId: null, bodyText: "Someone else's take.", data: null,
+      createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
+      flags: [{ id: 2, postId: 11, postType: { id: 5, name: 'racism' }, score: 3, createdAt: '', updatedAt: '' }],
+      replyCount: 0, resourceDisplayName: 'Carmencita',
+    };
+
+    function postNoBigotry(fixture: Awaited<ReturnType<typeof createComponent>>, newPostId = 99) {
+      fixture.componentInstance.form.setValue({ bodyText: 'All clear here.', postTypeId: 6, score: 0 });
+      fixture.componentInstance.submit();
+      httpMock.expectOne(`${API_BASE_URL}/posts`).flush({
+        post: { id: newPostId, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'All clear here.', data: null, createdAt: '2026-01-03T00:00:00Z', updatedAt: '2026-01-03T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
+        flag: { id: 3, postId: newPostId, postType: { id: 6, name: 'no-bigotry' }, score: 0 },
+      });
+    }
+
+    it('offers to remove a prior same-user severity post, excluding other users\' posts and the new post itself', async () => {
+      const fixture = await createComponent([PRIOR_RACIST_POST, OTHER_USER_RACIST_POST], NO_BIGOTRY_TYPES);
+
+      postNoBigotry(fixture);
+      const req = httpMock.expectOne(
+        (r) => r.url === `${API_BASE_URL}/resources/1/posts` && r.params.get('size') === '200',
+      );
+      req.flush({
+        content: [PRIOR_RACIST_POST, OTHER_USER_RACIST_POST, { id: 99, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'All clear here.', data: null, createdAt: '', updatedAt: '', flags: [{ id: 3, postId: 99, postType: { id: 6, name: 'no-bigotry' }, score: 0, createdAt: '', updatedAt: '' }], replyCount: 0, resourceDisplayName: 'Carmencita' }],
+        totalElements: 3, totalPages: 1, number: 0, size: 200,
+      });
+
+      expect(fixture.componentInstance.conflictingPosts().map((p) => p.id)).toEqual([10]);
+      expect(fixture.componentInstance.conflictDirection()).toBe('to-no-bigotry');
+    });
+
+    it('does not prompt when there are no conflicting posts', async () => {
+      const fixture = await createComponent([], NO_BIGOTRY_TYPES);
+
+      postNoBigotry(fixture);
+      httpMock.expectOne((r) => r.params.get('size') === '200').flush({
+        content: [{ id: 99, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'All clear here.', data: null, createdAt: '', updatedAt: '', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' }],
+        totalElements: 1, totalPages: 1, number: 0, size: 200,
+      });
+
+      expect(fixture.componentInstance.conflictingPosts()).toEqual([]);
+    });
+
+    it('still checks (in the opposite direction) when posting a severity flag, finding nothing if there\'s no prior "no-bigotry" post', async () => {
+      const fixture = await createComponent([PRIOR_RACIST_POST], NO_BIGOTRY_TYPES);
+      fixture.componentInstance.form.setValue({ bodyText: 'Another racist post.', postTypeId: 5, score: 3 });
+
+      fixture.componentInstance.submit();
+      httpMock.expectOne(`${API_BASE_URL}/posts`).flush({
+        post: { id: 100, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'Another racist post.', data: null, createdAt: '', updatedAt: '', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
+        flag: { id: 4, postId: 100, postType: { id: 5, name: 'racism' }, score: 3 },
+      });
+      // PRIOR_RACIST_POST isn't "no-bigotry"-flagged, so there's nothing to conflict with.
+      flushConflictCheck([PRIOR_RACIST_POST]);
+
+      expect(fixture.componentInstance.conflictingPosts()).toEqual([]);
+    });
+
+    it('the reverse: posting a severity flag offers to remove a prior "no-bigotry" post', async () => {
+      const priorNoBigotryPost = {
+        id: 20, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'Seemed fine to me.', data: null,
+        createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
+        flags: [{ id: 5, postId: 20, postType: { id: 6, name: 'no-bigotry' }, score: 0, createdAt: '', updatedAt: '' }],
+        replyCount: 0, resourceDisplayName: 'Carmencita',
+      };
+      const fixture = await createComponent([priorNoBigotryPost], NO_BIGOTRY_TYPES);
+      fixture.componentInstance.form.setValue({ bodyText: 'Actually, this is racist.', postTypeId: 5, score: 4 });
+
+      fixture.componentInstance.submit();
+      httpMock.expectOne(`${API_BASE_URL}/posts`).flush({
+        post: { id: 100, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'Actually, this is racist.', data: null, createdAt: '', updatedAt: '', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
+        flag: { id: 6, postId: 100, postType: { id: 5, name: 'racism' }, score: 4 },
+      });
+      flushConflictCheck([priorNoBigotryPost]);
+
+      expect(fixture.componentInstance.conflictingPosts().map((p) => p.id)).toEqual([20]);
+      expect(fixture.componentInstance.conflictDirection()).toBe('to-severity');
+    });
+
+    it('"keep previous" discards the just-created post instead, leaving the prior ones alone', async () => {
+      const fixture = await createComponent([PRIOR_RACIST_POST], NO_BIGOTRY_TYPES);
+      postNoBigotry(fixture, 99);
+      httpMock.expectOne((r) => r.params.get('size') === '200').flush({
+        content: [PRIOR_RACIST_POST],
+        totalElements: 1, totalPages: 1, number: 0, size: 200,
+      });
+      expect(fixture.componentInstance.conflictingPosts().length).toBe(1);
+      expect(fixture.componentInstance.posts().some((p) => p.id === 99)).toBe(true);
+
+      fixture.componentInstance.keepPreviousFlags();
+
+      const deleteReq = httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/99` && r.method === 'DELETE');
+      expect(deleteReq.request.headers.get('X-User-Id')).toBe('1');
+      deleteReq.flush(null);
+
+      expect(fixture.componentInstance.conflictingPosts()).toEqual([]);
+      // The new post is gone; the prior conflicting post is untouched.
+      expect(fixture.componentInstance.posts().some((p) => p.id === 99)).toBe(false);
+      expect(fixture.componentInstance.posts().some((p) => p.id === 10)).toBe(true);
+    });
+
+    it('surfaces an error and keeps the dialog open if discarding the new post fails', async () => {
+      const fixture = await createComponent([PRIOR_RACIST_POST], NO_BIGOTRY_TYPES);
+      postNoBigotry(fixture, 99);
+      httpMock.expectOne((r) => r.params.get('size') === '200').flush({
+        content: [PRIOR_RACIST_POST],
+        totalElements: 1, totalPages: 1, number: 0, size: 200,
+      });
+
+      fixture.componentInstance.keepPreviousFlags();
+      httpMock
+        .expectOne((r) => r.url === `${API_BASE_URL}/posts/99` && r.method === 'DELETE')
+        .flush({ detail: 'boom' }, { status: 500, statusText: 'Server Error' });
+
+      expect(fixture.componentInstance.conflictRemovalError()).toBe('boom');
+      expect(fixture.componentInstance.conflictingPosts().length).toBe(1);
+      expect(fixture.componentInstance.posts().some((p) => p.id === 99)).toBe(true);
+    });
+
+    it('confirming deletes each conflicting post (cascading its replies server-side) and removes it locally', async () => {
+      const fixture = await createComponent([PRIOR_RACIST_POST], NO_BIGOTRY_TYPES);
+      postNoBigotry(fixture);
+      httpMock.expectOne((r) => r.params.get('size') === '200').flush({
+        content: [PRIOR_RACIST_POST],
+        totalElements: 1, totalPages: 1, number: 0, size: 200,
+      });
+
+      fixture.componentInstance.confirmRemoveConflictingPosts();
+
+      const deleteReq = httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/10` && r.method === 'DELETE');
+      expect(deleteReq.request.headers.get('X-User-Id')).toBe('1');
+      deleteReq.flush(null);
+
+      expect(fixture.componentInstance.conflictingPosts()).toEqual([]);
+      expect(fixture.componentInstance.posts().some((p) => p.id === 10)).toBe(false);
+    });
+
+    it('surfaces an error and keeps the dialog open if removal fails', async () => {
+      const fixture = await createComponent([PRIOR_RACIST_POST], NO_BIGOTRY_TYPES);
+      postNoBigotry(fixture);
+      httpMock.expectOne((r) => r.params.get('size') === '200').flush({
+        content: [PRIOR_RACIST_POST],
+        totalElements: 1, totalPages: 1, number: 0, size: 200,
+      });
+
+      fixture.componentInstance.confirmRemoveConflictingPosts();
+      httpMock
+        .expectOne((r) => r.url === `${API_BASE_URL}/posts/10` && r.method === 'DELETE')
+        .flush({ detail: 'boom' }, { status: 500, statusText: 'Server Error' });
+
+      expect(fixture.componentInstance.conflictRemovalError()).toBe('boom');
+      expect(fixture.componentInstance.conflictingPosts().length).toBe(1);
     });
   });
 });
