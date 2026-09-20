@@ -21,9 +21,9 @@
    X-- BUG: When i click reply change focus to text box.
    X-- BUG: pane is not updated when adding new replies
    X-- also add a cancel reply button (red)?
+   X-- drill down capabilities on side panels
    
-   -- drill down capabilities on side panels
-   -- when adding no-bigotry, and then remove previous severity cards from user. But warn user first, with a floatable window 
+   -- when adding no-bigotry, and then remove previous severity cards from user. But warn user first, with a floatable window that shows all the cards that will be removed. Allow them to drill down and view each comment.
 
 
    -- Scrollable table header?
