@@ -35,20 +35,27 @@
     <h2>Add a Post</h2>
     <form [formGroup]="form" (ngSubmit)="submit()">
       <textarea
+        name="post-body"
         formControlName="bodyText"
         placeholder="What do you think?"
         rows="3"
       ></textarea>
+      @if (form.controls.bodyText.invalid && form.controls.bodyText.touched) {
+        <p class="field-error">Write something before posting.</p>
+      }
 
       <div class="flag-fields">
         <label>
-          Bigotry category (optional)
-          <select formControlName="postTypeId">
-            <option [ngValue]="null">No flag</option>
-            @for (type of visiblePostTypes(); track type.id) {
+          Bigotry category
+          <select name="post-category" formControlName="postTypeId">
+            <option [ngValue]="null" disabled hidden>Select a category…</option>
+            @for (type of postTypes(); track type.id) {
               <option [ngValue]="type.id">{{ type.name }}</option>
             }
           </select>
+          @if (form.controls.postTypeId.invalid && form.controls.postTypeId.touched) {
+            <span class="field-error">Choose a category.</span>
+          }
         </label>
 
         @if (isNoBigotrySelected()) {
@@ -56,12 +63,15 @@
         } @else if (selectedPostTypeId() !== null) {
           <label>
             Severity (0 = neutral, 5 = most severe)
-            <select formControlName="score">
-              <option [ngValue]="null">—</option>
+            <select name="post-severity" formControlName="score">
+              <option [ngValue]="null" disabled hidden>Select a severity…</option>
               @for (n of [0, 1, 2, 3, 4, 5]; track n) {
                 <option [ngValue]="n">{{ n === 0 ? '0 (Neutral)' : n }}</option>
               }
             </select>
+            @if (form.controls.score.invalid && form.controls.score.touched) {
+              <span class="field-error">Choose a severity.</span>
+            }
           </label>
         }
       </div>
@@ -76,7 +86,7 @@
     </form>
   </section>
 
-  <section class="thread">
+  <section class="thread" [class.resizing]="columnResizing()">
     <h2>Posts</h2>
     @if (posts().length === 0) {
       <p class="muted">No posts yet — be the first.</p>
@@ -85,23 +95,74 @@
         <thead>
           <tr>
             <th class="expand-col"></th>
-            <th>Post</th>
-            <th>Author</th>
-            <th>Category (Score)</th>
-            <th>Posted</th>
+            <th class="post-th" [attr.aria-sort]="ariaSortFor('post')" [style.width.px]="postColumnWidth()">
+              <button type="button" class="sort-button" (click)="setSort('post')">
+                Post
+                <span class="sort-icon" [class.sort-icon--active]="sortColumn() === 'post'">{{
+                  sortColumn() === 'post' ? (sortDirection() === 'asc' ? '▲' : '▼') : '▲'
+                }}</span>
+              </button>
+              <span
+                class="col-resizer"
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize Post column"
+                tabindex="0"
+                (pointerdown)="startColumnResize($event)"
+                (pointermove)="onColumnResizeMove($event)"
+                (pointerup)="onColumnResizeUp($event)"
+                (keydown)="onColumnResizeKeydown($event)"
+              ></span>
+            </th>
+            <th [attr.aria-sort]="ariaSortFor('author')">
+              <button type="button" class="sort-button" (click)="setSort('author')">
+                Author
+                <span class="sort-icon" [class.sort-icon--active]="sortColumn() === 'author'">{{
+                  sortColumn() === 'author' ? (sortDirection() === 'asc' ? '▲' : '▼') : '▲'
+                }}</span>
+              </button>
+            </th>
+            <th [attr.aria-sort]="ariaSortFor('category')">
+              <button type="button" class="sort-button" (click)="setSort('category')">
+                Category (Score)
+                <span class="sort-icon" [class.sort-icon--active]="sortColumn() === 'category'">{{
+                  sortColumn() === 'category' ? (sortDirection() === 'asc' ? '▲' : '▼') : '▲'
+                }}</span>
+              </button>
+            </th>
+            <th [attr.aria-sort]="ariaSortFor('posted')">
+              <button type="button" class="sort-button" (click)="setSort('posted')">
+                Posted
+                <span class="sort-icon" [class.sort-icon--active]="sortColumn() === 'posted'">{{
+                  sortColumn() === 'posted' ? (sortDirection() === 'asc' ? '▲' : '▼') : '▼'
+                }}</span>
+              </button>
+            </th>
             <th class="actions-col"></th>
           </tr>
         </thead>
         <tbody>
-          @for (post of posts(); track post.id) {
-            <tr class="post-row" (click)="toggleExpand(post.id)">
+          @for (post of sortedPosts(); track post.id) {
+            <tr
+              class="post-row"
+              [class.row-highlighted]="highlightedPostId() === post.id"
+              [appScrollIntoViewOn]="highlightedPostId() === post.id"
+              (click)="toggleExpand(post.id)"
+            >
               <td class="expand-col">
                 @if (post.replyCount > 0) {
                   <span class="expand-icon" [class.expand-icon--open]="isExpanded(post.id)">▸</span>
                   <span class="reply-count">{{ post.replyCount }}</span>
                 }
               </td>
-              <td class="body-col">{{ post.bodyText }}</td>
+              <td class="body-col">
+                <span class="body-text" [class.body-text--clamped]="isLongPost(post.bodyText) && !isBodyExpanded(post.id)">{{ post.bodyText }}</span>
+                @if (isLongPost(post.bodyText)) {
+                  <button type="button" class="link-button body-toggle" (click)="toggleBodyExpand(post.id); $event.stopPropagation()">
+                    {{ isBodyExpanded(post.id) ? 'Show less' : '… more' }}
+                  </button>
+                }
+              </td>
               <td>{{ post.username }}</td>
               <td class="flags-col">
                 @if (post.flags.length === 0) {
@@ -129,9 +190,20 @@
                     <table class="replies-table">
                       <tbody>
                         @for (reply of repliesFor(post.id); track reply.id) {
-                          <tr class="reply-row">
+                          <tr
+                            class="reply-row"
+                            [class.row-highlighted]="highlightedPostId() === reply.id"
+                            [appScrollIntoViewOn]="highlightedPostId() === reply.id"
+                          >
                             <td class="reply-branch">↳</td>
-                            <td class="body-col">{{ reply.bodyText }}</td>
+                            <td class="body-col" [style.width.px]="postColumnWidth()">
+                              <span class="body-text" [class.body-text--clamped]="isLongPost(reply.bodyText) && !isBodyExpanded(reply.id)">{{ reply.bodyText }}</span>
+                              @if (isLongPost(reply.bodyText)) {
+                                <button type="button" class="link-button body-toggle" (click)="toggleBodyExpand(reply.id)">
+                                  {{ isBodyExpanded(reply.id) ? 'Show less' : '… more' }}
+                                </button>
+                              }
+                            </td>
                             <td>{{ reply.username }}</td>
                             <td class="flags-col">
                               @if (reply.flags.length === 0) {
@@ -154,20 +226,30 @@
                   @if (openReplyPostId() === post.id) {
                     <div class="reply-form">
                       <textarea
+                        appAutofocus
+                        [attr.name]="'reply-body-' + post.id"
                         [formControl]="getReplyControl(post.id)"
                         placeholder="Write a reply…"
                         rows="2"
                       ></textarea>
+                      @if (isReplyInvalid(post.id)) {
+                        <p class="field-error">Write something before posting a reply.</p>
+                      }
                       @if (replyError()) {
                         <p class="field-error">{{ replyError() }}</p>
                       }
-                      <button
-                        type="button"
-                        [disabled]="replySubmittingPostId() === post.id"
-                        (click)="submitReply(post.id)"
-                      >
-                        {{ replySubmittingPostId() === post.id ? 'Replying…' : 'Post reply' }}
-                      </button>
+                      <div class="reply-form-actions">
+                        <button
+                          type="button"
+                          [disabled]="replySubmittingPostId() === post.id"
+                          (click)="submitReply(post.id)"
+                        >
+                          {{ replySubmittingPostId() === post.id ? 'Replying…' : 'Post reply' }}
+                        </button>
+                        <button type="button" class="cancel-reply-button" (click)="toggleReply(post.id)">
+                          Cancel Reply
+                        </button>
+                      </div>
                     </div>
                   }
                 </td>

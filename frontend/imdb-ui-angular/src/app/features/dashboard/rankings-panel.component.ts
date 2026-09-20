@@ -1,8 +1,9 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
-import { forkJoin, map, of, switchMap, catchError } from 'rxjs';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { forkJoin, map, of, skip, switchMap, catchError } from 'rxjs';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { AppHttpError } from '../../core/error.interceptor';
+import { PostActivityService } from '../../core/post-activity.service';
 import { NO_BIGOTRY_TYPE_NAME, SEVERE_SCORE_THRESHOLD } from '../../core/post-type.constants';
 import { PostTypeRanking, RankingService } from '../../api/ranking.service';
 import { PostService } from '../../api/post.service';
@@ -18,6 +19,7 @@ import { PostService } from '../../api/post.service';
 export class RankingsPanelComponent {
   private readonly rankingService = inject(RankingService);
   private readonly postService = inject(PostService);
+  private readonly postActivity = inject(PostActivityService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly rankings = signal<PostTypeRanking[]>([]);
@@ -25,6 +27,22 @@ export class RankingsPanelComponent {
   readonly errorMessage = signal<string | null>(null);
 
   constructor() {
+    this.load();
+
+    // Refetches whenever a post/reply is created anywhere in the app
+    // (resource-detail) — this panel is mounted for the dashboard's whole
+    // lifetime (dashboard.component.ts), so a new flagged post would never
+    // show up here without this. skip(1): toObservable() immediately
+    // replays the signal's current value on subscribe, which would
+    // otherwise double up with the initial load() call above.
+    toObservable(this.postActivity.changed)
+      .pipe(skip(1), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.load());
+  }
+
+  private load(): void {
+    this.loading.set(true);
+    this.errorMessage.set(null);
     this.rankingService
       .getRankings()
       .pipe(

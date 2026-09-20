@@ -1,3 +1,9 @@
+h2 {
+  padding-bottom: 0.6rem;
+  border-bottom: 2px solid var(--color-primary-light);
+  margin-bottom: 1rem;
+}
+
 .results-table {
   width: 100%;
   border-collapse: collapse;
@@ -5,19 +11,36 @@
 
 .results-table th {
   text-align: left;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.02em;
-  color: #888;
-  font-weight: 600;
-  padding: 0.5rem;
-  border-bottom: 1px solid #ddd;
+  letter-spacing: 0.03em;
+  color: var(--color-text-subtle);
+  font-weight: 700;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 2px solid var(--color-border);
 }
 
 .results-table td {
-  padding: 0.5rem;
-  border-bottom: 1px solid #eee;
+  padding: 0.6rem;
+  border-bottom: 1px solid var(--color-border);
   vertical-align: top;
+}
+
+.results-table tbody tr {
+  transition: background-color var(--transition-fast);
+}
+
+.results-table tbody tr:hover {
+  background: var(--color-surface-alt);
+}
+
+.results-table a {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.results-table a:hover {
+  text-decoration: underline;
 }
 
 .numeric-col {
@@ -26,37 +49,38 @@
 
 .flags-col .flag-badge {
   display: inline-block;
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  border-radius: var(--radius-pill);
   font-size: 0.75rem;
+  font-weight: 600;
   white-space: nowrap;
 }
 
 /* Severity color coding: red (4-5), orange (3), yellow (0-2), green ("no-bigotry"). */
 .flag-badge--red {
-  background: #fde8e8;
-  color: #a33a3a;
+  background: var(--color-severity-red-bg);
+  color: var(--color-severity-red-text);
 }
 
 .flag-badge--orange {
-  background: #fdead1;
-  color: #a35d1f;
+  background: var(--color-severity-orange-bg);
+  color: var(--color-severity-orange-text);
 }
 
 .flag-badge--yellow {
-  background: #fdf6d1;
-  color: #8a7a1f;
+  background: var(--color-severity-yellow-bg);
+  color: var(--color-severity-yellow-text);
 }
 
 .flag-badge--green {
-  background: #e3f3e3;
-  color: #2f7a3d;
+  background: var(--color-severity-green-bg);
+  color: var(--color-severity-green-text);
 }
 
 .muted {
-  color: #888;
+  color: var(--color-text-muted);
 }
 
 .field-error {
-  color: #b00020;
+  color: var(--color-danger);
 }

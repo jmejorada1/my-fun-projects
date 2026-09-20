@@ -156,11 +156,113 @@ describe('AppToolbarComponent', () => {
       const fixture = TestBed.createComponent(AppToolbarComponent);
       fixture.detectChanges();
       const navigateSpy = vi.spyOn(TestBed.inject(Router), 'navigateByUrl');
+      fixture.componentInstance.searchForm.controls.term.setValue('carmencita');
 
       fixture.componentInstance.submitSearch();
 
       expect(navigateSpy).not.toHaveBeenCalled();
       httpMock.expectOne(() => true).flush({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 20 });
+    });
+
+    it('clears search state instead of hitting the backend when the term is blank', () => {
+      const fixture = TestBed.createComponent(AppToolbarComponent);
+      fixture.detectChanges();
+      const searchState = TestBed.inject(SearchStateService);
+      const searchSpy = vi.spyOn(searchState, 'search');
+      const clearSpy = vi.spyOn(searchState, 'clear');
+      fixture.componentInstance.searchForm.controls.term.setValue('');
+
+      fixture.componentInstance.submitSearch();
+
+      expect(searchSpy).not.toHaveBeenCalled();
+      expect(clearSpy).toHaveBeenCalled();
+      httpMock.expectNone(() => true);
+    });
+
+    it('clears search state for a whitespace-only term too', () => {
+      const fixture = TestBed.createComponent(AppToolbarComponent);
+      fixture.detectChanges();
+      const searchState = TestBed.inject(SearchStateService);
+      const searchSpy = vi.spyOn(searchState, 'search');
+      fixture.componentInstance.searchForm.controls.term.setValue('   ');
+
+      fixture.componentInstance.submitSearch();
+
+      expect(searchSpy).not.toHaveBeenCalled();
+      httpMock.expectNone(() => true);
+    });
+  });
+
+  describe('back to top', () => {
+    afterEach(() => {
+      // Restore the real (jsdom) scrollY descriptor between tests.
+      Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
+    });
+
+    function setScrollY(value: number): void {
+      Object.defineProperty(window, 'scrollY', { value, configurable: true });
+      window.dispatchEvent(new Event('scroll'));
+    }
+
+    it('is hidden until the page is scrolled past the threshold', () => {
+      localStorage.setItem('imdb-ui-angular.currentUser', JSON.stringify(STORED_USER));
+      const fixture = TestBed.createComponent(AppToolbarComponent);
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.showBackToTop()).toBe(false);
+      expect(fixture.nativeElement.querySelector('.back-to-top')).toBeNull();
+
+      setScrollY(500);
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.showBackToTop()).toBe(true);
+      expect(fixture.nativeElement.querySelector('.back-to-top')).toBeTruthy();
+    });
+
+    it('hides again once scrolled back up', () => {
+      // Two scroll events in immediate succession fall inside the same
+      // throttleTime window — the second only resolves on its trailing
+      // edge, once real time (fake, here) actually advances past it.
+      vi.useFakeTimers();
+      try {
+        localStorage.setItem('imdb-ui-angular.currentUser', JSON.stringify(STORED_USER));
+        const fixture = TestBed.createComponent(AppToolbarComponent);
+        fixture.detectChanges();
+        setScrollY(500);
+        fixture.detectChanges();
+        expect(fixture.componentInstance.showBackToTop()).toBe(true);
+
+        setScrollY(0);
+        vi.advanceTimersByTime(150);
+        fixture.detectChanges();
+
+        expect(fixture.componentInstance.showBackToTop()).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('scrolls to the top when clicked', () => {
+      localStorage.setItem('imdb-ui-angular.currentUser', JSON.stringify(STORED_USER));
+      const fixture = TestBed.createComponent(AppToolbarComponent);
+      fixture.detectChanges();
+      const scrollSpy = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+      setScrollY(500);
+      fixture.detectChanges();
+
+      (fixture.nativeElement.querySelector('.back-to-top') as HTMLElement).click();
+
+      expect(scrollSpy).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+    });
+
+    it('never shows for a logged-out visitor, even past the threshold', () => {
+      const fixture = TestBed.createComponent(AppToolbarComponent);
+      fixture.detectChanges();
+
+      setScrollY(500);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.back-to-top')).toBeNull();
     });
   });
 });

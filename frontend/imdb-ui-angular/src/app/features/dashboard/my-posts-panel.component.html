@@ -4,60 +4,98 @@
   <p class="field-error">{{ errorMessage() }}</p>
 } @else {
   <section>
-    <h2>My Posts</h2>
-    @if (topLevelGroups().length === 0) {
-      <p class="muted">You haven't posted yet.</p>
-    } @else {
-      <ul class="tree">
-        @for (group of topLevelGroups(); track group.resourceId) {
-          <li class="tree-group">
-            <button type="button" class="tree-toggle" (click)="togglePostGroup(group.resourceId)">
-              <span class="tree-caret" [class.tree-caret--open]="isPostGroupExpanded(group.resourceId)">▸</span>
-              <span class="tree-label">{{ group.displayName }}</span>
-              <span class="tree-count">({{ group.posts.length }})</span>
-            </button>
-            @if (isPostGroupExpanded(group.resourceId)) {
-              <ul class="tree-children">
-                @for (post of group.posts; track post.id) {
-                  <li>
-                    <p>{{ post.bodyText }}</p>
-                    <time>{{ post.createdAt | date: 'medium' }}</time>
-                  </li>
-                }
-              </ul>
-            }
-          </li>
-        }
-      </ul>
+    <h2>
+      <button type="button" class="section-toggle" [attr.aria-expanded]="postsSectionExpanded()" (click)="togglePostsSection()">
+        <span class="section-caret" [class.section-caret--open]="postsSectionExpanded()">▸</span>
+        My Posts
+      </button>
+    </h2>
+    @if (postsSectionExpanded()) {
+      @if (topLevelGroups().length === 0) {
+        <p class="muted">You haven't posted yet.</p>
+      } @else {
+        <ul class="tree">
+          @for (group of topLevelGroups(); track group.resourceId) {
+            <li class="tree-group">
+              <button type="button" class="tree-toggle" (click)="togglePostGroup(group.resourceId)">
+                <span class="tree-caret" [class.tree-caret--open]="isPostGroupExpanded(group.resourceId)">▸</span>
+                <span class="tree-label">{{ group.displayName }}</span>
+                <span class="tree-count">({{ group.posts.length }})</span>
+              </button>
+              @if (isPostGroupExpanded(group.resourceId)) {
+                <ul class="tree-children">
+                  @for (post of group.posts; track post.id) {
+                    <li
+                      class="post-entry"
+                      tabindex="0"
+                      role="button"
+                      title="Jump to this post on its movie's page"
+                      (click)="goToPost(post)"
+                      (keydown.enter)="goToPost(post)"
+                    >
+                      <p class="body-text" [class.body-text--clamped]="isLongPost(post.bodyText) && !isBodyExpanded(post.id)">{{ post.bodyText }}</p>
+                      @if (isLongPost(post.bodyText)) {
+                        <button type="button" class="link-button body-toggle" (click)="toggleBodyExpand(post.id); $event.stopPropagation()">
+                          {{ isBodyExpanded(post.id) ? 'Show less' : '… more' }}
+                        </button>
+                      }
+                      <time>{{ post.createdAt | date: 'medium' }}</time>
+                    </li>
+                  }
+                </ul>
+              }
+            </li>
+          }
+        </ul>
+      }
     }
   </section>
 
   <section>
-    <h2>My Replies</h2>
-    @if (replyGroups().length === 0) {
-      <p class="muted">You haven't replied to anything yet.</p>
-    } @else {
-      <ul class="tree">
-        @for (group of replyGroups(); track group.resourceId) {
-          <li class="tree-group">
-            <button type="button" class="tree-toggle" (click)="toggleReplyGroup(group.resourceId)">
-              <span class="tree-caret" [class.tree-caret--open]="isReplyGroupExpanded(group.resourceId)">▸</span>
-              <span class="tree-label">{{ group.displayName }}</span>
-              <span class="tree-count">({{ group.posts.length }})</span>
-            </button>
-            @if (isReplyGroupExpanded(group.resourceId)) {
-              <ul class="tree-children">
-                @for (post of group.posts; track post.id) {
-                  <li>
-                    <p>{{ post.bodyText }}</p>
-                    <time>{{ post.createdAt | date: 'medium' }}</time>
-                  </li>
-                }
-              </ul>
-            }
-          </li>
-        }
-      </ul>
+    <h2>
+      <button type="button" class="section-toggle" [attr.aria-expanded]="repliesSectionExpanded()" (click)="toggleRepliesSection()">
+        <span class="section-caret" [class.section-caret--open]="repliesSectionExpanded()">▸</span>
+        My Replies
+      </button>
+    </h2>
+    @if (repliesSectionExpanded()) {
+      @if (replyGroups().length === 0) {
+        <p class="muted">You haven't replied to anything yet.</p>
+      } @else {
+        <ul class="tree">
+          @for (group of replyGroups(); track group.resourceId) {
+            <li class="tree-group">
+              <button type="button" class="tree-toggle" (click)="toggleReplyGroup(group.resourceId)">
+                <span class="tree-caret" [class.tree-caret--open]="isReplyGroupExpanded(group.resourceId)">▸</span>
+                <span class="tree-label">{{ group.displayName }}</span>
+                <span class="tree-count">({{ group.posts.length }})</span>
+              </button>
+              @if (isReplyGroupExpanded(group.resourceId)) {
+                <ul class="tree-children">
+                  @for (post of group.posts; track post.id) {
+                    <li
+                      class="post-entry"
+                      tabindex="0"
+                      role="button"
+                      title="Jump to this post on its movie's page"
+                      (click)="goToPost(post)"
+                      (keydown.enter)="goToPost(post)"
+                    >
+                      <p class="body-text" [class.body-text--clamped]="isLongPost(post.bodyText) && !isBodyExpanded(post.id)">{{ post.bodyText }}</p>
+                      @if (isLongPost(post.bodyText)) {
+                        <button type="button" class="link-button body-toggle" (click)="toggleBodyExpand(post.id); $event.stopPropagation()">
+                          {{ isBodyExpanded(post.id) ? 'Show less' : '… more' }}
+                        </button>
+                      }
+                      <time>{{ post.createdAt | date: 'medium' }}</time>
+                    </li>
+                  }
+                </ul>
+              }
+            </li>
+          }
+        </ul>
+      }
     }
   </section>
 }

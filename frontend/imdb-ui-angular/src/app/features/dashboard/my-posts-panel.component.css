@@ -1,5 +1,47 @@
 section + section {
-  margin-top: 1.5rem;
+  margin-top: 1.75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--color-border);
+}
+
+h2 {
+  padding-bottom: 0.6rem;
+  border-bottom: 2px solid var(--color-primary-light);
+}
+
+.section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* :not(:disabled) isn't semantically needed (this button is never disabled)
+   — it's there so this beats the global button:hover:not(:disabled) rule's
+   specificity and actually resets the background, matching the fix used in
+   resource-detail.component.css. */
+.section-toggle:hover:not(:disabled),
+.section-toggle:focus-visible {
+  background: none;
+  color: var(--color-primary);
+}
+
+.section-caret {
+  display: inline-block;
+  color: var(--color-primary);
+  font-size: 0.8rem;
+  transition: transform var(--transition-fast);
+}
+
+.section-caret--open {
+  transform: rotate(90deg);
 }
 
 .tree {
@@ -9,30 +51,36 @@ section + section {
 }
 
 .tree-group + .tree-group {
-  margin-top: 0.5rem;
+  margin-top: 0.25rem;
 }
 
 .tree-toggle {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.5rem;
   width: 100%;
-  padding: 0.25rem 0;
+  padding: 0.45rem 0.5rem;
   border: none;
+  border-radius: var(--radius-sm);
   background: none;
   font: inherit;
   font-weight: 600;
   text-align: left;
-  color: inherit;
+  color: var(--color-text);
   cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.tree-toggle:hover {
+  background: var(--color-surface-alt);
 }
 
 /* Rotates into an "expanded" caret purely with CSS, same trick as resource-detail's posts table. */
 .tree-caret {
   display: inline-block;
-  color: #888;
+  color: var(--color-primary);
   font-size: 0.75rem;
-  transition: transform 0.15s ease;
+  transition: transform var(--transition-fast);
 }
 
 .tree-caret--open {
@@ -47,40 +95,93 @@ section + section {
 }
 
 .tree-count {
-  color: #888;
-  font-weight: 400;
-  font-size: 0.8rem;
+  color: var(--color-text-subtle);
+  font-weight: 600;
+  font-size: 0.75rem;
+  background: var(--color-surface-alt);
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-pill);
 }
 
 .tree-children {
   list-style: none;
-  margin: 0.25rem 0 0;
-  padding-left: 1.1rem;
-  border-left: 2px solid #eee;
+  margin: 0.3rem 0 0;
+  padding-left: 1.25rem;
+  border-left: 2px solid var(--color-border);
 }
 
 .tree-children li {
-  padding: 0.4rem 0;
-  border-bottom: 1px solid #eee;
+  padding: 0.5rem 0.25rem;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .tree-children li:last-child {
   border-bottom: none;
 }
 
+.post-entry {
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--transition-fast);
+}
+
+.post-entry:hover {
+  background: var(--color-surface-alt);
+}
+
+.post-entry:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
 .tree-children li p {
   margin: 0 0 0.25rem;
 }
 
+.body-text--clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
+.body-toggle {
+  display: block;
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+}
+
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-primary);
+  font-size: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* :not(:disabled) isn't semantically needed (this button is never disabled)
+   — it's there so this beats the global button:hover:not(:disabled) rule's
+   specificity and actually resets the background, matching the fix used in
+   resource-detail.component.css. */
+.link-button:hover:not(:disabled) {
+  background: none;
+  color: var(--color-primary-hover);
+  text-decoration: underline;
+}
+
 time {
-  color: #888;
+  color: var(--color-text-subtle);
   font-size: 0.8rem;
 }
 
 .muted {
-  color: #888;
+  color: var(--color-text-muted);
 }
 
 .field-error {
-  color: #b00020;
+  color: var(--color-danger);
 }

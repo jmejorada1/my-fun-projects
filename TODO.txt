@@ -11,13 +11,46 @@
 
 ** Frontend-Angular
 
-   -- move posts section
-   -- better css
-   -- sortable tables (descending first)
-   -- drill down capabilities on side panel
+   X-- move posts section
+   X-- better css
+   X-- sortable tables (descending first)
+   X-- make post column resizable
+   X-- make my posts and my replies collaosable
+   X-- add "...more" to left panel
+   
+   X-- BUG: When i click reply change focus to text box.
+   X-- BUG: pane is not updated when adding new replies
+   X-- also add a cancel reply button (red)?
+   
+   -- drill down capabilities on side panels
+   -- when adding no-bigotry, and then remove previous severity cards from user. But warn user first, with a floatable window 
+
+
+   -- Scrollable table header?
+   -- When a user scrolls down, can you maintain "back to search" and "back to top" links?
    -- make search ajaxable
+   -- BUG: on multi text, click reply doesnt scroll down to text box.
+   -- Add back/forward buttons
 
+*** IMDB Data ****
+   -- Load imdb data, but ignore when primaryTitle is prefixed with Episode #   
 
+*** Code Changes ****
    -- restructure code to be easily configurable by domain.
+   -- organize app/api package
+   -- Do not hardcode localhost:4200 everywhere. Remove any hardcoded things. parameterize when possible
+
+
+   --- LLM Service API???
+        -- Add an LLM summarizing the search results
 
    
+
+
+** New TODO application:
+      - Resource is todo item
+      - post-categories:
+                Waiting
+                In-Progress
+                Done
+      - Add severity on "Waiting" state

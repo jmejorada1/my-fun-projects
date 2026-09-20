@@ -1,20 +1,26 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
-import { ActivatedRoute, RouterLink } from '@angular/router';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import {
+  AbstractControl,
+  FormControl,
+  FormGroup,
+  ReactiveFormsModule,
+  ValidationErrors,
+  Validators,
+} from '@angular/forms';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 import { AuthService } from '../../core/auth.service';
 import { AppHttpError } from '../../core/error.interceptor';
-import {
-  NO_BIGOTRY_TYPE_NAME,
-  SEVERE_SCORE_THRESHOLD,
-  flagSeverityClass as computeFlagSeverityClass,
-} from '../../core/post-type.constants';
+import { PostActivityService } from '../../core/post-activity.service';
+import { NO_BIGOTRY_TYPE_NAME, flagSeverityClass as computeFlagSeverityClass } from '../../core/post-type.constants';
 import { Post, PostService } from '../../api/post.service';
 import { Resource, ResourceService } from '../../api/resource.service';
 import { PostType } from '../../api/post-flag.service';
 import { PostTypeService } from '../../api/post-type.service';
+import { AutofocusDirective } from '../../shared/autofocus.directive';
+import { ScrollIntoViewOnDirective } from '../../shared/scroll-into-view-on.directive';
 
 /**
  * One row of the per-movie flag summary. `averageScore` is `null` for
@@ -26,6 +32,43 @@ interface CategorySummaryEntry {
   name: string;
   count: number;
   averageScore: number | null;
+}
+
+type PostSortColumn = 'post' | 'author' | 'category' | 'posted';
+type SortDirection = 'asc' | 'desc';
+
+const MIN_POST_COLUMN_PX = 160;
+const MAX_POST_COLUMN_PX = 640;
+const DEFAULT_POST_COLUMN_PX = 320;
+const POST_COLUMN_STORAGE_KEY = 'imdb-ui-angular.post-column-width';
+const COLUMN_KEYBOARD_STEP_PX = 20;
+
+// How long a drilled-into post/reply row stays visually highlighted.
+const HIGHLIGHT_DURATION_MS = 2500;
+
+// Matches the CSS `line-clamp: 3` on `.body-text--clamped`.
+const CLAMPED_LINES = 3;
+// Rough average glyph width for the table's 0.9rem sans-serif body text —
+// not measured layout, just enough to make the "… more" toggle track the
+// resizable Post column instead of using one fixed, width-blind threshold.
+const AVG_CHAR_WIDTH_PX = 6;
+
+/** Validators.required alone treats "   " as non-empty — this rejects whitespace-only text too. */
+function requiredNonBlank(control: AbstractControl<string>): ValidationErrors | null {
+  return control.value?.trim().length ? null : { required: true };
+}
+
+function loadStoredPostColumnWidth(): number | null {
+  try {
+    const raw = localStorage.getItem(POST_COLUMN_STORAGE_KEY);
+    return raw ? Number(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clampPostColumnWidth(px: number): number {
+  return Math.min(MAX_POST_COLUMN_PX, Math.max(MIN_POST_COLUMN_PX, px));
 }
 
 /**
@@ -41,17 +84,19 @@ interface CategorySummaryEntry {
  */
 @Component({
   selector: 'app-resource-detail',
-  imports: [DatePipe, DecimalPipe, RouterLink, ReactiveFormsModule],
+  imports: [DatePipe, DecimalPipe, RouterLink, ReactiveFormsModule, AutofocusDirective, ScrollIntoViewOnDirective],
   templateUrl: './resource-detail.component.html',
   styleUrl: './resource-detail.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ResourceDetailComponent {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly resourceService = inject(ResourceService);
   private readonly postService = inject(PostService);
   private readonly postTypeService = inject(PostTypeService);
   private readonly auth = inject(AuthService);
+  private readonly postActivity = inject(PostActivityService);
   private readonly destroyRef = inject(DestroyRef);
 
   private resourceId = 0;
@@ -63,31 +108,28 @@ export class ResourceDetailComponent {
   readonly loading = signal(true);
   readonly loadError = signal<string | null>(null);
 
+  // Newest-first by default, per design-spec.md §5's "most recent activity
+  // first" ordering — matches what the backend already returns, so this is
+  // a no-op sort until the user picks a different column.
+  readonly sortColumn = signal<PostSortColumn>('posted');
+  readonly sortDirection = signal<SortDirection>('desc');
+  readonly sortedPosts = computed(() => {
+    const column = this.sortColumn();
+    const multiplier = this.sortDirection() === 'asc' ? 1 : -1;
+    return [...this.posts()].sort((a, b) => multiplier * comparePostsBy(a, b, column));
+  });
+
   readonly form = new FormGroup({
-    bodyText: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
-    postTypeId: new FormControl<number | null>(null),
-    score: new FormControl<number | null>(null),
+    bodyText: new FormControl('', { nonNullable: true, validators: [requiredNonBlank] }),
+    postTypeId: new FormControl<number | null>(null, { validators: [Validators.required] }),
+    score: new FormControl<number | null>(null, { validators: [Validators.required] }),
   });
   readonly selectedPostTypeId = toSignal(this.form.controls.postTypeId.valueChanges, { initialValue: null });
   readonly isNoBigotrySelected = computed(() => {
     const id = this.selectedPostTypeId();
     return id !== null && this.postTypes().find((t) => t.id === id)?.name === NO_BIGOTRY_TYPE_NAME;
   });
-  /**
-   * Purely a frontend rule — the backend's post_type list has no concept of
-   * "no-bigotry" or of one category depending on another's flags, it's
-   * just lookup data. This resource's already-loaded top-level posts (the
-   * only kind that can carry a flag through this UI — replies have no
-   * category/score fields) are enough to decide it without a new endpoint.
-   */
-  readonly hasSevereFlag = computed(() =>
-    this.posts().some((post) => post.flags.some((flag) => flag.score >= SEVERE_SCORE_THRESHOLD)),
-  );
-  readonly visiblePostTypes = computed(() => {
-    const types = this.postTypes();
-    return this.hasSevereFlag() ? types.filter((t) => t.name !== NO_BIGOTRY_TYPE_NAME) : types;
-  });
-  /** This movie's flags grouped by category — same top-level-posts-only data as hasSevereFlag. */
+  /** This movie's flags grouped by category — same top-level-posts-only data used elsewhere on this page. */
   readonly categorySummary = computed<CategorySummaryEntry[]>(() => {
     const totals = new Map<string, { total: number; count: number }>();
     for (const post of this.posts()) {
@@ -121,6 +163,26 @@ export class ResourceDetailComponent {
   readonly replySubmittingPostId = signal<number | null>(null);
   readonly replyError = signal<string | null>(null);
 
+  // Post/reply bodies clamped to 3 lines by default (both tables share this
+  // Set — a top-level post's id and its own replies' ids never collide).
+  readonly expandedBodyIds = signal<Set<number>>(new Set());
+
+  // The "Post" column's width, user-resizable via the drag handle on its
+  // header — persisted per-viewer the same way the dashboard panels are.
+  readonly postColumnWidth = signal(clampPostColumnWidth(loadStoredPostColumnWidth() ?? DEFAULT_POST_COLUMN_PX));
+  readonly columnResizing = signal(false);
+  private columnDragStartX = 0;
+  private columnDragStartWidth = 0;
+
+  // Drilling in from the "My Posts" panel: briefly highlights and scrolls
+  // to one specific post/reply row, then clears itself.
+  readonly highlightedPostId = signal<number | null>(null);
+  // Set from a highlight/parent query param, consumed once posts have
+  // finished loading (see the effect below) — kept separate from
+  // highlightedPostId itself since applying it may need a network round
+  // trip first (ensureHighlightTargetLoaded's larger-page fallback).
+  private readonly pendingHighlight = signal<{ postId: number; parentId: number | null } | null>(null);
+
   constructor() {
     this.route.paramMap
       .pipe(
@@ -129,12 +191,41 @@ export class ResourceDetailComponent {
       )
       .subscribe((id) => this.load(id));
 
+    // A *separate* subscription from paramMap above: clicking another
+    // post/reply for the movie you're already viewing only changes query
+    // params, not the path's :id segment, and paramMap does not re-emit for
+    // that (Angular only re-emits it on a genuine path-param change) — so
+    // without this, drilling into a second post on an already-open movie
+    // page would silently do nothing.
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((queryParams) => {
+      if (!queryParams.has('highlight')) {
+        // Also fires (harmlessly) from this component's own cleanup
+        // navigation below, once the params it's clearing are gone.
+        return;
+      }
+      const postId = Number(queryParams.get('highlight'));
+      const parentId = queryParams.has('parent') ? Number(queryParams.get('parent')) : null;
+      this.pendingHighlight.set({ postId, parentId });
+    });
+
+    effect(() => {
+      const pending = this.pendingHighlight();
+      // Waits for the current resource's posts to finish loading — covers
+      // both a fresh navigation (loading starts true) and re-highlighting
+      // on an already-loaded page (loading is already false, applies at once).
+      if (pending && !this.loading()) {
+        this.pendingHighlight.set(null);
+        this.ensureHighlightTargetLoaded(this.resourceId, pending.postId, pending.parentId);
+      }
+    });
+
     this.postTypeService
       .listAll()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (types) => this.postTypes.set(types),
-        // Not fatal — plain-text posting still works without the flag dropdown.
+        // A category is required to post at all, so an empty list here just
+        // means the form can't be submitted until it loads successfully.
         error: () => this.postTypes.set([]),
       });
 
@@ -152,15 +243,6 @@ export class ResourceDetailComponent {
         scoreControl.setValue(null);
       }
     });
-
-    // If a newly-added post makes this movie ineligible for "No Bigotry"
-    // while it's still selected (e.g. two posts submitted back to back),
-    // clear the now-hidden selection rather than silently submitting it.
-    effect(() => {
-      if (this.hasSevereFlag() && this.isNoBigotrySelected()) {
-        this.form.controls.postTypeId.setValue(null);
-      }
-    });
   }
 
   submit(): void {
@@ -170,11 +252,11 @@ export class ResourceDetailComponent {
       return;
     }
 
+    // postTypeId and score are both required (form.invalid catches a
+    // missing one above), except when score is disabled — the "No Bigotry"
+    // auto-set-to-0 case — where getRawValue() still returns its real
+    // value even though a disabled control is excluded from form.invalid.
     const { bodyText, postTypeId, score } = this.form.getRawValue();
-    if ((postTypeId == null) !== (score == null)) {
-      this.submitError.set('Pick a category and a score together, or leave both blank.');
-      return;
-    }
 
     this.submitting.set(true);
     this.submitError.set(null);
@@ -182,7 +264,7 @@ export class ResourceDetailComponent {
       .create({
         username: user.username,
         resourceId: this.resourceId,
-        bodyText,
+        bodyText: bodyText.trim(),
         postTypeId: postTypeId ?? undefined,
         score: score ?? undefined,
       })
@@ -195,12 +277,91 @@ export class ResourceDetailComponent {
           const flags = response.flag ? [response.flag] : [];
           this.posts.update((posts) => [...posts, { ...response.post, flags }]);
           this.form.reset({ bodyText: '', postTypeId: null, score: null });
+          // The side panels (my-posts-panel, rankings-panel) load once and
+          // stay mounted across navigation — nudge them to refetch.
+          this.postActivity.notifyPostOrReplyCreated();
         },
         error: (err: unknown) => {
           this.submitError.set(err instanceof AppHttpError ? err.message : 'Failed to create post.');
           this.submitting.set(false);
         },
       });
+  }
+
+  /**
+   * Clicking the active column reverses direction; clicking a new column
+   * switches to it with a sensible default (newest/A-Z first).
+   */
+  setSort(column: PostSortColumn): void {
+    if (this.sortColumn() === column) {
+      this.sortDirection.update((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      this.sortColumn.set(column);
+      this.sortDirection.set(column === 'posted' ? 'desc' : 'asc');
+    }
+  }
+
+  /** `aria-sort` value for a column's `<th>` — 'none' when it isn't the active sort. */
+  ariaSortFor(column: PostSortColumn): 'ascending' | 'descending' | 'none' {
+    if (this.sortColumn() !== column) {
+      return 'none';
+    }
+    return this.sortDirection() === 'asc' ? 'ascending' : 'descending';
+  }
+
+  /** Drag-resize the Post column, same pointer-capture pattern as the dashboard's panel splitters. */
+  startColumnResize(event: PointerEvent): void {
+    event.preventDefault();
+    this.columnDragStartX = event.clientX;
+    this.columnDragStartWidth = this.postColumnWidth();
+    this.columnResizing.set(true);
+    const target = event.target as Element;
+    if (typeof target.setPointerCapture === 'function') {
+      target.setPointerCapture(event.pointerId);
+    }
+  }
+
+  onColumnResizeMove(event: PointerEvent): void {
+    if (!this.columnResizing()) {
+      return;
+    }
+    const delta = event.clientX - this.columnDragStartX;
+    this.postColumnWidth.set(clampPostColumnWidth(this.columnDragStartWidth + delta));
+  }
+
+  onColumnResizeUp(event: PointerEvent): void {
+    if (!this.columnResizing()) {
+      return;
+    }
+    this.columnResizing.set(false);
+    this.persistPostColumnWidth();
+    const target = event.target as Element;
+    if (typeof target.releasePointerCapture === 'function') {
+      target.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  /** Arrow-key resizing for the column handle, per the ARIA separator pattern. */
+  onColumnResizeKeydown(event: KeyboardEvent): void {
+    let delta = 0;
+    if (event.key === 'ArrowLeft') {
+      delta = -COLUMN_KEYBOARD_STEP_PX;
+    } else if (event.key === 'ArrowRight') {
+      delta = COLUMN_KEYBOARD_STEP_PX;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    this.postColumnWidth.set(clampPostColumnWidth(this.postColumnWidth() + delta));
+    this.persistPostColumnWidth();
+  }
+
+  private persistPostColumnWidth(): void {
+    try {
+      localStorage.setItem(POST_COLUMN_STORAGE_KEY, String(this.postColumnWidth()));
+    } catch {
+      // Best-effort convenience only — fine if storage is unavailable.
+    }
   }
 
   /**
@@ -216,10 +377,16 @@ export class ResourceDetailComponent {
   getReplyControl(postId: number): FormControl<string> {
     let control = this.replyControls.get(postId);
     if (!control) {
-      control = new FormControl('', { nonNullable: true, validators: [Validators.required] });
+      control = new FormControl('', { nonNullable: true, validators: [requiredNonBlank] });
       this.replyControls.set(postId, control);
     }
     return control;
+  }
+
+  /** True once the user has tried to submit a blank reply — drives the inline error message. */
+  isReplyInvalid(postId: number): boolean {
+    const control = this.getReplyControl(postId);
+    return control.invalid && control.touched;
   }
 
   repliesFor(postId: number): Post[] {
@@ -244,6 +411,24 @@ export class ResourceDetailComponent {
     if (!wasOpen) {
       this.ensureRepliesLoaded(postId);
     }
+  }
+
+  /** Width-aware: narrowing the Post column lowers this, so the toggle stays honest as it resizes. */
+  isLongPost(bodyText: string): boolean {
+    const charsPerLine = this.postColumnWidth() / AVG_CHAR_WIDTH_PX;
+    return bodyText.length > charsPerLine * CLAMPED_LINES;
+  }
+
+  isBodyExpanded(postId: number): boolean {
+    return this.expandedBodyIds().has(postId);
+  }
+
+  toggleBodyExpand(postId: number): void {
+    this.expandedBodyIds.update((ids) => {
+      const next = new Set(ids);
+      next.has(postId) ? next.delete(postId) : next.add(postId);
+      return next;
+    });
   }
 
   toggleReply(postId: number): void {
@@ -294,7 +479,7 @@ export class ResourceDetailComponent {
     this.replySubmittingPostId.set(postId);
     this.replyError.set(null);
     this.postService
-      .reply(postId, { userId: user.id, bodyText: control.value })
+      .reply(postId, { userId: user.id, bodyText: control.value.trim() })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (reply) => {
@@ -303,10 +488,19 @@ export class ResourceDetailComponent {
             next.set(postId, [...(next.get(postId) ?? []), reply]);
             return next;
           });
+          // The create response doesn't carry the parent's updated
+          // replyCount (design-spec.md — list-endpoints-only field), and
+          // this is the only local copy of it, so bump it by hand. Without
+          // this, a post's expand caret (replyCount > 0) and count badge
+          // stay stale until the page is reloaded.
+          this.posts.update((posts) =>
+            posts.map((p) => (p.id === postId ? { ...p, replyCount: p.replyCount + 1 } : p)),
+          );
           control.reset('');
           this.openReplyPostId.set(null);
           this.replySubmittingPostId.set(null);
           // Reply — stay on this page, no navigation.
+          this.postActivity.notifyPostOrReplyCreated();
         },
         error: (err: unknown) => {
           this.replyError.set(err instanceof AppHttpError ? err.message : 'Failed to post reply.');
@@ -319,6 +513,7 @@ export class ResourceDetailComponent {
     this.resourceId = id;
     this.loading.set(true);
     this.loadError.set(null);
+    this.highlightedPostId.set(null);
 
     this.resourceService
       .get(id)
@@ -343,5 +538,77 @@ export class ResourceDetailComponent {
           this.loading.set(false);
         },
       });
+  }
+
+  /**
+   * The default page is only the 20 most recent top-level posts, which can
+   * miss a drill-down target on a busy movie (either the target itself, for
+   * a top-level post, or its parent, for a reply). Re-fetch a much larger
+   * page — matching the "just get basically everything" convention
+   * rankings-panel already uses for its own severity check — rather than
+   * silently doing nothing.
+   */
+  private ensureHighlightTargetLoaded(resourceId: number, postId: number, parentId: number | null): void {
+    const idThatMustBeLoaded = parentId ?? postId;
+    if (this.posts().some((p) => p.id === idThatMustBeLoaded)) {
+      this.highlightPost(postId, parentId);
+      return;
+    }
+    this.postService
+      .listTopLevel(resourceId, 0, 200)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (page) => {
+          this.posts.set(page.content);
+          this.highlightPost(postId, parentId);
+        },
+        // Best-effort — if it's still not there, just skip the highlight
+        // rather than leaving the page stuck waiting for one.
+        error: () => {},
+      });
+  }
+
+  /**
+   * A reply isn't in `posts` (it's fetched lazily per-post), so a reply
+   * target expands its parent's thread first — the row then mounts once
+   * replies finish loading, and appScrollIntoViewOn picks it up from there.
+   */
+  private highlightPost(postId: number, parentId: number | null): void {
+    if (parentId !== null && !this.isExpanded(parentId)) {
+      this.toggleExpand(parentId);
+    }
+    this.highlightedPostId.set(postId);
+    const timeoutId = setTimeout(() => this.highlightedPostId.set(null), HIGHLIGHT_DURATION_MS);
+    this.destroyRef.onDestroy(() => clearTimeout(timeoutId));
+
+    // Drop the highlight/parent query params so a refresh doesn't
+    // re-trigger this and the URL doesn't stay cluttered. Done here (async,
+    // well after the original navigation settled) rather than synchronously
+    // inside the paramMap subscriber that's still resolving it.
+    this.router.navigate(['/resources', this.resourceId], { replaceUrl: true });
+  }
+}
+
+/**
+ * A post can carry multiple category flags, but the "Category (Score)"
+ * column only has room to sort by one — the first flag, alphabetically by
+ * category and then by score. Posts with no flags sort before flagged ones
+ * in ascending order (nothing to compare, treated as "least").
+ */
+function comparePostsBy(a: Post, b: Post, column: PostSortColumn): number {
+  switch (column) {
+    case 'post':
+      return a.bodyText.localeCompare(b.bodyText);
+    case 'author':
+      return a.username.localeCompare(b.username);
+    case 'category': {
+      const [aFlag, bFlag] = [a.flags[0], b.flags[0]];
+      if (!aFlag || !bFlag) {
+        return Number(Boolean(aFlag)) - Number(Boolean(bFlag));
+      }
+      return aFlag.postType.name.localeCompare(bFlag.postType.name) || aFlag.score - bFlag.score;
+    }
+    case 'posted':
+      return Date.parse(a.createdAt) - Date.parse(b.createdAt);
   }
 }
