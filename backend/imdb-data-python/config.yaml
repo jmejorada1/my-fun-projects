@@ -1,0 +1,25 @@
+# Configuration for import_resources.py.
+# Any value here can be overridden per-run with the matching CLI flag,
+# e.g. `python3 import_resources.py --start-row 1 --end-row 500`.
+
+# Path to the IMDB title.basics.tsv file to read from.
+tsv_path: title.basics.tsv
+
+# Row range to import, 1-indexed, counting data rows only (the header line
+# is not counted). start_row=1 is the first title after the header.
+# The range is inclusive on both ends.
+start_row: 1
+end_row: 1000
+
+# Domain to import into (must already exist in the `domain` table, e.g.
+# 'imdb' or 'imdb/bigotry') — resource_category lookups and the inserted
+# resource rows are scoped to it.
+domain: imdb
+
+# posts-db connection details (must match backend/posts/src/main/resources/application.yml).
+db_host: localhost
+db_port: 5432
+db_name: posts-db
+db_schema: posts
+db_user: postgres
+db_password: "P@55w0rd"

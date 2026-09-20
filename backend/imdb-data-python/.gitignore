@@ -1,0 +1,10 @@
+# Virtual environment
+.venv/
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# IMDB source data — large downloaded dataset, not project source
+title.basics.tsv
+title.basics.tsv.gz

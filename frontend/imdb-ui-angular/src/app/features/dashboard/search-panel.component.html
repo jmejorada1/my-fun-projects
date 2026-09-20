@@ -1,0 +1,52 @@
+<section>
+  <h2>Search Results</h2>
+
+  @if (loading()) {
+    <p>Searching…</p>
+  } @else if (errorMessage()) {
+    <p class="field-error">{{ errorMessage() }}</p>
+  } @else if (!hasSearched()) {
+    <p class="muted">Search for a movie using the box in the toolbar above.</p>
+  } @else if (results().length === 0) {
+    <p class="muted">No results.</p>
+  } @else {
+    <table class="results-table">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Category</th>
+          <th class="numeric-col">Total Posts</th>
+          @for (category of flagCategories(); track category) {
+            <th>{{ category }}</th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (resource of results(); track resource.id) {
+          <tr>
+            <td>
+              <a [routerLink]="['/resources', resource.id]">{{ resource.displayName }}</a>
+            </td>
+            <td class="muted">{{ resource.category.displayName }}</td>
+            <td class="numeric-col">{{ resource.postCount }}</td>
+            @for (category of flagCategories(); track category) {
+              <td class="flags-col">
+                @if (flagEntryFor(resource, category); as entry) {
+                  <span class="flag-badge" [class]="flagSeverityClass(category, entry.averageScore)">
+                    @if (isNoBigotry(category)) {
+                      {{ entry.flagCount }}
+                    } @else {
+                      avg {{ entry.averageScore | number: '1.1-1' }} ({{ entry.flagCount }})
+                    }
+                  </span>
+                } @else {
+                  <span class="muted">—</span>
+                }
+              </td>
+            }
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>

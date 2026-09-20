@@ -1,0 +1,10 @@
+
+
+- user can log in just by enter email (this will be expanded in future). I plan to create a separate login-ui later. But for now can you create it in imdb-ui-angular? Also can you write a deployable UI that does the following:
+        - user will have a left hand frame of all their movie/posts
+        - user will have a search bar to search all programs in backend database via REST call. Just do a plane 'submit' style search for now. But we may improve this in the future to do type ahead search.
+        - user will have a right hand panel displaying top 5 resources per bigotry category
+
+Build this in Angular. Do not implement anything yet. Provide a Design/Pre-implementation spec first, so we can review. Also the rest-api endpoints you will be calling are in this spring boot project: backend/posts. The domain you will be using will be "imdb/bigotry", which will rate movies based on bigotry scores. In the future we might rate movies,shows,etc using a different rating scheme.
+
+Design the implementation spec in testable phases. Do not guess. Ask quesitons if you're not sure. 

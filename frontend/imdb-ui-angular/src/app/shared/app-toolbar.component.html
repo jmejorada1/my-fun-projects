@@ -1,0 +1,26 @@
+<header class="app-toolbar">
+  <label class="domain-picker">
+    Domain:
+    <select [value]="selectedDomain()" (change)="onDomainChange($event)">
+      @for (option of domainOptions; track option.value) {
+        <option [value]="option.value" [disabled]="!option.enabled">
+          {{ option.label }}{{ option.enabled ? '' : ' (coming soon)' }}
+        </option>
+      }
+    </select>
+  </label>
+
+  @if (currentUser()) {
+    <form class="search-form" [formGroup]="searchForm" (ngSubmit)="submitSearch()">
+      <input type="text" formControlName="term" placeholder="Search movies…" />
+      <button type="submit">Search</button>
+    </form>
+  }
+
+  @if (currentUser(); as user) {
+    <div class="user-status">
+      <span>Hi {{ user.username }}</span>
+      <button type="button" class="link-button" (click)="logout()">Logout</button>
+    </div>
+  }
+</header>

@@ -1,0 +1,29 @@
+<div class="dashboard" [class.resizing]="resizing()" [style.grid-template-columns]="gridTemplateColumns()">
+  <app-my-posts-panel class="panel panel--left" />
+  <div
+    class="splitter"
+    role="separator"
+    aria-orientation="vertical"
+    aria-label="Resize left panel"
+    tabindex="0"
+    (pointerdown)="startResize('left', $event)"
+    (pointermove)="onPointerMove($event)"
+    (pointerup)="onPointerUp($event)"
+    (keydown)="onSplitterKeydown('left', $event)"
+  ></div>
+  <div class="panel panel--center">
+    <router-outlet />
+  </div>
+  <div
+    class="splitter"
+    role="separator"
+    aria-orientation="vertical"
+    aria-label="Resize right panel"
+    tabindex="0"
+    (pointerdown)="startResize('right', $event)"
+    (pointermove)="onPointerMove($event)"
+    (pointerup)="onPointerUp($event)"
+    (keydown)="onSplitterKeydown('right', $event)"
+  ></div>
+  <app-rankings-panel class="panel panel--right" />
+</div>

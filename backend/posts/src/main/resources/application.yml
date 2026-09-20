@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: posts
+  datasource:
+    url: jdbc:postgresql://localhost:5432/posts-db
+    username: postgres
+    password: "P@55w0rd"
+    hikari:
+      schema: posts
+  flyway:
+    schemas: posts
+    default-schema: posts
+    create-schemas: true
+  jpa:
+    properties:
+      hibernate:
+        default_schema: posts
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  cors:
+    # frontend/imdb-ui-angular/docs/design-spec.md §3.7. Comma-separated;
+    # add the deployed UI's origin here once it exists — no code change
+    # needed.
+    allowed-origins: http://localhost:4200

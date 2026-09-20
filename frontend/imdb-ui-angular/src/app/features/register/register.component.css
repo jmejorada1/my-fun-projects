@@ -1,0 +1,47 @@
+.register {
+  max-width: 320px;
+  margin: 12vh auto 0;
+  padding: 2rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-family: system-ui, sans-serif;
+}
+
+.subtitle {
+  color: #666;
+  margin-top: -0.5rem;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+label {
+  margin-top: 0.5rem;
+}
+
+input {
+  padding: 0.5rem;
+  font-size: 1rem;
+}
+
+button {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.field-error {
+  color: #b00020;
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.switch-link {
+  margin: 1rem 0 0;
+  font-size: 0.875rem;
+  color: #666;
+}

@@ -1,0 +1,181 @@
+@if (loading()) {
+  <p>Loading…</p>
+} @else if (loadError()) {
+  <p class="field-error">{{ loadError() }}</p>
+} @else {
+  <a routerLink="/" class="back-link">← Back to Search</a>
+
+  @if (resource(); as r) {
+    <header class="resource-header">
+      <h1>{{ r.displayName }}</h1>
+      <p class="muted">{{ r.category.displayName }}</p>
+    </header>
+  }
+
+  @if (categorySummary().length > 0) {
+    <section class="flag-summary">
+      <h2>Flag Summary</h2>
+      <div class="summary-grid">
+        @for (entry of categorySummary(); track entry.name) {
+          <div class="summary-card" [class]="flagSeverityClass(entry.name, entry.averageScore ?? 0)">
+            <span class="summary-name">{{ entry.name }}</span>
+            @if (entry.averageScore !== null) {
+              <span class="summary-value">avg {{ entry.averageScore | number: '1.1-1' }}</span>
+              <span class="summary-count">{{ entry.count }} {{ entry.count === 1 ? 'flag' : 'flags' }}</span>
+            } @else {
+              <span class="summary-value">{{ entry.count }}</span>
+            }
+          </div>
+        }
+      </div>
+    </section>
+  }
+
+  <section class="new-post">
+    <h2>Add a Post</h2>
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <textarea
+        formControlName="bodyText"
+        placeholder="What do you think?"
+        rows="3"
+      ></textarea>
+
+      <div class="flag-fields">
+        <label>
+          Bigotry category (optional)
+          <select formControlName="postTypeId">
+            <option [ngValue]="null">No flag</option>
+            @for (type of visiblePostTypes(); track type.id) {
+              <option [ngValue]="type.id">{{ type.name }}</option>
+            }
+          </select>
+        </label>
+
+        @if (isNoBigotrySelected()) {
+          <p class="muted no-severity-note">Severity is automatically set to 0 (neutral) for this category.</p>
+        } @else if (selectedPostTypeId() !== null) {
+          <label>
+            Severity (0 = neutral, 5 = most severe)
+            <select formControlName="score">
+              <option [ngValue]="null">—</option>
+              @for (n of [0, 1, 2, 3, 4, 5]; track n) {
+                <option [ngValue]="n">{{ n === 0 ? '0 (Neutral)' : n }}</option>
+              }
+            </select>
+          </label>
+        }
+      </div>
+
+      @if (submitError()) {
+        <p class="field-error">{{ submitError() }}</p>
+      }
+
+      <button type="submit" [disabled]="submitting()">
+        {{ submitting() ? 'Posting…' : 'Post' }}
+      </button>
+    </form>
+  </section>
+
+  <section class="thread">
+    <h2>Posts</h2>
+    @if (posts().length === 0) {
+      <p class="muted">No posts yet — be the first.</p>
+    } @else {
+      <table class="posts-table">
+        <thead>
+          <tr>
+            <th class="expand-col"></th>
+            <th>Post</th>
+            <th>Author</th>
+            <th>Category (Score)</th>
+            <th>Posted</th>
+            <th class="actions-col"></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (post of posts(); track post.id) {
+            <tr class="post-row" (click)="toggleExpand(post.id)">
+              <td class="expand-col">
+                @if (post.replyCount > 0) {
+                  <span class="expand-icon" [class.expand-icon--open]="isExpanded(post.id)">▸</span>
+                  <span class="reply-count">{{ post.replyCount }}</span>
+                }
+              </td>
+              <td class="body-col">{{ post.bodyText }}</td>
+              <td>{{ post.username }}</td>
+              <td class="flags-col">
+                @if (post.flags.length === 0) {
+                  <span class="muted">—</span>
+                } @else {
+                  @for (flag of post.flags; track flag.id) {
+                    <span class="flag-badge" [class]="flagSeverityClass(flag.postType.name, flag.score)">{{ flag.postType.name }} ({{ flag.score }})</span>
+                  }
+                }
+              </td>
+              <td><time>{{ post.createdAt | date: 'medium' }}</time></td>
+              <td class="actions-col">
+                <button type="button" class="link-button" (click)="toggleReply(post.id); $event.stopPropagation()">
+                  {{ openReplyPostId() === post.id ? 'Cancel' : 'Reply' }}
+                </button>
+              </td>
+            </tr>
+            @if (isExpanded(post.id) || openReplyPostId() === post.id) {
+              <tr class="detail-row">
+                <td></td>
+                <td colspan="5">
+                  @if (repliesLoading(post.id)) {
+                    <p class="muted">Loading replies…</p>
+                  } @else if (repliesFor(post.id).length > 0) {
+                    <table class="replies-table">
+                      <tbody>
+                        @for (reply of repliesFor(post.id); track reply.id) {
+                          <tr class="reply-row">
+                            <td class="reply-branch">↳</td>
+                            <td class="body-col">{{ reply.bodyText }}</td>
+                            <td>{{ reply.username }}</td>
+                            <td class="flags-col">
+                              @if (reply.flags.length === 0) {
+                                <span class="muted">—</span>
+                              } @else {
+                                @for (flag of reply.flags; track flag.id) {
+                                  <span class="flag-badge" [class]="flagSeverityClass(flag.postType.name, flag.score)">{{ flag.postType.name }} ({{ flag.score }})</span>
+                                }
+                              }
+                            </td>
+                            <td><time>{{ reply.createdAt | date: 'medium' }}</time></td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  } @else {
+                    <p class="muted">No replies yet.</p>
+                  }
+
+                  @if (openReplyPostId() === post.id) {
+                    <div class="reply-form">
+                      <textarea
+                        [formControl]="getReplyControl(post.id)"
+                        placeholder="Write a reply…"
+                        rows="2"
+                      ></textarea>
+                      @if (replyError()) {
+                        <p class="field-error">{{ replyError() }}</p>
+                      }
+                      <button
+                        type="button"
+                        [disabled]="replySubmittingPostId() === post.id"
+                        (click)="submitReply(post.id)"
+                      >
+                        {{ replySubmittingPostId() === post.id ? 'Replying…' : 'Post reply' }}
+                      </button>
+                    </div>
+                  }
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    }
+  </section>
+}

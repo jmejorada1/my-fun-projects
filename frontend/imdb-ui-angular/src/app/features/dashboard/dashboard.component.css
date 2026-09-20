@@ -1,0 +1,40 @@
+.dashboard {
+  display: grid;
+  padding: 1rem;
+  min-height: 100vh;
+  box-sizing: border-box;
+  font-family: system-ui, sans-serif;
+  overflow-x: auto;
+}
+
+.dashboard.resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.panel {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 1rem;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.splitter {
+  cursor: col-resize;
+  border-radius: 3px;
+  background: transparent;
+  touch-action: none;
+  transition: background-color 0.15s ease;
+}
+
+.splitter:hover,
+.splitter:active,
+.splitter:focus-visible {
+  background: #cbd5e1;
+}
+
+.splitter:focus-visible {
+  outline: 2px solid #3366cc;
+  outline-offset: 1px;
+}

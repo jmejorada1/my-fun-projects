@@ -1,0 +1,86 @@
+section + section {
+  margin-top: 1.5rem;
+}
+
+.tree {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.tree-group + .tree-group {
+  margin-top: 0.5rem;
+}
+
+.tree-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.25rem 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* Rotates into an "expanded" caret purely with CSS, same trick as resource-detail's posts table. */
+.tree-caret {
+  display: inline-block;
+  color: #888;
+  font-size: 0.75rem;
+  transition: transform 0.15s ease;
+}
+
+.tree-caret--open {
+  transform: rotate(90deg);
+}
+
+.tree-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-count {
+  color: #888;
+  font-weight: 400;
+  font-size: 0.8rem;
+}
+
+.tree-children {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding-left: 1.1rem;
+  border-left: 2px solid #eee;
+}
+
+.tree-children li {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #eee;
+}
+
+.tree-children li:last-child {
+  border-bottom: none;
+}
+
+.tree-children li p {
+  margin: 0 0 0.25rem;
+}
+
+time {
+  color: #888;
+  font-size: 0.8rem;
+}
+
+.muted {
+  color: #888;
+}
+
+.field-error {
+  color: #b00020;
+}

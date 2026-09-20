@@ -1,0 +1,245 @@
+:host {
+  display: block;
+  font-family: system-ui, sans-serif;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 1rem;
+  color: #555;
+  text-decoration: none;
+}
+
+.resource-header {
+  margin-bottom: 1.5rem;
+}
+
+.resource-header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+}
+
+.muted {
+  color: #888;
+}
+
+.field-error {
+  color: #b00020;
+}
+
+.flag-summary {
+  margin-bottom: 1.5rem;
+}
+
+.flag-summary h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.summary-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 130px;
+  padding: 0.6rem 0.9rem;
+  border-radius: 10px;
+}
+
+.summary-name {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  letter-spacing: 0.03em;
+  opacity: 0.85;
+}
+
+.summary-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.summary-count {
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
+.thread {
+  margin-bottom: 1.5rem;
+}
+
+.posts-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.posts-table th {
+  text-align: left;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: #888;
+  font-weight: 600;
+  padding: 0.5rem;
+  border-bottom: 1px solid #ddd;
+}
+
+.posts-table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid #eee;
+  vertical-align: top;
+  overflow-wrap: break-word;
+}
+
+.expand-col {
+  width: 3rem;
+  white-space: nowrap;
+}
+
+.actions-col {
+  width: 5.5rem;
+  text-align: right;
+}
+
+.post-row {
+  cursor: pointer;
+}
+
+.post-row:hover {
+  background: #f7f7f7;
+}
+
+/* Rotates into a "expanded" caret purely with CSS — no extra glyph swap needed. */
+.expand-icon {
+  display: inline-block;
+  color: #888;
+  transition: transform 0.15s ease;
+}
+
+.expand-icon--open {
+  transform: rotate(90deg);
+}
+
+.reply-count {
+  margin-left: 0.3rem;
+  color: #888;
+  font-size: 0.75rem;
+}
+
+.detail-row td {
+  background: #fafafa;
+}
+
+/* Nested tree level: reused as an inner table rather than another
+   .posts-table so the "↳" branch column stays visually subordinate. */
+.replies-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0.5rem;
+}
+
+.replies-table td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid #eee;
+  vertical-align: top;
+  overflow-wrap: break-word;
+}
+
+.reply-branch {
+  width: 1.25rem;
+  color: #bbb;
+}
+
+.flags-col {
+  display: table-cell;
+}
+
+.flags-col .flag-badge {
+  display: inline-block;
+  margin: 0 0.3rem 0.2rem 0;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+/* Severity color coding: red (4-5), orange (3), yellow (0-2), green ("no-bigotry"). */
+.flag-badge--red {
+  background: #fde8e8;
+  color: #a33a3a;
+}
+
+.flag-badge--orange {
+  background: #fdead1;
+  color: #a35d1f;
+}
+
+.flag-badge--yellow {
+  background: #fdf6d1;
+  color: #8a7a1f;
+}
+
+.flag-badge--green {
+  background: #e3f3e3;
+  color: #2f7a3d;
+}
+
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: #3366cc;
+  font-size: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.reply-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.new-post form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 480px;
+}
+
+textarea {
+  padding: 0.5rem;
+  font: inherit;
+  resize: vertical;
+}
+
+.flag-fields {
+  display: flex;
+  gap: 1rem;
+}
+
+.flag-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.no-severity-note {
+  align-self: flex-end;
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+button {
+  align-self: flex-start;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}

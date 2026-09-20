@@ -1,0 +1,62 @@
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.results-table th {
+  text-align: left;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: #888;
+  font-weight: 600;
+  padding: 0.5rem;
+  border-bottom: 1px solid #ddd;
+}
+
+.results-table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid #eee;
+  vertical-align: top;
+}
+
+.numeric-col {
+  text-align: center;
+}
+
+.flags-col .flag-badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+/* Severity color coding: red (4-5), orange (3), yellow (0-2), green ("no-bigotry"). */
+.flag-badge--red {
+  background: #fde8e8;
+  color: #a33a3a;
+}
+
+.flag-badge--orange {
+  background: #fdead1;
+  color: #a35d1f;
+}
+
+.flag-badge--yellow {
+  background: #fdf6d1;
+  color: #8a7a1f;
+}
+
+.flag-badge--green {
+  background: #e3f3e3;
+  color: #2f7a3d;
+}
+
+.muted {
+  color: #888;
+}
+
+.field-error {
+  color: #b00020;
+}

@@ -1,0 +1,28 @@
+<section>
+  <h2>Top 5 by Category</h2>
+
+  @if (loading()) {
+    <p>Loading…</p>
+  } @else if (errorMessage()) {
+    <p class="field-error">{{ errorMessage() }}</p>
+  } @else {
+    @for (ranking of rankings(); track ranking.postType.id) {
+      <div class="ranking-group">
+        <h3>{{ ranking.postType.name }}</h3>
+        @if (ranking.resources.length === 0) {
+          <p class="muted">No flagged resources yet.</p>
+        } @else {
+          <ol>
+            @for (item of ranking.resources; track item.resource.id) {
+              <li>
+                {{ item.resource.displayName }} —
+                avg {{ item.averageScore | number: '1.1-1' }}
+                ({{ item.flagCount }} flags)
+              </li>
+            }
+          </ol>
+        }
+      </div>
+    }
+  }
+</section>

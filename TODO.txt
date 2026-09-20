@@ -1,0 +1,21 @@
+-- backend--add domain to tables. For example 'imdb', 'thought-pattern'.
+
+-- add tests in both projects
+-- create UI, in Angular
+        - user can log in just by enter email (this will be expanded in future)
+        - user will have a left hand frame of all their posts
+        - user will have a search bar to search all programs
+        - user will have a right hand panel displaying top 5 resources per category
+
+--- add to github
+
+** Frontend-Angular
+
+   -- move posts section
+   -- better css
+   -- sortable tables (descending first)
+   -- drill down capabilities on side panel
+   -- make search ajaxable
+
+
+   -- restructure code to be easily configurable by domain.
