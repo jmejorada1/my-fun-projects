@@ -11,13 +11,19 @@
 
 ** Frontend-Angular
 
-   -- move posts section
-   -- better css
-   -- sortable tables (descending first)
-   -- drill down capabilities on side panel
+   X-- move posts section
+   X-- better css
+   X-- sortable tables (descending first)
+   X-- make post column resizable
+   -- drill down capabilities on side panels
+   -- BUG: When i click reply change focus to text box.
    -- make search ajaxable
+   -- make my posts and my replies collaosable
 
 
    -- restructure code to be easily configurable by domain.
+
+
+   --- LLM Service API???
 
    

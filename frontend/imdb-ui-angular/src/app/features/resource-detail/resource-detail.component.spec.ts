@@ -384,6 +384,33 @@ describe('ResourceDetailComponent', () => {
     expect(fixture.componentInstance.openReplyPostId()).toBeNull();
   });
 
+  it('bumps replyCount locally so the expand caret appears without a page reload', async () => {
+    const fixture = await createComponent([
+      {
+        id: 43, resourceId: 1, userId: 9, username: 'other-user', parentPostId: null, bodyText: 'No replies yet.', data: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
+        flags: [], replyCount: 0, resourceDisplayName: 'Carmencita',
+      },
+    ]);
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.expand-icon')).toBeNull();
+
+    fixture.componentInstance.toggleReply(43);
+    httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/43/replies` && r.method === 'GET').flush({
+      content: [], totalElements: 0, totalPages: 0, number: 0, size: 50,
+    });
+    fixture.componentInstance.getReplyControl(43).setValue('First reply.');
+    fixture.componentInstance.submitReply(43);
+    httpMock.expectOne(`${API_BASE_URL}/posts/43/replies`).flush({
+      id: 201, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: 43, bodyText: 'First reply.', data: null,
+      createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita',
+    });
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.posts().find((p) => p.id === 43)?.replyCount).toBe(1);
+    expect(el.querySelector('.expand-icon')).toBeTruthy();
+    expect(el.querySelector('.reply-count')?.textContent?.trim()).toBe('1');
+  });
+
   it('does not submit an empty reply', async () => {
     const fixture = await createComponent();
 
@@ -424,5 +451,200 @@ describe('ResourceDetailComponent', () => {
     fixture.componentInstance.toggleExpand(42);
     fixture.componentInstance.toggleExpand(42);
     httpMock.expectNone((r) => r.url === `${API_BASE_URL}/posts/42/replies`);
+  });
+
+  describe('sorting the posts table', () => {
+    const SORT_TEST_POSTS = [
+      {
+        id: 1, resourceId: 1, userId: 1, username: 'zed', parentPostId: null, bodyText: 'Middle post.', data: null,
+        createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z',
+        flags: [{ id: 1, postId: 1, postType: { id: 5, name: 'sexism' }, score: 2, createdAt: '', updatedAt: '' }],
+        replyCount: 0, resourceDisplayName: 'Carmencita',
+      },
+      {
+        id: 2, resourceId: 1, userId: 2, username: 'amy', parentPostId: null, bodyText: 'Oldest post.', data: null,
+        createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
+        flags: [],
+        replyCount: 0, resourceDisplayName: 'Carmencita',
+      },
+      {
+        id: 3, resourceId: 1, userId: 3, username: 'mo', parentPostId: null, bodyText: 'Newest post.', data: null,
+        createdAt: '2026-01-03T00:00:00Z', updatedAt: '2026-01-03T00:00:00Z',
+        flags: [{ id: 2, postId: 3, postType: { id: 6, name: 'racism' }, score: 4, createdAt: '', updatedAt: '' }],
+        replyCount: 0, resourceDisplayName: 'Carmencita',
+      },
+    ];
+
+    it('defaults to newest-first by "Posted", matching the toolbar indicator', async () => {
+      const fixture = await createComponent(SORT_TEST_POSTS);
+      const c = fixture.componentInstance;
+
+      expect(c.sortColumn()).toBe('posted');
+      expect(c.sortDirection()).toBe('desc');
+      expect(c.sortedPosts().map((p) => p.id)).toEqual([3, 1, 2]);
+      expect(c.ariaSortFor('posted')).toBe('descending');
+      expect(c.ariaSortFor('author')).toBe('none');
+    });
+
+    it('sorts by author A-Z on first click, then reverses on a second click of the same column', async () => {
+      const fixture = await createComponent(SORT_TEST_POSTS);
+      const c = fixture.componentInstance;
+
+      c.setSort('author');
+      expect(c.sortDirection()).toBe('asc');
+      expect(c.sortedPosts().map((p) => p.username)).toEqual(['amy', 'mo', 'zed']);
+
+      c.setSort('author');
+      expect(c.sortDirection()).toBe('desc');
+      expect(c.sortedPosts().map((p) => p.username)).toEqual(['zed', 'mo', 'amy']);
+    });
+
+    it('sorts by post body text A-Z', async () => {
+      const fixture = await createComponent(SORT_TEST_POSTS);
+      const c = fixture.componentInstance;
+
+      c.setSort('post');
+      expect(c.sortedPosts().map((p) => p.bodyText)).toEqual(['Middle post.', 'Newest post.', 'Oldest post.']);
+    });
+
+    it('sorts by category, unflagged posts first, ties broken by score', async () => {
+      const fixture = await createComponent(SORT_TEST_POSTS);
+      const c = fixture.componentInstance;
+
+      c.setSort('category');
+      // amy: no flag: racism (id 3): sexism (id 1) — alphabetical, unflagged first.
+      expect(c.sortedPosts().map((p) => p.id)).toEqual([2, 3, 1]);
+    });
+
+    it('switching to a new column resets direction to that column\'s default, not the previous direction', async () => {
+      const fixture = await createComponent(SORT_TEST_POSTS);
+      const c = fixture.componentInstance;
+
+      c.setSort('author'); // asc
+      c.setSort('posted'); // switching column — should default to desc, not inherit asc
+      expect(c.sortDirection()).toBe('desc');
+      expect(c.sortedPosts().map((p) => p.id)).toEqual([3, 1, 2]);
+    });
+
+    it('renders table rows in the sorted order', async () => {
+      const fixture = await createComponent(SORT_TEST_POSTS);
+      fixture.componentInstance.setSort('post');
+      fixture.detectChanges();
+
+      const bodies = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('.post-row .body-col'),
+      ).map((el) => el.textContent?.trim());
+      expect(bodies).toEqual(['Middle post.', 'Newest post.', 'Oldest post.']);
+    });
+  });
+
+  describe('long post bodies', () => {
+    const LONG_BODY = 'x'.repeat(200);
+
+    it('shows a "… more" toggle only for posts over the length threshold', async () => {
+      const fixture = await createComponent([
+        { id: 1, resourceId: 1, userId: 1, username: 'a', parentPostId: null, bodyText: LONG_BODY, data: null, createdAt: '', updatedAt: '', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
+        { id: 2, resourceId: 1, userId: 1, username: 'b', parentPostId: null, bodyText: 'short.', data: null, createdAt: '', updatedAt: '', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
+      ]);
+
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(text).toContain('… more');
+      expect(fixture.componentInstance.isLongPost(LONG_BODY)).toBe(true);
+      expect(fixture.componentInstance.isLongPost('short.')).toBe(false);
+    });
+
+    it('expands and re-collapses a post body without affecting other posts', async () => {
+      const fixture = await createComponent([
+        { id: 1, resourceId: 1, userId: 1, username: 'a', parentPostId: null, bodyText: LONG_BODY, data: null, createdAt: '', updatedAt: '', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
+      ]);
+      const c = fixture.componentInstance;
+
+      expect(c.isBodyExpanded(1)).toBe(false);
+      c.toggleBodyExpand(1);
+      expect(c.isBodyExpanded(1)).toBe(true);
+      expect(c.isBodyExpanded(2)).toBe(false);
+      c.toggleBodyExpand(1);
+      expect(c.isBodyExpanded(1)).toBe(false);
+    });
+
+    it('clicking the toggle does not also expand the row\'s reply thread', async () => {
+      const fixture = await createComponent([
+        { id: 1, resourceId: 1, userId: 1, username: 'a', parentPostId: null, bodyText: LONG_BODY, data: null, createdAt: '', updatedAt: '', flags: [], replyCount: 1, resourceDisplayName: 'Carmencita' },
+      ]);
+
+      const toggle = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find(
+        (b) => b.textContent?.includes('more'),
+      ) as HTMLButtonElement;
+      toggle.click();
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.isBodyExpanded(1)).toBe(true);
+      expect(fixture.componentInstance.isExpanded(1)).toBe(false);
+    });
+
+    it('lowers the truncation threshold as the Post column narrows', async () => {
+      const fixture = await createComponent();
+      const c = fixture.componentInstance;
+      const midLengthText = 'y'.repeat(120);
+
+      c.postColumnWidth.set(320);
+      expect(c.isLongPost(midLengthText)).toBe(false);
+
+      c.postColumnWidth.set(160);
+      expect(c.isLongPost(midLengthText)).toBe(true);
+    });
+  });
+
+  describe('resizing the Post column', () => {
+    beforeEach(() => localStorage.removeItem('imdb-ui-angular.post-column-width'));
+
+    it('drag-resizes the column and persists the width', async () => {
+      const fixture = await createComponent();
+      const resizer = (fixture.nativeElement as HTMLElement).querySelector('.col-resizer') as HTMLElement;
+
+      // MouseEvent, not PointerEvent — jsdom doesn't implement pointer
+      // capture, and the component's (pointerdown) binding fires for any
+      // native "pointerdown"-named event regardless of its concrete type.
+      resizer.dispatchEvent(new MouseEvent('pointerdown', { clientX: 320, bubbles: true }));
+      resizer.dispatchEvent(new MouseEvent('pointermove', { clientX: 420, bubbles: true }));
+      resizer.dispatchEvent(new MouseEvent('pointerup', { clientX: 420, bubbles: true }));
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.postColumnWidth()).toBe(420);
+      const postTh = (fixture.nativeElement as HTMLElement).querySelector('.post-th') as HTMLElement;
+      expect(postTh.style.width).toBe('420px');
+      expect(localStorage.getItem('imdb-ui-angular.post-column-width')).toBe('420');
+    });
+
+    it('clamps drag-resize to the min/max column width', async () => {
+      const fixture = await createComponent();
+      const resizer = (fixture.nativeElement as HTMLElement).querySelector('.col-resizer') as HTMLElement;
+
+      resizer.dispatchEvent(new MouseEvent('pointerdown', { clientX: 320, bubbles: true }));
+      resizer.dispatchEvent(new MouseEvent('pointermove', { clientX: -1000, bubbles: true }));
+      resizer.dispatchEvent(new MouseEvent('pointerup', { clientX: -1000, bubbles: true }));
+
+      expect(fixture.componentInstance.postColumnWidth()).toBe(160); // MIN_POST_COLUMN_PX
+    });
+
+    it('resizes via arrow keys on the handle and persists the result', async () => {
+      const fixture = await createComponent();
+      const c = fixture.componentInstance;
+      const startWidth = c.postColumnWidth();
+
+      c.onColumnResizeKeydown({ key: 'ArrowRight', preventDefault: () => {} } as KeyboardEvent);
+      expect(c.postColumnWidth()).toBe(startWidth + 20);
+      expect(localStorage.getItem('imdb-ui-angular.post-column-width')).toBe(String(startWidth + 20));
+
+      c.onColumnResizeKeydown({ key: 'ArrowLeft', preventDefault: () => {} } as KeyboardEvent);
+      expect(c.postColumnWidth()).toBe(startWidth);
+    });
+
+    it('restores a previously persisted width on load', async () => {
+      localStorage.setItem('imdb-ui-angular.post-column-width', '500');
+      const fixture = await createComponent();
+
+      expect(fixture.componentInstance.postColumnWidth()).toBe(500);
+    });
   });
 });

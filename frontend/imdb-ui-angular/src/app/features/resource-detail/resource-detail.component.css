@@ -119,8 +119,87 @@
   letter-spacing: 0.03em;
   color: var(--color-text-subtle);
   font-weight: 700;
-  padding: 0.5rem 0.6rem;
+  padding: 0;
   border-bottom: 2px solid var(--color-border);
+}
+
+.post-th {
+  position: relative;
+}
+
+.col-resizer {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none;
+  transition: background-color var(--transition-fast);
+}
+
+.col-resizer:hover,
+.col-resizer:active,
+.col-resizer:focus-visible {
+  background: var(--color-border-strong);
+}
+
+.col-resizer:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.thread.resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+/* A light tint + dark text (same pair the "Back to Search" link uses) reads
+   clearly on hover — safer than trying to force `background: none` against
+   the global button:hover rule's fill, and repeating "button" + :not(:disabled)
+   here pushes this comfortably past that rule's specificity either way. */
+button.sort-button:hover:not(:disabled),
+button.sort-button:active:not(:disabled),
+button.sort-button:focus-visible {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.sort-icon {
+  font-size: 0.6rem;
+  opacity: 0;
+  color: var(--color-primary);
+  transition: opacity var(--transition-fast);
+}
+
+.sort-button:hover .sort-icon {
+  opacity: 0.5;
+}
+
+.sort-icon--active {
+  opacity: 1 !important;
 }
 
 .posts-table td {
@@ -128,6 +207,24 @@
   border-bottom: 1px solid var(--color-border);
   vertical-align: top;
   overflow-wrap: break-word;
+}
+
+.body-text {
+  display: block;
+}
+
+.body-text--clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
+.body-toggle {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.8rem;
 }
 
 .expand-col {
@@ -176,6 +273,7 @@
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 0.5rem;
+  table-layout: fixed;
 }
 
 .replies-table td {
