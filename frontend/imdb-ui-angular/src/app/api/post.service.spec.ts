@@ -55,4 +55,13 @@ describe('PostService', () => {
     expect(req.request.body).toEqual({ username: 'jdoe', resourceId: 1, bodyText: 'hello' });
     req.flush({ post: { id: 1 }, flag: null });
   });
+
+  it('sends the acting user as an X-User-Id header when deleting a post', () => {
+    service.delete(42, 7).subscribe();
+
+    const req = httpMock.expectOne(`${API_BASE_URL}/posts/42`);
+    expect(req.request.method).toBe('DELETE');
+    expect(req.request.headers.get('X-User-Id')).toBe('7');
+    req.flush(null);
+  });
 });

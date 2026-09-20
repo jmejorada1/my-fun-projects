@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { API_BASE_URL } from '../core/api-config';
 import { Page } from './page';
@@ -75,5 +75,16 @@ export class PostService {
 
   reply(postId: number, request: ReplyCreateRequest): Observable<Post> {
     return this.http.post<Post>(`${API_BASE_URL}/posts/${postId}/replies`, request);
+  }
+
+  /**
+   * Soft-deletes a post and, in the same backend transaction, its entire
+   * reply subtree — including replies from other users, since the cascade
+   * walks the parentPostId tree, not authorship. Owner-only: the backend
+   * 403s if `userId` isn't the post's own author.
+   */
+  delete(postId: number, userId: number): Observable<void> {
+    const headers = new HttpHeaders({ 'X-User-Id': String(userId) });
+    return this.http.delete<void>(`${API_BASE_URL}/posts/${postId}`, { headers });
   }
 }
