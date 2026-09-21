@@ -7,8 +7,11 @@
 
 set -uo pipefail
 
+# This script lives in scripts/, but docker-compose.yml is at the repo root —
+# run everything from there, not from scripts/ itself.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$ROOT_DIR"
 
 # Keep in sync with the host-side `ports:` entries in docker-compose.yml.
 REQUIRED_PORTS=(4200 8080 5433)
@@ -58,7 +61,7 @@ if command -v docker >/dev/null 2>&1; then
 fi
 
 # 4. docker-compose.yml present and valid.
-if [ -f "$SCRIPT_DIR/docker-compose.yml" ]; then
+if [ -f "$ROOT_DIR/docker-compose.yml" ]; then
   if command -v docker >/dev/null 2>&1 && docker compose config >/dev/null 2>&1; then
     pass "docker-compose.yml is valid"
   elif command -v docker >/dev/null 2>&1; then
@@ -66,8 +69,8 @@ if [ -f "$SCRIPT_DIR/docker-compose.yml" ]; then
       "Run 'docker compose config' from the repo root to see the parse error."
   fi
 else
-  fail "docker-compose.yml not found in $SCRIPT_DIR" \
-    "This script must live at the repo root, next to docker-compose.yml."
+  fail "docker-compose.yml not found in $ROOT_DIR" \
+    "This script must live at <repo root>/scripts/, next to a repo-root docker-compose.yml."
 fi
 
 # 5. Host ports docker-compose.yml needs to publish must be free.

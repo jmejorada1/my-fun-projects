@@ -5,22 +5,26 @@
 # one bundled with older Docker Desktop installs) — `build` is a fast
 # no-op via layer caching when nothing changed, so this costs nothing on
 # repeat runs. Any arguments are forwarded to `up`, e.g.:
-#   ./docker-run.sh -d              # detached
-#   ./docker-run.sh posts frontend  # only start these services
+#   ./scripts/docker-run.sh -d              # detached
+#   ./scripts/docker-run.sh posts frontend  # only start these services
 #
 # The one argument NOT forwarded to `up` is `bigotry-data` — pull it out
 # anywhere in the argument list to also seed mock imdb/bigotry data
 # (resources + user1/user2/user3 posts/replies/flags) after startup, e.g.:
-#   ./docker-run.sh bigotry-data     # start the stack, then seed it
+#   ./scripts/docker-run.sh bigotry-data     # start the stack, then seed it
 # This forces the stack up detached (regardless of other args) so the
 # seeding job can run against it, then leaves it running in the
-# background — use ./docker-shutdown.sh to stop it, same as any other
-# detached run.
+# background — use ./scripts/docker-shutdown.sh to stop it, same as any
+# other detached run.
 
 set -uo pipefail
 
+# This script lives in scripts/, but docker-compose.yml and every relative
+# build context (./backend/posts, etc.) it points at are at the repo root —
+# run everything from there, not from scripts/ itself.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$ROOT_DIR"
 
 LOAD_BIGOTRY_DATA=false
 UP_ARGS=()
@@ -85,4 +89,4 @@ echo "Stack is running (detached) with mock bigotry data loaded."
 echo "  Frontend: http://localhost:4200"
 echo "  API:      http://localhost:8080/swagger-ui.html"
 echo "  Logs:     docker compose logs -f"
-echo "  Stop:     ./docker-shutdown.sh"
+echo "  Stop:     ./scripts/docker-shutdown.sh"

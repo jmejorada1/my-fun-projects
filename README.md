@@ -77,24 +77,24 @@ container from inside `posts`.
 1. Start the app:
 
    ```bash
-   ./docker-run.sh
+   ./scripts/docker-run.sh
    ```
 
-   This runs [`docker-precheck.sh`](docker-precheck.sh) first — catching a
-   not-running Docker daemon, a broken compose file, or a collided port
-   with a specific fix instead of a raw Docker error — then, if that
-   passes, `docker compose build` followed by `docker compose up`, which
-   builds and starts `postgres`, `posts` (runs its Flyway migrations
+   This runs [`docker-precheck.sh`](scripts/docker-precheck.sh) first —
+   catching a not-running Docker daemon, a broken compose file, or a
+   collided port with a specific fix instead of a raw Docker error — then,
+   if that passes, `docker compose build` followed by `docker compose up`,
+   which builds and starts `postgres`, `posts` (runs its Flyway migrations
    automatically on boot), and `frontend`. Any arguments you pass are
-   forwarded to that `up` command, e.g. `./docker-run.sh -d` to run
-   detached, or `./docker-run.sh posts` to start just one service.
+   forwarded to that `up` command, e.g. `./scripts/docker-run.sh -d` to run
+   detached, or `./scripts/docker-run.sh posts` to start just one service.
 
    Pass `bigotry-data` (anywhere in the arguments) to also seed mock
    `imdb/bigotry` data — resources plus `user1`/`user2`/`user3`
    posts/replies/flags — right after startup:
 
    ```bash
-   ./docker-run.sh bigotry-data
+   ./scripts/docker-run.sh bigotry-data
    ```
 
    This one forces the stack up detached (so the seeding job can run
@@ -102,7 +102,7 @@ container from inside `posts`.
    the background afterward — see "Seeding mock bigotry data" below for
    what gets loaded and how to load more later.
 
-   (Or run the steps yourself: `./docker-precheck.sh`, then
+   (Or run the steps yourself: `./scripts/docker-precheck.sh`, then
    `docker compose build`, then `docker compose up`. `up --build` in one
    shot also works if your Compose version supports it — the bundled one
    in older Docker Desktop installs doesn't.)
@@ -115,8 +115,8 @@ container from inside `posts`.
 3. Stop the app:
 
    ```bash
-   ./docker-shutdown.sh          # keeps the database volume
-   ./docker-shutdown.sh --all    # also wipes the database
+   ./scripts/docker-shutdown.sh          # keeps the database volume
+   ./scripts/docker-shutdown.sh --all    # also wipes the database
    ```
 
    (Equivalent to `docker compose down` / `docker compose down -v`, if you
@@ -125,9 +125,9 @@ container from inside `posts`.
 4. Made a code change and want it live without restarting everything?
 
    ```bash
-   ./docker-reload.sh            # rebuild + redeploy both frontend and posts
-   ./docker-reload.sh frontend   # frontend only
-   ./docker-reload.sh backend    # posts only
+   ./scripts/docker-reload.sh            # rebuild + redeploy both frontend and posts
+   ./scripts/docker-reload.sh frontend   # frontend only
+   ./scripts/docker-reload.sh backend    # posts only
    ```
 
    Unlike `docker-run.sh`, this skips the port-free precheck (which would
@@ -189,17 +189,17 @@ The easiest way to run it, standalone, without the rest of the stack
 already up:
 
 ```bash
-./docker-load-bigotry-data.sh
+./scripts/docker-load-bigotry-data.sh
 ```
 
-[`docker-load-bigotry-data.sh`](docker-load-bigotry-data.sh) starts (or
-reuses) just `postgres` + `posts` — enough for Flyway migrations to apply —
-then runs `bigotry-loader`; the frontend is never started. Any arguments
-are forwarded to the loader, e.g.
-`./docker-load-bigotry-data.sh --total-posts 1000 --seed 42`.
+[`docker-load-bigotry-data.sh`](scripts/docker-load-bigotry-data.sh) starts
+(or reuses) just `postgres` + `posts` — enough for Flyway migrations to
+apply — then runs `bigotry-loader`; the frontend is never started. Any
+arguments are forwarded to the loader, e.g.
+`./scripts/docker-load-bigotry-data.sh --total-posts 1000 --seed 42`.
 
-(Or, if `postgres`/`posts` are already running via `./docker-run.sh`, run
-the job directly: `docker compose run --rm bigotry-loader`.)
+(Or, if `postgres`/`posts` are already running via `./scripts/docker-run.sh`,
+run the job directly: `docker compose run --rm bigotry-loader`.)
 
 These become CLI flags on
 [`import_bigotry_data.py`](backend/imdb-data-python/import_bigotry_data.py);
@@ -212,7 +212,7 @@ another batch on top of what's already there.
 ### Rebuilding after code changes
 
 ```bash
-./docker-run.sh <service-name>              # e.g. ./docker-run.sh posts
+./scripts/docker-run.sh <service-name>      # e.g. ./scripts/docker-run.sh posts
 # or, without the precheck:
 docker compose build <service-name> && docker compose up <service-name>
 ```

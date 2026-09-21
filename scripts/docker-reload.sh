@@ -1,21 +1,25 @@
 #!/usr/bin/env bash
 # Rebuilds and redeploys frontend and/or posts in a stack that's already
 # running — the fast "I changed some code, get it live" loop. Unlike
-# ./docker-run.sh, this skips docker-precheck.sh's port-free checks (which
-# fail here since the running stack's own containers already hold those
-# ports) and only touches the service(s) you ask for, leaving everything
-# else (including postgres data) untouched.
+# ./scripts/docker-run.sh, this skips docker-precheck.sh's port-free checks
+# (which fail here since the running stack's own containers already hold
+# those ports) and only touches the service(s) you ask for, leaving
+# everything else (including postgres data) untouched.
 #
 # Usage:
-#   ./docker-reload.sh                    # rebuild + redeploy both (default)
-#   ./docker-reload.sh frontend           # frontend only
-#   ./docker-reload.sh backend            # posts only
-#   ./docker-reload.sh frontend backend   # same as default, explicit
+#   ./scripts/docker-reload.sh                    # rebuild + redeploy both (default)
+#   ./scripts/docker-reload.sh frontend           # frontend only
+#   ./scripts/docker-reload.sh backend            # posts only
+#   ./scripts/docker-reload.sh frontend backend   # same as default, explicit
 
 set -uo pipefail
 
+# This script lives in scripts/, but docker-compose.yml and every relative
+# build context (./backend/posts, etc.) it points at are at the repo root —
+# run everything from there, not from scripts/ itself.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$ROOT_DIR"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "docker CLI not found — install Docker Desktop: https://www.docker.com/products/docker-desktop/" >&2
