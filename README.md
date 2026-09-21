@@ -1,4 +1,11 @@
-# my-fun-projects
+<p align="center">
+  <img src="assets/banner.svg" alt="my-fun-projects — built purely for the fun of it" width="720">
+</p>
+
+<p align="center">
+  <img alt="just for fun" src="https://img.shields.io/badge/purpose-just%20for%20fun-ff5f6d?style=for-the-badge">
+  <img alt="no pressure" src="https://img.shields.io/badge/pressure-zero-3bd6c6?style=for-the-badge">
+</p>
 
 **👉 [QUICKSTART.md](QUICKSTART.md) — spin up the full stack in Docker and
 start exploring in minutes.**
