@@ -6,15 +6,35 @@
 
   <form [formGroup]="form" (ngSubmit)="submit()">
     <label for="username">Username</label>
-    <input id="username" type="text" formControlName="username" placeholder="choose a username" autocomplete="username" />
-    @if (username.invalid && username.touched) {
+    <input
+      id="username"
+      type="text"
+      formControlName="username"
+      placeholder="choose a username"
+      autocomplete="username"
+      maxlength="15"
+    />
+    @if (username.hasError('required') && username.touched) {
       <p class="field-error">Choose a username.</p>
+    } @else if (username.hasError('maxlength') && username.touched) {
+      <p class="field-error">Username cannot be longer than 15 characters.</p>
     }
 
     <label for="email">Email</label>
-    <input id="email" type="email" formControlName="email" placeholder="you@example.com" autocomplete="email" />
-    @if (email.invalid && email.touched) {
+    <input
+      id="email"
+      type="email"
+      formControlName="email"
+      placeholder="you@example.com"
+      autocomplete="email"
+      maxlength="15"
+    />
+    @if (email.hasError('required') && email.touched) {
+      <p class="field-error">Enter your email address.</p>
+    } @else if (email.hasError('email') && email.touched) {
       <p class="field-error">Enter a valid email address.</p>
+    } @else if (email.hasError('maxlength') && email.touched) {
+      <p class="field-error">Email cannot be longer than 15 characters.</p>
     }
 
     @if (errorMessage()) {

@@ -26,8 +26,14 @@ export class RegisterComponent {
   // [formGroup] on the <form> is required for (ngSubmit) to fire at all —
   // see the identical bug fixed in login.component.ts.
   readonly form = new FormGroup({
-    username: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
-    email: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.email] }),
+    username: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.required, Validators.maxLength(15)],
+    }),
+    email: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.required, Validators.email, Validators.maxLength(15)],
+    }),
   });
   readonly username = this.form.controls.username;
   readonly email = this.form.controls.email;

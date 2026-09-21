@@ -172,6 +172,25 @@ services actually pick those values up varies:
    those ports) and only touches the service(s) you name, leaving the
    database and everything else untouched.
 
+5. Want a true clean slate — wipe the database, remove every image this
+   project built, and rebuild with no cached layers?
+
+   ```bash
+   ./scripts/docker-clean-rebuild.sh          # rebuild, foreground
+   ./scripts/docker-clean-rebuild.sh --all    # rebuild + seed both domains' mock data
+   ```
+
+   Runs `docker-hard-clean.sh` (see below), then `docker compose build
+   --no-cache`, then hands off to `docker-run.sh` (forwarding any
+   arguments) to bring the stack back up. Prints how long the whole thing
+   took at the end. Doesn't touch Docker's global build cache — run
+   `docker builder prune -f` yourself first if you want that cleared too.
+
+   Just want the teardown, without the rebuild-and-restart? Run
+   `./scripts/docker-hard-clean.sh` on its own — same
+   `docker compose down -v --rmi all --remove-orphans`, no rebuild, no
+   restart.
+
 No `.env` file is required — the stack runs with the same default DB
 password already in `application.yml`, and the same default ports
 (`4200`/`8080`/`5433`) described throughout this README. To use a
