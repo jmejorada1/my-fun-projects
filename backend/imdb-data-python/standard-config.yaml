@@ -1,0 +1,44 @@
+# Configuration for import_standard_data.py.
+# Any value here can be overridden per-run with the matching CLI flag,
+# e.g. `python3 import_standard_data.py --start-row 1 --end-row 500`.
+
+# Path to the title.basics-formatted TSV file to read from. Defaults to the
+# sample bundled in this repo (sample-data/title.basics.sample.tsv, 5000
+# rows: 500 of each resource_category title type) so this loader works
+# out of the box with no IMDB download. Point this at the real
+# title.basics.tsv (see ../README.md's "Loading IMDB data" section) for
+# larger-scale or non-sample imports.
+tsv_path: sample-data/title.basics.sample.tsv
+
+# Row range to import as resources, 1-indexed, counting data rows only (the
+# header line is not counted). The range is inclusive on both ends. Kept
+# narrow by default (unlike bigotry-config.yaml's full 5000) — this loader
+# is meant for a small amount of seed data, not the full sample.
+start_row: 1
+end_row: 500
+
+# Domain to seed into (must already exist in the `domain` table, with
+# resource_category and post_type rows already seeded for it — see
+# V17__seed_imdb_standard_domain.sql).
+domain: imdb/standard
+
+# Total number of posts+replies to generate across user1/user2/user3. Small
+# by default — enough to exercise rankings/search, not a stress test.
+total_posts: 60
+
+# Fraction (0-1) of total_posts that are replies to another post (threaded
+# under a top-level post on the same resource) rather than top-level posts.
+reply_fraction: 0.3
+
+# How many posts/replies user1/user2/user3 get, in that order — user1 gets
+# the smallest share, user3 the largest. Applied proportionally to
+# total_posts (e.g. [1, 2, 3] with total_posts=60 -> 10/20/30).
+user_weights: [1, 2, 3]
+
+# posts-db connection details (must match backend/posts/src/main/resources/application.yml).
+db_host: localhost
+db_port: 5432
+db_name: posts-db
+db_schema: posts
+db_user: postgres
+db_password: "P@55w0rd"

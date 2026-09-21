@@ -8,13 +8,21 @@
 #   ./scripts/docker-run.sh -d              # detached
 #   ./scripts/docker-run.sh posts frontend  # only start these services
 #
-# The one argument NOT forwarded to `up` is `bigotry-data` — pull it out
-# anywhere in the argument list to also seed mock imdb/bigotry data
-# (resources + user1/user2/user3 posts/replies/flags) after startup, e.g.:
-#   ./scripts/docker-run.sh bigotry-data     # start the stack, then seed it
-# This forces the stack up detached (regardless of other args) so the
-# seeding job can run against it, then leaves it running in the
-# background — use ./scripts/docker-shutdown.sh to stop it, same as any
+# Three arguments are NOT forwarded to `up` — pull any of these out of the
+# argument list, anywhere, to also seed mock data after startup:
+#   bigotry-data   seed mock imdb/bigotry data (resources +
+#                  user1/user2/user3 posts/replies/flags)
+#   standard-data  seed mock imdb/standard data (resources +
+#                  a small amount of user1/user2/user3 posts/replies)
+#   --all          shorthand for both bigotry-data and standard-data
+# Either, both, or --all, e.g.:
+#   ./scripts/docker-run.sh bigotry-data                 # just bigotry
+#   ./scripts/docker-run.sh standard-data                # just standard
+#   ./scripts/docker-run.sh bigotry-data standard-data   # both
+#   ./scripts/docker-run.sh --all                        # both, shorthand
+# Passing any of these forces the stack up detached (regardless of other
+# args) so the seeding job(s) can run against it, then leaves it running in
+# the background — use ./scripts/docker-shutdown.sh to stop it, same as any
 # other detached run.
 
 set -uo pipefail
@@ -34,10 +42,16 @@ FRONTEND_PORT="${FRONTEND_PORT:-4200}"
 API_PORT="${API_PORT:-8080}"
 
 LOAD_BIGOTRY_DATA=false
+LOAD_STANDARD_DATA=false
 UP_ARGS=()
 for arg in "$@"; do
   if [ "$arg" = "bigotry-data" ]; then
     LOAD_BIGOTRY_DATA=true
+  elif [ "$arg" = "standard-data" ]; then
+    LOAD_STANDARD_DATA=true
+  elif [ "$arg" = "--all" ]; then
+    LOAD_BIGOTRY_DATA=true
+    LOAD_STANDARD_DATA=true
   else
     UP_ARGS+=("$arg")
   fi
@@ -59,7 +73,7 @@ if ! docker compose build; then
   exit 1
 fi
 
-if [ "$LOAD_BIGOTRY_DATA" = false ]; then
+if [ "$LOAD_BIGOTRY_DATA" = false ] && [ "$LOAD_STANDARD_DATA" = false ]; then
   echo
   echo "Build complete — starting docker compose..."
   echo
@@ -68,7 +82,7 @@ if [ "$LOAD_BIGOTRY_DATA" = false ]; then
 fi
 
 echo
-echo "Build complete — starting docker compose (detached, so mock bigotry data can be seeded)..."
+echo "Build complete — starting docker compose (detached, so mock data can be seeded)..."
 echo
 
 if ! docker compose up -d "${UP_ARGS[@]+"${UP_ARGS[@]}"}"; then
@@ -83,16 +97,28 @@ if ! "$SCRIPT_DIR/docker-wait-for-posts.sh"; then
   exit 1
 fi
 
-echo
-echo "Seeding mock bigotry data..."
-if ! docker compose run --rm bigotry-loader; then
+if [ "$LOAD_BIGOTRY_DATA" = true ]; then
   echo
-  echo "bigotry-loader failed — see the error above. The stack is still running."
-  exit 1
+  echo "Seeding mock bigotry data..."
+  if ! docker compose run --rm bigotry-loader; then
+    echo
+    echo "bigotry-loader failed — see the error above. The stack is still running."
+    exit 1
+  fi
+fi
+
+if [ "$LOAD_STANDARD_DATA" = true ]; then
+  echo
+  echo "Seeding mock standard data..."
+  if ! docker compose run --rm standard-loader; then
+    echo
+    echo "standard-loader failed — see the error above. The stack is still running."
+    exit 1
+  fi
 fi
 
 echo
-echo "Stack is running (detached) with mock bigotry data loaded."
+echo "Stack is running (detached) with mock data loaded."
 echo "  Frontend: http://localhost:${FRONTEND_PORT}"
 echo "  API:      http://localhost:${API_PORT}/swagger-ui.html"
 echo "  Logs:     docker compose logs -f"

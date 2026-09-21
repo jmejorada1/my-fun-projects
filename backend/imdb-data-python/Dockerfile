@@ -4,7 +4,7 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY import_resources.py config.yaml import_bigotry_data.py bigotry-config.yaml ./
+COPY import_resources.py config.yaml import_bigotry_data.py bigotry-config.yaml import_standard_data.py standard-config.yaml ./
 COPY sample-data/ sample-data/
 
 # db_host/db_port in config.yaml/bigotry-config.yaml default to localhost,

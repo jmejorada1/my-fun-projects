@@ -104,5 +104,22 @@ services:
         condition: service_healthy
     profiles: ["tools"]
 
+  # Seeds imdb/standard with resources (a small 500-row slice of the bundled
+  # sample by default) plus a small amount of mock users/posts/replies for
+  # local testing — deliberately its own script/service rather than reusing
+  # bigotry-loader, since imdb/standard has no severity score or neutral-flag
+  # concept (see import_standard_data.py's docstring and
+  # backend/imdb-data-python/CLAUDE.md's "Adding a new domain"). Same image
+  # as imdb-loader/bigotry-loader, different entrypoint. Run explicitly, e.g.:
+  #   docker compose run --rm standard-loader --total-posts 200
+  standard-loader:
+    build:
+      context: ./backend/imdb-data-python
+    entrypoint: ["python3", "import_standard_data.py", "--db-host", "postgres", "--db-port", "5432"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: ["tools"]
+
 volumes:
   postgres-data:

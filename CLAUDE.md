@@ -39,8 +39,11 @@ docker setup"). Don't treat either as existing deployment tooling.
 Full details: [root README.md](README.md). Short version:
 
 ```bash
-./scripts/docker-run.sh              # precheck, build, up (foreground)
-./scripts/docker-run.sh bigotry-data # same, detached, then seeds imdb/bigotry mock data
+./scripts/docker-run.sh                             # precheck, build, up (foreground)
+./scripts/docker-run.sh bigotry-data                # same, detached, then seeds imdb/bigotry mock data
+./scripts/docker-run.sh standard-data               # same, detached, then seeds imdb/standard mock data
+./scripts/docker-run.sh bigotry-data standard-data  # same, detached, then seeds both
+./scripts/docker-run.sh --all                       # same, detached, then seeds both (shorthand)
 ./scripts/docker-reload.sh [frontend|backend]  # rebuild+redeploy without the port precheck
 ./scripts/docker-shutdown.sh [--all] # down, optionally -v (wipes the DB volume)
 ```
@@ -66,20 +69,24 @@ derive from these same three variables. The one exception: `posts`'
 `.env` port variables since it's an internal container-to-container URL,
 not a host-published port.
 
-Loading data (`imdb-loader`, `bigotry-loader`) — one-off jobs, excluded
-from `up` via Compose's `tools` profile:
+Loading data (`imdb-loader`, `bigotry-loader`, `standard-loader`) —
+one-off jobs, excluded from `up` via Compose's `tools` profile:
 
 ```bash
 docker compose run --rm imdb-loader --domain imdb/bigotry
-docker compose run --rm bigotry-loader          # mock users/posts/replies/flags
+docker compose run --rm imdb-loader --domain imdb/standard
+docker compose run --rm bigotry-loader          # mock users/posts/replies/flags for imdb/bigotry
+docker compose run --rm standard-loader         # mock users/posts/replies for imdb/standard
 ./scripts/docker-load-bigotry-data.sh           # same bigotry-loader, standalone (spins up postgres+posts itself)
+./scripts/docker-load-standard-data.sh          # same standard-loader, standalone (spins up postgres+posts itself)
 ```
 
-`imdb/standard` needs its own `resource` import too before it has any
-data to show: `docker compose run --rm imdb-loader --domain imdb/standard`
-(already generic — no domain-specific loader needed, unlike bigotry's
-mock posts/replies/flags, which are bigotry-specific and don't have an
-`imdb/standard` equivalent).
+Each domain needs its own `resource` import (`resource_category` is
+scoped per domain) — `imdb-loader --domain <name>` is already generic, no
+domain-specific loader needed there. Mock posts/replies/flags *are*
+domain-specific by design (a domain's flags mean different things — see
+`backend/imdb-data-python/CLAUDE.md`'s "Adding a new domain"), so
+`bigotry-loader`/`standard-loader` are separate scripts, not a shared one.
 
 ## Environment gotchas hit while working in this repo
 

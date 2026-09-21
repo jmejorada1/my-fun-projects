@@ -102,18 +102,25 @@ services actually pick those values up varies:
    forwarded to that `up` command, e.g. `./scripts/docker-run.sh -d` to run
    detached, or `./scripts/docker-run.sh posts` to start just one service.
 
-   Pass `bigotry-data` (anywhere in the arguments) to also seed mock
-   `imdb/bigotry` data — resources plus `user1`/`user2`/`user3`
-   posts/replies/flags — right after startup:
+   Pass `bigotry-data` and/or `standard-data` (anywhere in the arguments)
+   to also seed mock data right after startup — `bigotry-data` seeds
+   `imdb/bigotry` (resources plus `user1`/`user2`/`user3`
+   posts/replies/flags), `standard-data` seeds `imdb/standard` (resources
+   plus a small amount of `user1`/`user2`/`user3` posts/replies). `--all`
+   is shorthand for both:
 
    ```bash
    ./scripts/docker-run.sh bigotry-data
+   ./scripts/docker-run.sh standard-data
+   ./scripts/docker-run.sh bigotry-data standard-data   # both
+   ./scripts/docker-run.sh --all                        # both, shorthand
    ```
 
-   This one forces the stack up detached (so the seeding job can run
-   against it, regardless of any other arguments) and leaves it running in
-   the background afterward — see "Seeding mock bigotry data" below for
-   what gets loaded and how to load more later.
+   Passing any of these forces the stack up detached (so the seeding
+   job(s) can run against it, regardless of any other arguments) and
+   leaves it running in the background afterward — see "Seeding mock
+   bigotry data" and "Seeding mock standard data" below for what gets
+   loaded and how to load more later.
 
    (Or run the steps yourself: `./scripts/docker-precheck.sh`, then
    `docker compose build`, then `docker compose up`. `up --build` in one
@@ -176,10 +183,12 @@ imports that entire sample:
    docker compose run --rm imdb-loader --start-row 1 --end-row 1000 --domain imdb/bigotry
    ```
 
-   Use `imdb/bigotry`, not `imdb` — it's the only domain the frontend's
-   domain picker actually sends
+   Use `imdb/bigotry` or `imdb/standard`, not `imdb` — those are the two
+   domains the frontend's domain picker actually sends
    ([`domain-options.ts`](frontend/imdb-ui-angular/src/app/core/domain-options.ts)),
-   so that's what needs the resource data.
+   so those are what need the resource data. Each domain needs its own
+   import (`resource_category` is scoped per domain), so run this twice if
+   you want both populated.
 
    Re-run with a later `--start-row` to import further ranges; see
    [`backend/imdb-data-python/README.md`](backend/imdb-data-python/README.md)
@@ -226,6 +235,42 @@ see that script's docstring and
 the full option list. Resource import is idempotent (already-imported
 tconsts are skipped), but posts/replies/flags are not — re-running adds
 another batch on top of what's already there.
+
+### Seeding mock standard data
+
+`standard-loader` is a third one-off job, also excluded from `up`, that
+seeds `imdb/standard` with a 500-row slice of the bundled sample as
+resources plus a small amount of mock `user1`/`user2`/`user3` posts and
+replies (rated `skip-it`/`it-was-okay`/`i-enjoyed-it`/`i-loved-it`) for
+local UI testing. It's a separate script from `bigotry-loader` on purpose
+— `imdb/standard` has no severity score or neutral-flag concept, so its
+mock data has nothing to layer that logic on top of (see
+[`import_standard_data.py`](backend/imdb-data-python/import_standard_data.py)'s
+docstring).
+
+The easiest way to run it, standalone, without the rest of the stack
+already up:
+
+```bash
+./scripts/docker-load-standard-data.sh
+```
+
+[`docker-load-standard-data.sh`](scripts/docker-load-standard-data.sh)
+starts (or reuses) just `postgres` + `posts` — enough for Flyway
+migrations to apply — then runs `standard-loader`; the frontend is never
+started. Any arguments are forwarded to the loader, e.g.
+`./scripts/docker-load-standard-data.sh --total-posts 200 --seed 42`.
+
+(Or, if `postgres`/`posts` are already running via `./scripts/docker-run.sh`,
+run the job directly: `docker compose run --rm standard-loader`.)
+
+These become CLI flags on
+[`import_standard_data.py`](backend/imdb-data-python/import_standard_data.py);
+see that script's docstring and
+[`standard-config.yaml`](backend/imdb-data-python/standard-config.yaml) for
+the full option list. Resource import is idempotent (already-imported
+tconsts are skipped), but posts/replies are not — re-running adds another
+batch on top of what's already there.
 
 ### Rebuilding after code changes
 
