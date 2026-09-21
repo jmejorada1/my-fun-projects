@@ -262,6 +262,8 @@ button.sort-button:focus-visible {
 /* Rotates into a "expanded" caret purely with CSS — no extra glyph swap needed. */
 .expand-icon {
   display: inline-block;
+  font-size: 1.15rem;
+  font-weight: 700;
   color: var(--color-primary);
   transition: transform var(--transition-fast);
 }

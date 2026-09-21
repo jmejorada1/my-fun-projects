@@ -23,15 +23,16 @@ describe('IMDB_STANDARD_CONFIG', () => {
     expect(IMDB_STANDARD_CONFIG.enabled).toBe(true);
   });
 
-  it('overrides the primary and severity-bucket theme tokens for its own skin', () => {
+  it('overrides the primary color and only the orange bucket (to grey) for its own skin', () => {
     expect(IMDB_STANDARD_CONFIG.themeTokens['--color-primary']).toBeTruthy();
+    // red/yellow/green are left un-overridden — skip-it/i-enjoyed-it/
+    // i-loved-it use styles.css's literal red/yellow/green as-is. Only
+    // it-was-okay's orange bucket is reskinned, to a neutral grey.
     expect(Object.keys(IMDB_STANDARD_CONFIG.themeTokens)).toEqual(
-      expect.arrayContaining([
-        '--color-severity-red-bg',
-        '--color-severity-orange-bg',
-        '--color-severity-yellow-bg',
-        '--color-severity-green-bg',
-      ]),
+      expect.arrayContaining(['--color-severity-orange-bg', '--color-severity-orange-text']),
+    );
+    expect(Object.keys(IMDB_STANDARD_CONFIG.themeTokens)).not.toEqual(
+      expect.arrayContaining(['--color-severity-red-bg', '--color-severity-yellow-bg', '--color-severity-green-bg']),
     );
   });
 });

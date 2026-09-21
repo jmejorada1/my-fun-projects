@@ -16,6 +16,25 @@
   z-index: 10;
 }
 
+/* The one glance a user needs to tell which domain/app they're in — color
+   comes from --color-primary, which DomainSelectionService.applyTheme()
+   already sets per domain (imdb-bigotry.config.ts/imdb-standard.config.ts's
+   themeTokens), so this follows any domain's skin with no extra logic. */
+.brand-name {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+
+.right-group {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-shrink: 0;
+}
+
 .domain-picker {
   display: flex;
   align-items: center;

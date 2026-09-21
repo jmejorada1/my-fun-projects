@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -40,6 +40,11 @@ export class AppToolbarComponent {
   readonly domainOptions = this.domainSelection.options;
   readonly selectedDomain = this.domainSelection.selectedDomain;
   readonly currentUser = this.auth.currentUser;
+  /** Drives the big brand name — its color comes from the same
+   *  `--color-primary` token DomainSelectionService.applyTheme() already
+   *  sets on :root per domain, so no domain-specific styling logic is
+   *  needed here beyond showing the active config's own label. */
+  readonly activeDomainConfig = this.domainSelection.activeDomainConfig;
 
   // toSignal unsubscribes automatically on destroy — no manual cleanup needed.
   readonly showBackToTop = toSignal(
@@ -56,6 +61,21 @@ export class AppToolbarComponent {
   // [formGroup] on the <form> is required for (ngSubmit) to fire at all —
   // see the identical bug fixed in login.component.ts.
   readonly searchForm = new FormGroup({ term: new FormControl('', { nonNullable: true }) });
+
+  constructor() {
+    // This component is mounted once for the whole app (it lives on every
+    // route), so the search box's own value would otherwise survive a
+    // domain switch (which logs the current user out — see
+    // DomainSelectionService.select()) and a fresh login into the new
+    // domain, showing a stale query alongside SearchStateService's own
+    // now-cleared results. Same currentUser()-transition trigger as
+    // SearchStateService's reset, kept separate since this is
+    // component-local form state, not shared search state.
+    effect(() => {
+      this.auth.currentUser();
+      this.searchForm.reset({ term: '' });
+    });
+  }
 
   onDomainChange(event: Event): void {
     this.domainSelection.select((event.target as HTMLSelectElement).value);

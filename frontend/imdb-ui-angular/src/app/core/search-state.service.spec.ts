@@ -5,6 +5,7 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { SearchStateService } from './search-state.service';
+import { AuthService } from './auth.service';
 import { API_BASE_URL } from './api-config';
 import { errorInterceptor } from './error.interceptor';
 
@@ -72,5 +73,29 @@ describe('SearchStateService', () => {
     expect(service.hasSearched()).toBe(false);
     expect(service.loading()).toBe(false);
     httpMock.expectNone(() => true);
+  });
+
+  it('clears stale results when the current user changes, e.g. a domain switch forcing a logout', () => {
+    // Regression test: resources are domain-scoped, but this service is a
+    // root singleton — without this, a domain switch (which logs the
+    // current user out first — see DomainSelectionService.select()) left
+    // the *previous* domain's results on screen. Clicking one navigated to
+    // a resourceId that doesn't exist in the newly-selected domain
+    // ("Resource <id> not found").
+    service.search('shawshank');
+    httpMock.expectOne((r) => r.url === `${API_BASE_URL}/resources`).flush({
+      content: [{ id: 1, name: 'tt1', displayName: 'The Shawshank Redemption', category: { id: 1, name: 'movie', displayName: 'Movie' } }],
+      totalElements: 1,
+      totalPages: 1,
+      number: 0,
+      size: 20,
+    });
+    expect(service.results().length).toBe(1);
+
+    TestBed.inject(AuthService).logout();
+    TestBed.tick();
+
+    expect(service.results()).toEqual([]);
+    expect(service.hasSearched()).toBe(false);
   });
 });
