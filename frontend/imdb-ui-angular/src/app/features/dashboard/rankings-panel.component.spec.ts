@@ -9,6 +9,17 @@ import { RankingsPanelComponent } from './rankings-panel.component';
 import { API_BASE_URL } from '../../core/api-config';
 import { errorInterceptor } from '../../core/error.interceptor';
 import { PostActivityService } from '../../core/post-activity.service';
+import { DomainSelectionService } from '../../core/domain-selection.service';
+import { DOMAIN_OPTIONS_TOKEN } from '../../core/domain-options';
+
+// imdb-standard.config.ts ships with enabled: false (flips true once
+// backend seed data exists — plan §11 Phase 2b); this override makes it
+// selectable purely for these tests, same pattern
+// domain-selection.service.spec.ts already uses.
+const BOTH_DOMAINS_ENABLED = [
+  { value: 'imdb/bigotry', label: 'Big-O-Meter', enabled: true, description: 'Bigotry flagging.' },
+  { value: 'imdb/standard', label: 'Movie-Meter', enabled: true, description: 'Standard ratings.' },
+];
 
 describe('RankingsPanelComponent', () => {
   let httpMock: HttpTestingController;
@@ -145,5 +156,60 @@ describe('RankingsPanelComponent', () => {
     ]);
 
     expect(fixture.componentInstance.rankings()[0].resources.length).toBe(1);
+  });
+
+  describe('imdb/standard (category-only rating domain)', () => {
+    // The outer beforeEach above already injects HttpTestingController,
+    // which locks the module against further provider overrides — reset
+    // and reconfigure from scratch with imdb/standard enabled instead of
+    // overriding the already-instantiated module.
+    beforeEach(async () => {
+      TestBed.resetTestingModule();
+      await TestBed.configureTestingModule({
+        imports: [RankingsPanelComponent],
+        providers: [
+          provideRouter([]),
+          provideHttpClient(withInterceptors([errorInterceptor])),
+          provideHttpClientTesting(),
+          { provide: DOMAIN_OPTIONS_TOKEN, useValue: BOTH_DOMAINS_ENABLED },
+        ],
+      }).compileComponents();
+      httpMock = TestBed.inject(HttpTestingController);
+      // Safe here (unlike resource-detail's tests): nothing in this spec
+      // ever logs a user in, so select()'s domain-switch logout is a no-op.
+      TestBed.inject(DomainSelectionService).select('imdb/standard');
+    });
+
+    it('renders a pick count instead of an average score', () => {
+      const fixture = TestBed.createComponent(RankingsPanelComponent);
+
+      httpMock.expectOne(`${API_BASE_URL}/rankings`).flush([
+        {
+          postType: { id: 1, name: 'i-loved-it' },
+          resources: [{ resource: { id: 1, name: 'tt1', displayName: 'A Movie' }, averageScore: 0, flagCount: 12 }],
+        },
+      ]);
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.isCategoryOnly()).toBe(true);
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(text).toContain('12 picks');
+      expect(text).not.toContain('avg');
+    });
+
+    it('does not run any ranking post-processing — postProcessRankings is unset for this domain', () => {
+      const fixture = TestBed.createComponent(RankingsPanelComponent);
+
+      httpMock.expectOne(`${API_BASE_URL}/rankings`).flush([
+        {
+          postType: { id: 1, name: 'skip-it' },
+          resources: [{ resource: { id: 1, name: 'tt1', displayName: 'A Movie' }, averageScore: 0, flagCount: 3 }],
+        },
+      ]);
+
+      // No GET .../posts request follows, unlike bigotry's severity
+      // re-check — afterEach's httpMock.verify() would fail otherwise.
+      expect(fixture.componentInstance.rankings().length).toBe(1);
+    });
   });
 });

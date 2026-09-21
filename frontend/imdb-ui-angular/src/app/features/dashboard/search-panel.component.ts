@@ -45,8 +45,11 @@ export class SearchPanelComponent {
     return resource.flagSummary.find((entry) => entry.postTypeName === postTypeName);
   }
 
-  isNoBigotry(postTypeName: string): boolean {
-    return postTypeName === this.domainSelection.activeDomainConfig().neutralPostTypeName;
+  /** True when this category's cell should show a bare count instead of "avg X (count)" —
+   *  either a neutral flag (bigotry's "no-bigotry") or the whole domain has no severity to average. */
+  isCountOnly(postTypeName: string): boolean {
+    const config = this.domainSelection.activeDomainConfig();
+    return config.rating.mode === 'category-only' || postTypeName === config.neutralPostTypeName;
   }
 
   flagSeverityClass(postTypeName: string, score: number): string {

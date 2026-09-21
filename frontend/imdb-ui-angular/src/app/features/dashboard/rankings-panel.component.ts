@@ -28,6 +28,11 @@ export class RankingsPanelComponent {
   readonly loading = signal(true);
   readonly errorMessage = signal<string | null>(null);
 
+  /** Whether the active domain has no severity to average — drives the template's avg-vs-count rendering. */
+  isCategoryOnly(): boolean {
+    return this.domainSelection.activeDomainConfig().rating.mode === 'category-only';
+  }
+
   constructor() {
     this.load();
 

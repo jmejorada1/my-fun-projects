@@ -15,6 +15,15 @@ const TWO_ENABLED_OPTIONS = [
   { value: 'imdb/bigotry', label: 'Big-O-Meter', enabled: true, description: 'Bigotry flagging.' },
   { value: 'imdb/standard', label: 'Movie-Meter', enabled: true, description: 'Standard ratings.' },
 ];
+
+// A fake not-yet-enabled option, decoupled from imdb/standard's real (now
+// enabled — Phase 2b seeded its backend data) config state, so this
+// "disabled option" rendering stays covered regardless of which real
+// domains happen to be enabled.
+const ONE_DISABLED_OPTION = [
+  { value: 'imdb/bigotry', label: 'Big-O-Meter', enabled: true, description: 'Bigotry flagging.' },
+  { value: 'imdb/future', label: 'Future-Meter', enabled: false, description: 'Not yet.' },
+];
 const STORED_USER = { id: 1, username: 'jdoe', email: 'jdoe@example.com', firstName: null, lastName: null };
 
 describe('AppToolbarComponent', () => {
@@ -36,13 +45,14 @@ describe('AppToolbarComponent', () => {
   });
 
   it('renders a not-yet-enabled domain option as disabled with a "coming soon" note', () => {
+    TestBed.overrideProvider(DOMAIN_OPTIONS_TOKEN, { useValue: ONE_DISABLED_OPTION });
     const fixture = TestBed.createComponent(AppToolbarComponent);
     fixture.detectChanges();
 
     const options: NodeListOf<HTMLOptionElement> = fixture.nativeElement.querySelectorAll('option');
-    const movieMeter = Array.from(options).find((o) => o.value === 'imdb/standard');
-    expect(movieMeter?.disabled).toBe(true);
-    expect(movieMeter?.textContent).toContain('coming soon');
+    const future = Array.from(options).find((o) => o.value === 'imdb/future');
+    expect(future?.disabled).toBe(true);
+    expect(future?.textContent).toContain('coming soon');
   });
 
   it('selecting a new domain calls DomainSelectionService.select with it', () => {

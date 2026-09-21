@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from './auth.service';
 import { DEFAULT_DOMAIN, DOMAIN_OPTIONS_TOKEN, DomainOption } from './domain-options';
@@ -31,6 +31,30 @@ export class DomainSelectionService {
     }
     return config;
   });
+
+  // Keys most recently applied to :root by applyTheme() — cleared before
+  // the next domain's tokens are applied so a switch between two
+  // non-default domains doesn't leave a stale override behind (plan §8).
+  private previouslyAppliedTokenKeys: string[] = [];
+
+  constructor() {
+    // Reruns on every domain switch (activeDomainConfig depends on
+    // selectedDomain), including the very first evaluation for whichever
+    // domain was restored from storage — so a page load already renders
+    // in the right skin, not just a switch mid-session.
+    effect(() => this.applyTheme(this.activeDomainConfig()));
+  }
+
+  private applyTheme(config: DomainConfig): void {
+    const root = document.documentElement.style;
+    for (const key of this.previouslyAppliedTokenKeys) {
+      root.removeProperty(key); // fall back to styles.css's base :root value
+    }
+    for (const [key, value] of Object.entries(config.themeTokens)) {
+      root.setProperty(key, value);
+    }
+    this.previouslyAppliedTokenKeys = Object.keys(config.themeTokens);
+  }
 
   select(domain: string): void {
     const option = this.options.find((o) => o.value === domain);
