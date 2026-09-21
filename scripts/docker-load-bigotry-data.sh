@@ -17,6 +17,13 @@
 #   ./scripts/docker-load-bigotry-data.sh --total-posts 1000 --seed 42
 #   ./scripts/docker-load-bigotry-data.sh --start-row 1 --end-row 500
 
+if [ -n "${ZSH_VERSION:-}" ] || { [ -n "${BASH_VERSION:-}" ] && [ "${BASH_SOURCE[0]}" != "${0}" ]; }; then
+  echo "Run this directly — ./scripts/docker-load-bigotry-data.sh — don't source it with '.' or 'source'." >&2
+  echo "Sourcing runs it in your current shell instead of a fresh bash process, which breaks here" >&2
+  echo "and can terminate your interactive shell entirely instead of just this script." >&2
+  return 1 2>/dev/null || exit 1
+fi
+
 set -uo pipefail
 
 # This script lives in scripts/, but docker-compose.yml and every relative

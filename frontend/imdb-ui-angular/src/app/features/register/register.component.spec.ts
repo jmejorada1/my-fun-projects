@@ -62,6 +62,28 @@ describe('RegisterComponent', () => {
     expect(fixture.componentInstance.email.touched).toBe(true);
   });
 
+  it('rejects a username longer than 15 characters', () => {
+    const fixture = TestBed.createComponent(RegisterComponent);
+    fixture.componentInstance.username.setValue('a-username-that-is-too-long');
+    fixture.componentInstance.email.setValue('new@example.com');
+
+    fixture.componentInstance.submit();
+
+    httpMock.expectNone(() => true);
+    expect(fixture.componentInstance.username.hasError('maxlength')).toBe(true);
+  });
+
+  it('rejects an email longer than 15 characters', () => {
+    const fixture = TestBed.createComponent(RegisterComponent);
+    fixture.componentInstance.username.setValue('newuser');
+    fixture.componentInstance.email.setValue('a-very-long-email@example.com');
+
+    fixture.componentInstance.submit();
+
+    httpMock.expectNone(() => true);
+    expect(fixture.componentInstance.email.hasError('maxlength')).toBe(true);
+  });
+
   it('registers, auto-logs in, and navigates to the dashboard on success', () => {
     const fixture = TestBed.createComponent(RegisterComponent);
     const navigateSpy = vi.spyOn(router, 'navigateByUrl');
@@ -82,7 +104,7 @@ describe('RegisterComponent', () => {
   it('shows a conflict message when the username/email is already taken', () => {
     const fixture = TestBed.createComponent(RegisterComponent);
     fixture.componentInstance.username.setValue('jdoe');
-    fixture.componentInstance.email.setValue('jdoe@example.com');
+    fixture.componentInstance.email.setValue('jdoe@abc.com');
 
     fixture.componentInstance.submit();
 

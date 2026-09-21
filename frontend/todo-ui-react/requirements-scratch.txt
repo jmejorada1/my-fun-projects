@@ -1,0 +1,22 @@
+
+A `todo` domain is a good test of how far the generic model actually
+stretches, since it's not just "another IMDB variant" — it has no
+inherent catalog of pre-existing items the way IMDB titles do.
+
+A plausible mapping onto the existing entities:
+
+| To-do app concept | Maps onto |
+|---|---|
+| A to-do list (e.g. "Groceries") | `Resource`, with `resource_category` distinguishing list types if useful (or a single seeded category if lists aren't typed) |
+| A to-do item / comment on it | `Post` — a top-level post could represent the item itself, with replies as comments/subtasks underneath it |
+| Status or priority label | `PostType` + `PostFlag`, the same way `imdb/standard` already repurposes a scored flag as a plain, non-severity label — `todo`'s post types could be `not-started`/`in-progress`/`done` with a constant score, following the exact precedent `imdb/standard` already set |
+| A todo-ui user | `AppUser`, domain-scoped the same as any other domain's users |
+
+Nothing above requires a schema migration beyond the same domain-seeding
+pattern [§8.3](#83-adding-a-domain-today-imdb-variants) already uses — new `domain`, `resource_category`, and
+`post_type` rows. The React frontend would talk to the exact same REST
+surface ([§5](#5-rest-api-surface)) with `X-Domain: todo`, and `RankingController`'s "top
+resources per post type" view would, with no code change, become "which
+lists have the most `done` items" instead of "which titles are most
+flagged for racism" — that's the payoff of it having been built
+domain-agnostic from the start ([§1](#1-what-this-service-is)).

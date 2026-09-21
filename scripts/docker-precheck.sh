@@ -5,6 +5,13 @@
 # Docker error. Exits 0 if the stack should be able to start, non-zero
 # otherwise.
 
+if [ -n "${ZSH_VERSION:-}" ] || { [ -n "${BASH_VERSION:-}" ] && [ "${BASH_SOURCE[0]}" != "${0}" ]; }; then
+  echo "Run this directly — ./scripts/docker-precheck.sh — don't source it with '.' or 'source'." >&2
+  echo "Sourcing runs it in your current shell instead of a fresh bash process, which breaks here" >&2
+  echo "and can terminate your interactive shell entirely instead of just this script." >&2
+  return 1 2>/dev/null || exit 1
+fi
+
 set -uo pipefail
 
 # This script lives in scripts/, but docker-compose.yml is at the repo root —
@@ -91,6 +98,19 @@ port_in_use() {
 }
 
 for port in "${REQUIRED_PORTS[@]}"; do
+  case "$port" in
+    ''|*[!0-9]*)
+      fail "invalid port value: '$port'" \
+        "Check FRONTEND_PORT/API_PORT/POSTGRES_PORT in .env — each must be a plain number (1-65535)."
+      continue
+      ;;
+  esac
+  if [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
+    fail "port $port is out of range" \
+      "Valid TCP ports are 1-65535 — check .env."
+    continue
+  fi
+
   port_in_use "$port"
   case $? in
     0) fail "port $port is already in use" \

@@ -46,6 +46,9 @@ Full details: [root README.md](README.md). Short version:
 ./scripts/docker-run.sh --all                       # same, detached, then seeds both (shorthand)
 ./scripts/docker-reload.sh [frontend|backend]  # rebuild+redeploy without the port precheck
 ./scripts/docker-shutdown.sh [--all] # down, optionally -v (wipes the DB volume)
+./scripts/docker-hard-clean.sh       # down -v --rmi all --remove-orphans, standalone teardown only
+./scripts/docker-clean-rebuild.sh [args forwarded to docker-run.sh]
+    # docker-hard-clean.sh, then build --no-cache, then docker-run.sh — full from-scratch reset, prints elapsed time
 ```
 
 Compose v2 syntax throughout (`docker compose ...`, no hyphen) — this repo

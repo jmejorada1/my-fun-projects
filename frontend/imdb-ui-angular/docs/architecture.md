@@ -22,7 +22,8 @@ consumes, see [`backend/posts/docs/architecture.md`](../../../backend/posts/docs
 - [7. Auth](#7-auth)
 - [8. Testing](#8-testing)
 - [9. Deployment](#9-deployment)
-- [10. Related Documents](#10-related-documents)
+- [10. TODO / Future Work](#10-todo--future-work)
+- [11. Related Documents](#11-related-documents)
 
 ## 1. What This App Is
 
@@ -277,7 +278,26 @@ works against any backend without rebuilding. Full stack wiring
 (`FRONTEND_PORT`, CORS origin, compose service definition):
 [root `CLAUDE.md`](../../../CLAUDE.md) / [root `README.md`](../../../README.md).
 
-## 10. Related Documents
+## 10. TODO / Future Work
+
+[↑ Back to Table of Contents](#table-of-contents)
+
+- **Live updates for `PostActivityService` ([§5](#5-state-management)).**
+  Right now the left/right dashboard panels only learn a post/flag changed
+  when the routed `ResourceDetailComponent` bumps the same signal from
+  inside this tab — another tab, another user, or a change made anywhere
+  else is invisible until a manual refresh. Two options, not yet decided
+  between:
+  - **Polling** — cheapest to add (an interval-driven refetch behind the
+    existing `PostActivityService` signal), but adds constant request
+    volume and a visible staleness window.
+  - **WebSockets** — push-based, no staleness window, but needs a
+    connection channel through the backend (which currently has no
+    push/session infrastructure at all — see
+    [`backend/posts/docs/architecture.md`](../../../backend/posts/docs/architecture.md))
+    and reconnect/backoff handling on this side.
+
+## 11. Related Documents
 
 [↑ Back to Table of Contents](#table-of-contents)
 

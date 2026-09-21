@@ -7,6 +7,13 @@
 # Shared by docker-run.sh (bigotry-data mode) and docker-load-bigotry-data.sh.
 # Assumes postgres + posts are already starting via `docker compose up -d`.
 
+if [ -n "${ZSH_VERSION:-}" ] || { [ -n "${BASH_VERSION:-}" ] && [ "${BASH_SOURCE[0]}" != "${0}" ]; }; then
+  echo "Run this directly — ./scripts/docker-wait-for-posts.sh — don't source it with '.' or 'source'." >&2
+  echo "Sourcing runs it in your current shell instead of a fresh bash process, which breaks here" >&2
+  echo "and can terminate your interactive shell entirely instead of just this script." >&2
+  return 1 2>/dev/null || exit 1
+fi
+
 set -uo pipefail
 
 # This script lives in scripts/, but docker-compose.yml is at the repo root —

@@ -77,7 +77,7 @@ public class ResourceService {
 
     public Page<ResourceResponse> list(Long categoryId, String search, String domain, Pageable pageable) {
         Long domainId = domainService.requireByName(domain).getId();
-        Page<Resource> resources = resourceRepository.search(domainId, categoryId, search, pageable);
+        Page<Resource> resources = resourceRepository.search(domainId, categoryId, escapeLikePattern(search), pageable);
 
         List<Long> resourceIds = resources.getContent().stream().map(Resource::getId).toList();
         Map<Long, Long> postCountByResourceId = postCountByResourceId(resourceIds);
@@ -118,5 +118,26 @@ public class ResourceService {
         Long domainId = domainService.requireByName(domain).getId();
         return resourceRepository.findByIdAndDomainIdAndDeletedAtIsNull(id, domainId)
                 .orElseThrow(() -> EntityNotFoundException.of("Resource", id));
+    }
+
+    /**
+     * Escapes LIKE metacharacters ({@code \}, {@code %}, {@code _}) in a
+     * user-supplied search term before it's wrapped in {@code %...%} and
+     * bound into {@link ResourceRepository#search}'s query. Without this, a
+     * literal {@code %} or {@code _} in someone's search text would act as
+     * an unintended wildcard (e.g. searching for "50%" would match any
+     * title containing "50" followed by anything) rather than being
+     * matched literally — not SQL-injectable either way (the value is
+     * always a bind parameter), just a correctness/hardening fix so the
+     * search behaves as a plain substring match.
+     */
+    private static String escapeLikePattern(String search) {
+        if (search == null) {
+            return null;
+        }
+        return search
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
     }
 }

@@ -3,7 +3,8 @@
 Spin up the full stack in Docker, pre-loaded with mock data for both
 domains, and start clicking around in a couple of minutes. For the
 system design behind all this, see
-[`OVERALL-ARCHITECTURE.md`](OVERALL-ARCHITECTURE.md).
+[`OVERALL-ARCHITECTURE.md`](OVERALL-ARCHITECTURE.md). See the
+  [Angular UI User Guide](frontend/imdb-ui-angular/docs/user-guide.md) for current frontend screens.
 
 ## System Requirements
 
