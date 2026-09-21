@@ -53,16 +53,16 @@ content-type category (`racism`/`sexism`/`lgbtq-phobic`/`no-bigotry`) plus
 a 0–5 severity score; `imdb/standard` flags a post with a plain rating
 category (`skip-it`/`it-was-okay`/`i-enjoyed-it`/`i-loved-it`) and a fixed,
 meaningless score (the frontend always sends the same constant — see
-`frontend/imdb-ui-angular/docs/domain-configurability-plan.md` §9 for why
-that's the deliberate, no-schema-change approach rather than making
-`post_flag.score` nullable). Core entities: `domain` (partitions
-everything else), `app_user`, `resource`, `resource_category` (lookup,
-seeded per domain from IMDB's `titleType` values), `post`
+[`frontend/imdb-ui-angular/docs/design-spec.md`](../../frontend/imdb-ui-angular/docs/design-spec.md)
+§2 decision #7 for why that's the deliberate, no-schema-change approach
+rather than making `post_flag.score` nullable). Core entities: `domain`
+(partitions everything else), `app_user`, `resource`, `resource_category`
+(lookup, seeded per domain from IMDB's `titleType` values), `post`
 (self-referencing via `parent_post_id` for unlimited-depth threaded
 replies), `post_type` (lookup, seeded per domain), `post_flag` (join
 table — a single post can carry multiple type flags, each with its own
 score). Full ERD and relationship-by-relationship rationale:
-`docs/db-design-spec.md`.
+[`docs/db-design-spec.md`](docs/db-design-spec.md).
 
 ### Adding a new domain
 
@@ -75,37 +75,37 @@ copy, don't share, across domains), and its `post_type` rows. Import
 resources for it via the already-generic `imdb-loader`
 (`docker compose run --rm imdb-loader --domain <name>`) — no code change
 needed there. The frontend side of "add a domain" is a single config file;
-see `frontend/imdb-ui-angular/docs/domain-configurability-plan.md`.
+see [`frontend/imdb-ui-angular/docs/architecture.md`](../../frontend/imdb-ui-angular/docs/architecture.md) §4.
 
 ### Docs are the source of truth for the data model — read before changing it
 
-`docs/` contains a chain of specs that must stay consistent with each
-other and with the code:
+`docs/` contains a chain of living specs that must stay consistent with
+each other and with the code:
 
-- `docs/requirements.txt` — original raw product requirements (rough draft,
-  superseded by the specs below wherever they differ).
-- `docs/design-spec.md` — the canonical data model: table definitions,
-  constraints, and a running "Assumptions & Decisions" / "Resolved
-  Questions" / "Open Questions" log. Every non-obvious modeling choice
-  (soft-delete strategy, threading depth, category taxonomy, cascade
-  behavior, domain scoping) is recorded here with its rationale.
-- `docs/db-design-spec.md` — plain-language, relationship-by-relationship
-  narrative walkthrough of the ER diagram, for faster onboarding.
-- `docs/implementation-spec-spring-boot.md` — the Spring Boot build plan
-  this was originally built from: package layout, Flyway migration
-  conventions, entity/repository/service conventions (including
-  transaction boundaries), the REST endpoint surface, and error handling.
+- [`docs/design-spec.md`](docs/design-spec.md) — the canonical data model:
+  table definitions, constraints, and a running decision log. Every
+  non-obvious modeling choice (soft-delete strategy, threading depth,
+  category taxonomy, cascade behavior, domain scoping) is recorded here
+  with its rationale.
+- [`docs/db-design-spec.md`](docs/db-design-spec.md) — plain-language,
+  relationship-by-relationship narrative walkthrough of the ER diagram,
+  for faster onboarding.
+- [`docs/architecture.md`](docs/architecture.md) — components, request
+  lifecycle, REST API surface, package layout, and how the domain-scoping
+  design is meant to support more than the current IMDB domains.
+- [`docs/running-locally.md`](docs/running-locally.md) — running this
+  service without Docker.
 
-Before changing the data model, check these docs' decision-log / "Open
-Questions" sections. If you find a gap they don't already cover, add it to
-the relevant doc using the same decision-log / open-questions format
-rather than deciding silently in code.
+Before changing the data model, check [`design-spec.md`](docs/design-spec.md)'s decision log /
+"Open Questions" section. If you find a gap it doesn't already cover, add
+it using the same decision-log / open-questions format rather than
+deciding silently in code.
 
 ### Tech stack specifics
 
 Spring Boot 4.1.1, Java 25, base package `com.jp.projects.posts`,
 PostgreSQL (schema `posts`). `spring-boot-starter-security` is a
-dependency, but auth is intentionally a placeholder (`design-spec.md` §6)
+dependency, but auth is intentionally a placeholder ([`design-spec.md`](docs/design-spec.md) §6)
 — username-only login/register, no password/token yet.
 `app.cors.allowed-origins` and `spring.datasource.url` are both
 overridable via env var (`APP_CORS_ALLOWED_ORIGINS`,

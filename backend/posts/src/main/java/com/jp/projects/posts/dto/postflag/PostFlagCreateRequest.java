@@ -5,7 +5,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
 public record PostFlagCreateRequest(
-        @NotNull Long userId,          // see the ownership caveat in implementation-spec-spring-boot.md §8
+        @NotNull Long userId,          // see the ownership caveat in architecture.md §5
         @NotNull Long postTypeId,
         @NotNull @Min(0) @Max(5) Integer score          // 0 = neutral
 ) {}

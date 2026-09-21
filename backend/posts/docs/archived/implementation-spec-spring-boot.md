@@ -11,7 +11,7 @@ Boot implementation plan: dependencies, package layout, migrations, entity
 mappings, repositories, services, the REST surface, error handling, and
 testing strategy. It does not change anything in the data model itself —
 where something here depends on an item still marked open in
-`design-spec.md` §7, that's called out explicitly rather than guessed at.
+`design-spec.md` §6, that's called out explicitly rather than guessed at.
 
 ## Table of Contents
 
@@ -338,7 +338,7 @@ All extend `JpaRepository<Entity, Long>` plus:
   - `Page<Post> findByResourceIdAndParentPostIdIsNullAndDeletedAtIsNull(Long resourceId, Pageable)` — top-level posts
   - `Page<Post> findByParentPostIdAndDeletedAtIsNull(Long parentPostId, Pageable)` — direct replies to a post
   - A cascading soft-delete operation for a post's subtree — **confirmed:
-    write-time recursive cascade** (resolves `design-spec.md` §7).
+    write-time recursive cascade** (resolves `design-spec.md` §6).
     `@Modifying` queries only execute inside an existing transaction, so this
     must always be called from a `@Transactional` service method (§7),
     never directly from a controller:

@@ -7,8 +7,7 @@ UPDATE post_flag pf SET domain_id = p.domain_id
 ALTER TABLE post_flag ALTER COLUMN domain_id SET NOT NULL;
 
 -- Derived, DB-enforced: a flag's domain must match its post's domain, and
--- the flag's type must belong to that same domain (domain-scoping-spec.md
--- D12/§3).
+-- the flag's type must belong to that same domain (design-spec.md §4.3).
 ALTER TABLE post_flag
     ADD CONSTRAINT fk_post_flag_post_same_domain
     FOREIGN KEY (post_id, domain_id) REFERENCES post (id, domain_id);

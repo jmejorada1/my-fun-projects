@@ -2,9 +2,10 @@ import { DomainConfig } from '../domain-config.model';
 
 /**
  * "skip it" / "it was okay" / "I enjoyed it" / "I loved it" — a plain
- * rating, no severity to average (docs/domain-configurability-plan.md §4).
- * The backend's post_flag.score is still NOT NULL, so every flag this
- * domain creates still submits `rating.fixedScoreValue` — see plan §9.
+ * rating, no severity to average (docs/design-spec.md §4). The backend's
+ * post_flag.score is still NOT NULL, so every flag this domain creates
+ * still submits `rating.fixedScoreValue` — see docs/design-spec.md §2
+ * decision #7.
  */
 const CATEGORY_BADGE_CLASS: Readonly<Record<string, string>> = {
   // Reuses bigotry's four flag-badge classes as generic "tier 1..4" pill

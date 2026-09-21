@@ -1,10 +1,26 @@
 # my-fun-projects
 
-Users flag IMDB titles (movies, TV, video games) with categorized,
-severity-scored posts — e.g. `racism`, `sexism`, `lgbtq-phobic`, or a
-`no-bigotry` counter-flag — and reply in threaded comments underneath. See
-[`backend/posts/docs/design-spec.md`](backend/posts/docs/design-spec.md) for
-the full domain model.
+**👉 [QUICKSTART.md](QUICKSTART.md) — spin up the full stack in Docker and
+start exploring in minutes.**
+
+See also: [OVERALL-ARCHITECTURE.md](OVERALL-ARCHITECTURE.md) — container
+topology, the pluggable domain model, and AWS deployment notes.
+
+A domain-partitioned discussion platform: users post about catalog items
+and reply in threaded comments, with each **domain** defining its own
+flag/rating categories and what they mean — new domains plug into the
+same backend and schema without a code change. Two domains are live
+today, both against IMDB's catalog:
+
+- **`imdb/bigotry`** — categorized, severity-scored content flags
+  (`racism`, `sexism`, `lgbtq-phobic`, or a `no-bigotry` counter-flag).
+- **`imdb/standard`** — a plain rating, no severity: `skip-it`,
+  `it-was-okay`, `i-enjoyed-it`, or `i-loved-it`.
+
+See [`backend/posts/docs/design-spec.md`](backend/posts/docs/design-spec.md)
+for the full (domain-agnostic) data model, or
+[`OVERALL-ARCHITECTURE.md`](OVERALL-ARCHITECTURE.md) §3 for how the
+pluggable domain design works end to end.
 
 ## Architecture
 
@@ -31,7 +47,7 @@ the full domain model.
 |---|---|---|---|
 | `posts` | [`backend/posts`](backend/posts) | Spring Boot 4 / Java 25 | REST API for resources, posts, replies, and flags. Owns the schema via Flyway migrations, applied automatically on startup. |
 | `imdb-ui-angular` | [`frontend/imdb-ui-angular`](frontend/imdb-ui-angular) | Angular 22 | SPA served as static files via nginx. Calls `posts` directly from the browser. |
-| `imdb-data-python` | [`backend/imdb-data-python`](backend/imdb-data-python) | Python | One-off scripts: `import_resources.py` imports a row range of IMDB's `title.basics.tsv` into the `posts-db.resource` table; `import_bigotry_data.py` additionally seeds mock users, posts, replies, and flags. Neither is a long-running service. |
+| `imdb-data-python` | [`backend/imdb-data-python`](backend/imdb-data-python) | Python | One-off scripts: `import_resources.py` imports a row range of IMDB's `title.basics.tsv` into the `posts-db.resource` table for whichever domain you target; `import_bigotry_data.py`/`import_standard_data.py` additionally seed mock users, posts, replies, and flags/ratings for their respective domain. None are long-running services. |
 | `postgres` | — | Postgres 16 | Single database (`posts-db`), single schema (`posts`), owned by the `posts` service's migrations. |
 
 All of this stack's host ports (`4200`/`8080`/`5433` above are just the
@@ -80,8 +96,9 @@ services actually pick those values up varies:
   also a `POSTGRES_PORT`-overridable default — specifically so it *doesn't*
   need to fight a local Postgres install; a pgAdmin session pointed at your
   own local database is fine to leave running.)
-- **Nothing else to download** — `imdb-loader`/`bigotry-loader` (below) run
-  against a 5000-row sample of IMDB's `title.basics.tsv` checked into the
+- **Nothing else to download** — `imdb-loader`/`bigotry-loader`/
+  `standard-loader` (below) run against a 5000-row sample of IMDB's
+  `title.basics.tsv` checked into the
   repo. A `title.basics.tsv` download is only needed if you want to import
   the real, full dataset instead (see "Loading IMDB data" below).
 

@@ -15,7 +15,7 @@ export interface DomainOption {
 /**
  * Derived from DOMAIN_REGISTRY (core/domain/domain-registry.ts) — picker
  * metadata lives on each domain's DomainConfig now, so adding a domain
- * never means editing this file (docs/domain-configurability-plan.md §5–§6).
+ * never means editing this file (docs/architecture.md §4).
  * The backend's actual domain names (`imdb/bigotry`, `imdb/standard`) are
  * internal — the picker shows each config's friendly `label` instead.
  */

@@ -65,7 +65,7 @@ export class DomainSelectionService {
     this.selectedDomainSignal.set(domain);
     this.writeToStorage(domain);
 
-    // Accounts are scoped to one domain (design-spec.md decision #9's
+    // Accounts are scoped to one domain (design-spec.md §2 decision #1's
     // login/register split relies on this) — the current session, if any,
     // no longer applies once the domain changes underneath it.
     if (this.auth.currentUser()) {

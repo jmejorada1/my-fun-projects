@@ -43,7 +43,7 @@ function toggled(ids: Set<number>, id: number): Set<number> {
 const LONG_POST_CHAR_THRESHOLD = 160;
 
 /**
- * Left panel — every post the logged-in user authored (design-spec.md §5),
+ * Left panel — every post the logged-in user authored (design-spec.md §3),
  * split into top-level posts and replies by `parentPostId` — the backend
  * returns both mixed from the one endpoint, so the split is purely a
  * client-side presentation choice, not a second request. The "My Posts" /

@@ -8,7 +8,7 @@ export type RatingMode = 'severity-score' | 'category-only';
  * Everything about a domain — picker metadata, rating/flagging behavior,
  * and skin — that used to be hardcoded to (or split across
  * domain-options.ts and) `imdb/bigotry`. See
- * docs/domain-configurability-plan.md. Adding a domain is one file
+ * docs/architecture.md §4. Adding a domain is one file
  * implementing this interface plus one line in domain-registry.ts; nothing
  * else needs a manual edit (domain-options.ts derives DOMAIN_OPTIONS from
  * the registry, and styles.css needs no per-domain edit — see §8).

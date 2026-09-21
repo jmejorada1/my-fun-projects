@@ -7,7 +7,7 @@ UPDATE resource r SET domain_id = rc.domain_id
 ALTER TABLE resource ALTER COLUMN domain_id SET NOT NULL;
 
 -- Derived, DB-enforced: a resource's domain must match its category's
--- domain (domain-scoping-spec.md D11/§3).
+-- domain (design-spec.md §4.3).
 ALTER TABLE resource
     ADD CONSTRAINT fk_resource_category_same_domain
     FOREIGN KEY (category_id, domain_id) REFERENCES resource_category (id, domain_id);

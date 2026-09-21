@@ -1,24 +1,41 @@
 # Running imdb-ui-angular Locally
 
 How to install, run, build, and test this app. See
+[`architecture.md`](./architecture.md) for how it's structured and
 [`design-spec.md`](./design-spec.md) for what it does and why.
 
-## Prerequisites
+## Table of Contents
+
+- [1. Prerequisites](#1-prerequisites)
+- [2. Install Dependencies](#2-install-dependencies)
+- [3. Run the Dev Server](#3-run-the-dev-server)
+- [4. Build for Production](#4-build-for-production)
+- [5. Run Unit Tests](#5-run-unit-tests)
+- [6. Configuration](#6-configuration)
+- [7. Troubleshooting](#7-troubleshooting)
+
+## 1. Prerequisites
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 - **Node.js 20+** (this was built/tested against Node 24) and npm.
 - **The `backend/posts` service running on `http://localhost:8080`**, with
-  Flyway migrated through at least `V14` (seeds the `imdb/bigotry` domain
-  this app talks to) and CORS configured to allow `http://localhost:4200`
+  Flyway migrated through at least `V17` (seeds both `imdb/bigotry` and
+  `imdb/standard` — the two domains this app's picker offers) and CORS
+  configured to allow `http://localhost:4200`
   (`app.cors.allowed-origins` in `backend/posts/src/main/resources/application.yml`
   — already set up). Without it, every screen in this app will show a
-  network-error state. See `backend/posts/docs/implementation-spec-spring-boot.md`
-  Appendix A, or just run:
+  network-error state. See
+  [`backend/posts/docs/running-locally.md`](../../../backend/posts/docs/running-locally.md),
+  or just run:
   ```bash
   cd backend/posts && ./start-posts-server.sh
   ```
 - Angular CLI is used via `npx` below — no global install needed.
 
-## Install dependencies
+## 2. Install Dependencies
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 Only needed once, or after pulling changes that touch `package.json`:
 
@@ -27,7 +44,9 @@ cd frontend/imdb-ui-angular
 npm install
 ```
 
-## Run the dev server
+## 3. Run the Dev Server
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 ```bash
 npm start
@@ -35,21 +54,27 @@ npm start
 ```
 
 Open **http://localhost:4200**. The dev server rebuilds and live-reloads
-on save. You'll land on `/login` (enter any email — there's no password,
-per design-spec.md §6); a successful login redirects to the 3-panel
-dashboard at `/`.
+on save. You'll land on `/login` — pick a domain from the toolbar's
+picker, then either log in with an existing username or follow the
+"Register" link (username + email, no password —
+[`design-spec.md`](./design-spec.md) §2 decisions #1–#2). A successful login/registration
+redirects to the 3-panel dashboard at `/`.
 
-## Build for production
+## 4. Build for Production
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 ```bash
 npx ng build
 ```
 
-Output goes to `dist/imdb-ui-angular/`. This is a static site — the build
-artifacts can be served by any static file host; nothing server-side is
-needed on the frontend's side.
+Output goes to `dist/imdb-ui-angular/browser/`. This is a static site —
+see [`architecture.md`](./architecture.md) §9 for how the Docker image
+serves it and resolves the backend URL at container startup.
 
-## Run unit tests
+## 5. Run Unit Tests
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 ```bash
 npm test              # watch mode — reruns on save (default in a TTY)
@@ -60,21 +85,30 @@ Runs the full Vitest suite (services, interceptors, the auth guard, and
 every component). These are unit tests with `HttpClientTesting` — they
 don't need the backend running.
 
-## Configuration
+## 6. Configuration
 
-The backend URL and the domain this app operates in are both plain
-constants in [`src/app/core/api-config.ts`](../src/app/core/api-config.ts):
+[↑ Back to Table of Contents](#table-of-contents)
+
+There's no build-time domain constant — which domain is active is a
+runtime choice made in the toolbar's picker (persisted to `localStorage`),
+not a config file edit. See [`architecture.md`](./architecture.md) §4.
+
+The backend base URL defaults to the constant in
+[`src/app/core/api-config.ts`](../src/app/core/api-config.ts):
 
 ```ts
 export const API_BASE_URL = 'http://localhost:8080';
-export const DOMAIN = 'imdb/bigotry';
 ```
 
-Change `API_BASE_URL` if the backend runs somewhere other than
-`localhost:8080`. There's no separate prod/dev environment file yet — see
-the open "deployment target" question in `design-spec.md` §8.
+For plain `ng serve`, that's the only URL this app will use — edit it
+directly if your backend runs somewhere else. In the Docker build, this
+default is overridden at *container startup* instead
+([`architecture.md`](./architecture.md) §6/§9), so you don't need to touch
+this file for that path.
 
-## Troubleshooting
+## 7. Troubleshooting
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 - **Every request fails / "Could not reach the server"** — the backend
   isn't running, or isn't on `http://localhost:8080`. Check
@@ -84,12 +118,14 @@ the open "deployment target" question in `design-spec.md` §8.
   this app from (e.g. you're serving it from a different port). Add that
   origin in `backend/posts/src/main/resources/application.yml` and
   restart the backend.
-- **`Domain 'imdb/bigotry' not found` (404)** — the backend's database
-  hasn't run migration `V14` yet (seeds that domain). Restart
-  `backend/posts` so Flyway applies pending migrations, or check
-  `flyway_schema_history` is at `v14`+.
+- **A domain 404s / errors as soon as you pick it** — the backend's
+  database hasn't run that domain's seed migration yet (`V14` for
+  `imdb/bigotry`, `V17` for `imdb/standard`). Restart `backend/posts` so
+  Flyway applies pending migrations, or check `flyway_schema_history`.
 - **Dashboard panels show errors/empty even though the backend is up** —
-  the `imdb/bigotry` domain has no `resource`/`post`/`post_flag` data of
-  its own yet (it's separate from `imdb`'s data). Import some resources
-  with `backend/imdb-data-python/import_resources.py --domain "imdb/bigotry"`
-  and create posts/flags against them to see the panels populate.
+  the selected domain has no `resource`/`post`/`post_flag` data of its own
+  yet (each domain's data is separate). Import resources with
+  `backend/imdb-data-python/import_resources.py --domain "imdb/bigotry"`
+  (or `"imdb/standard"`) and create posts/flags against them, or run the
+  Docker mock-data loaders described in the root
+  [`README.md`](../../../README.md) to see the panels populate.

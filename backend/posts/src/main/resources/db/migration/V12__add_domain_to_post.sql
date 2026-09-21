@@ -7,8 +7,7 @@ UPDATE post p SET domain_id = r.domain_id
 ALTER TABLE post ALTER COLUMN domain_id SET NOT NULL;
 
 -- Derived, DB-enforced: a post's domain must match its resource's domain,
--- and its author must belong to that same domain (domain-scoping-spec.md
--- D12/D13/§3).
+-- and its author must belong to that same domain (design-spec.md §4.3).
 ALTER TABLE post
     ADD CONSTRAINT fk_post_resource_same_domain
     FOREIGN KEY (resource_id, domain_id) REFERENCES resource (id, domain_id);

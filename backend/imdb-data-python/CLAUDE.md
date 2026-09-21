@@ -29,10 +29,8 @@ has `resource_category` rows seeded (see the `posts` service's
 `CLAUDE.md` — "Adding a new domain") — no change needed here.
 `import_bigotry_data.py`'s synthetic users/posts/replies/flags are
 bigotry-specific by design; a different domain wanting equivalent mock
-data needs its own script, not a generalization of this one (that was a
-deliberate choice — see
-`frontend/imdb-ui-angular/docs/domain-configurability-plan.md` §11's
-Phase 2b for the reasoning when `imdb/standard` was added).
+data needs its own script, not a generalization of this one (a deliberate
+choice made when `imdb/standard` was added).
 `import_standard_data.py` is the `imdb/standard` example of this pattern:
 it reuses `import_bigotry_data.py`'s generic DB helpers (`ensure_users`,
 `create_post`, `create_flag`, `import_resources`, `split_by_weight` — the

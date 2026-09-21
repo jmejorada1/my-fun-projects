@@ -47,8 +47,7 @@ public class Resource {
     /**
      * Derived from {@code category}'s domain, never set independently by a
      * client — enforced via a composite FK to
-     * {@code resource_category (id, domain_id)} (domain-scoping-spec.md
-     * D11).
+     * {@code resource_category (id, domain_id)} (design-spec.md §4.3).
      */
     @Column(name = "domain_id", nullable = false)
     private Long domainId;

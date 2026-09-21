@@ -1,6 +1,7 @@
 # Posts Service — Database Design Narrative
 
-Status: Draft, pending implementation
+Status: Implemented. Narrative companion to the canonical spec — kept up
+to date alongside it.
 Companion to: [`design-spec.md`](./design-spec.md) (full spec, assumptions, table
 definitions, business rules)
 
@@ -17,6 +18,8 @@ understand the schema without parsing the diagram syntax directly.
 - [Putting It Together: One Example](#putting-it-together-one-example)
 
 ## The Diagram
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 ```mermaid
 erDiagram
@@ -110,6 +113,8 @@ erDiagram
 
 ## Reading the Notation
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 Each `||--o{` line is a one-to-many relationship. The `||` end sits on the
 "one" side, the `o{` end sits on the "many" side. For example
 `APP_USER ||--o{ POST : authors` reads as: **one `app_user` authors zero or
@@ -118,6 +123,8 @@ more `post` rows.** The label after the colon (`authors`, `categorizes`,
 has no effect on the schema itself, it just makes the diagram self-explanatory.
 
 ## Walking Through Each Relationship
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 **`APP_USER ||--o{ POST : authors`**
 A user can write many posts (top-level posts and replies alike), but every
@@ -128,7 +135,7 @@ relationship, implemented as `post.user_id` pointing back at `app_user.id`.
 `resource_category` is a small, fixed lookup table seeded from IMDB's own
 `titleType` values (`movie`, `short`, `tvSeries`, `tvEpisode`,
 `tvMiniSeries`, `tvMovie`, `tvSpecial`, `tvShort`, `video`, `videoGame` — see
-`design-spec.md` §4.3 for the full list with descriptions). Each row pairs a
+[`design-spec.md`](./design-spec.md) §4.3 for the full list with descriptions). Each row pairs a
 machine-readable `name` with a human-readable `display_name`. Every
 `resource` points at exactly one category row via `resource.category_id`.
 This is why a title can't belong to two categories at once in this model —
@@ -150,7 +157,7 @@ by other posts' `parent_post_id`, replies can nest to unlimited depth — a
 reply to a reply to a reply, and so on — which is how the "one user posts,
 others reply underneath" requirement is satisfied. A recommended composite
 foreign key (`post(id, resource_id)` → `post(parent_post_id, resource_id)`,
-detailed in `design-spec.md` §4.3) additionally guarantees that a reply
+detailed in [`design-spec.md`](./design-spec.md) §4.3) additionally guarantees that a reply
 always shares its `resource_id` with its parent, so a thread can never
 accidentally jump to a different movie or show.
 
@@ -180,6 +187,8 @@ would be two separate `post_flag` rows, both pointing at the same
 
 ## Domain Scoping
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 **`DOMAIN ||--o{ RESOURCE_CATEGORY : scopes`** (and the same relationship to
 `POST_TYPE` and `APP_USER`)
 `domain` is a new lookup table — today it holds a single row, `imdb` — that
@@ -196,10 +205,12 @@ same technique the `parent_post_id`/`resource_id` same-thread constraint
 above already uses, just one column wider. The practical effect: it's
 impossible at the database level for a post to reference a resource from a
 different domain, or to be flagged with a type that belongs to some other
-domain. Full rationale and the trade-offs of enforcing this end-to-end:
-[`domain-scoping-spec.md`](./domain-scoping-spec.md).
+domain. See [`design-spec.md`](./design-spec.md) decision #11 and §4.3 for the column-level
+detail.
 
 ## Putting It Together: One Example
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 Imagine a top-level post on the resource "The Room" that gets a reply, and
 the reply is flagged twice:

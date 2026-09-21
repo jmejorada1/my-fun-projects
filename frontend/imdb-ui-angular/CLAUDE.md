@@ -1,11 +1,13 @@
 # CLAUDE.md - Angular Guidelines
 
 For backend-dependency setup and troubleshooting, see
-[`docs/running-locally.md`](docs/running-locally.md). For the data
-model this app renders, see
-[`docs/design-spec.md`](docs/design-spec.md). For how a domain's rating
-behavior/skin is configured, see
-[`docs/domain-configurability-plan.md`](docs/domain-configurability-plan.md).
+[`docs/running-locally.md`](docs/running-locally.md). For screens, flows,
+and business-rule decisions, see
+[`docs/design-spec.md`](docs/design-spec.md). For how the code is
+structured, including how a domain's rating behavior/skin is configured,
+see [`docs/architecture.md`](docs/architecture.md). For an end-user's
+walkthrough of the app itself (with screenshots), see
+[`docs/user-guide.md`](docs/user-guide.md).
 
 ## Build & Test Commands
 - Run dev server: `ng serve`
@@ -41,7 +43,7 @@ in `core/domain/domain-registry.ts`. `domain-options.ts` (picker
 label/description/enabled) is *derived* from that registry, not
 hand-maintained — adding a domain means one new config file + one line in
 the registry, not edits scattered across components. Full design and
-rationale: `docs/domain-configurability-plan.md`. Components read the
+rationale: [`docs/architecture.md`](docs/architecture.md) §4. Components read the
 active domain's config via `DomainSelectionService.activeDomainConfig()`,
 not by importing domain-specific constants directly.
 

@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Temporary, dev-only (implementation-spec-spring-boot.md §8, §19). Delete
+ * Temporary, dev-only (architecture.md §5). Delete
  * this service (and its controller) once real registration/auth exists —
  * flagged as the seam where a Google identity provider would eventually
  * plug in instead.

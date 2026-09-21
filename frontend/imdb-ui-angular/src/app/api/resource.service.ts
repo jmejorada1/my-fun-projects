@@ -29,7 +29,7 @@ export interface Resource {
   flagSummary: ResourceFlagSummaryEntry[];
 }
 
-/** Backs GET /resources — design-spec.md §3.3 (search) and §5 (search panel). */
+/** Backs GET /resources — design-spec.md §3 (search panel). */
 @Injectable({ providedIn: 'root' })
 export class ResourceService {
   private readonly http = inject(HttpClient);

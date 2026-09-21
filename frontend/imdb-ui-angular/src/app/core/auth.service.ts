@@ -14,7 +14,7 @@ export interface AuthUser {
 const STORAGE_KEY = 'imdb-ui-angular.currentUser';
 
 /**
- * Placeholder auth (design-spec.md §6) — no password/token. `login` looks
+ * Placeholder auth (design-spec.md §2 decision #2) — no password/token. `login` looks
  * up an existing account by username; `register` creates a new one from a
  * username + email. Both just store whatever `AppUserResponse` the
  * backend returns; neither knows or cares how that response was obtained,

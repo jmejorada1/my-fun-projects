@@ -35,7 +35,7 @@ public class PostFlagService {
                 .orElseThrow(() -> EntityNotFoundException.of("PostType", request.postTypeId()));
 
         // `request.userId()` is accepted per the unenforced-acting-user
-        // pattern (implementation-spec-spring-boot.md §8) but post_flag has
+        // pattern (architecture.md §5) but post_flag has
         // no user_id column to persist it against — flags aren't tied to a
         // specific flagger in the schema.
         //
