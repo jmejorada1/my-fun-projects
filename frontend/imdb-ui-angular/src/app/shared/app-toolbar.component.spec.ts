@@ -12,8 +12,8 @@ import { DOMAIN_OPTIONS_TOKEN } from '../core/domain-options';
 import { SearchStateService } from '../core/search-state.service';
 
 const TWO_ENABLED_OPTIONS = [
-  { value: 'imdb/bigotry', label: 'Big-O-Meter', enabled: true },
-  { value: 'imdb/standard', label: 'Movie-Meter', enabled: true },
+  { value: 'imdb/bigotry', label: 'Big-O-Meter', enabled: true, description: 'Bigotry flagging.' },
+  { value: 'imdb/standard', label: 'Movie-Meter', enabled: true, description: 'Standard ratings.' },
 ];
 const STORED_USER = { id: 1, username: 'jdoe', email: 'jdoe@example.com', firstName: null, lastName: null };
 

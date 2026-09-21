@@ -224,17 +224,52 @@
                   }
 
                   @if (openReplyPostId() === post.id) {
-                    <div class="reply-form">
+                    @let replyForm = getReplyForm(post.id);
+                    <div class="reply-form" [formGroup]="replyForm">
                       <textarea
                         appAutofocus
                         [attr.name]="'reply-body-' + post.id"
-                        [formControl]="getReplyControl(post.id)"
+                        formControlName="bodyText"
                         placeholder="Write a reply…"
                         rows="2"
                       ></textarea>
                       @if (isReplyInvalid(post.id)) {
                         <p class="field-error">Write something before posting a reply.</p>
                       }
+
+                      <div class="flag-fields">
+                        <label>
+                          Bigotry category (optional)
+                          <select
+                            [attr.name]="'reply-category-' + post.id"
+                            formControlName="postTypeId"
+                            (change)="onReplyPostTypeChange(post.id)"
+                          >
+                            <option [ngValue]="null">— None —</option>
+                            @for (type of postTypes(); track type.id) {
+                              <option [ngValue]="type.id">{{ type.name }}</option>
+                            }
+                          </select>
+                        </label>
+
+                        @if (isReplyNoBigotrySelected(post.id)) {
+                          <p class="muted no-severity-note">Severity is automatically set to 0 (neutral) for this category.</p>
+                        } @else if (replyForm.controls.postTypeId.value !== null) {
+                          <label>
+                            Severity (0 = neutral, 5 = most severe)
+                            <select [attr.name]="'reply-severity-' + post.id" formControlName="score">
+                              <option [ngValue]="null" disabled hidden>Select a severity…</option>
+                              @for (n of [0, 1, 2, 3, 4, 5]; track n) {
+                                <option [ngValue]="n">{{ n === 0 ? '0 (Neutral)' : n }}</option>
+                              }
+                            </select>
+                            @if (replyForm.controls.score.invalid && replyForm.controls.score.touched) {
+                              <span class="field-error">Choose a severity.</span>
+                            }
+                          </label>
+                        }
+                      </div>
+
                       @if (replyError()) {
                         <p class="field-error">{{ replyError() }}</p>
                       }

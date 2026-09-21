@@ -15,7 +15,7 @@
           <ol>
             @for (item of ranking.resources; track item.resource.id) {
               <li>
-                {{ item.resource.displayName }} —
+                <a [routerLink]="['/resources', item.resource.id]">{{ item.resource.displayName }}</a> —
                 avg {{ item.averageScore | number: '1.1-1' }}
                 ({{ item.flagCount }} flags)
               </li>

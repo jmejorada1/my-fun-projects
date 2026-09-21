@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { forkJoin, map, of, skip, switchMap, catchError } from 'rxjs';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { AppHttpError } from '../../core/error.interceptor';
@@ -11,7 +12,7 @@ import { PostService } from '../../api/post.service';
 /** Right panel — top 5 resources per post type (design-spec.md §3.5, §5). */
 @Component({
   selector: 'app-rankings-panel',
-  imports: [DecimalPipe],
+  imports: [DecimalPipe, RouterLink],
   templateUrl: './rankings-panel.component.html',
   styleUrl: './rankings-panel.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

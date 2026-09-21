@@ -1,5 +1,9 @@
 <main class="login">
-  
+  @if (currentDomain(); as domain) {
+    <h1>{{ domain.label }}</h1>
+    <p class="subtitle">{{ domain.description }}</p>
+  }
+
   <form [formGroup]="form" (ngSubmit)="submit()">
     <label for="username">Username</label>
     <input id="username" type="text" formControlName="username" placeholder="your username" autocomplete="username" />

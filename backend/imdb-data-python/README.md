@@ -1,8 +1,28 @@
 # imdb-data-python
 
-Imports a row range from `title.basics.tsv` into the `posts-db` → `posts.resource`
-table used by the [posts](../posts) Spring Boot service. See
-`../posts/docs/design-spec.md` §4.3 for the target schema.
+Two one-off scripts against the `posts-db` used by the [posts](../posts)
+Spring Boot service. See `../posts/docs/design-spec.md` §4.3 for the target
+schema.
+
+- **`import_resources.py`** — imports a row range from a title.basics-formatted
+  TSV into `posts.resource`.
+- **`import_bigotry_data.py`** — imports resources the same way (idempotent:
+  skips tconsts already present) plus seeds mock users `user1`/`user2`/
+  `user3`, posts, threaded replies, and `post_flag` rows, for local testing
+  of the bigotry-flagging UI. See its docstring and
+  [`bigotry-config.yaml`](./bigotry-config.yaml) for options; run
+  `./.venv/bin/python3 import_bigotry_data.py --help` for the full flag
+  list.
+
+Both default to [`sample-data/title.basics.sample.tsv`](./sample-data/title.basics.sample.tsv)
+— a 5000-row subset (500 rows per `resource_category` title type,
+`tt0000001`–`tt0260178`) checked into this repo, so either script runs with
+no IMDB download required. Point `tsv_path`/`--tsv-path` at the real, full
+`title.basics.tsv` instead for larger-scale imports (see "Loading IMDB
+data" in the [root README](../../README.md)). Both scripts also skip rows
+whose `primaryTitle` is one of IMDB's generic placeholder episode titles
+(e.g. `Episode #1.1`) — tens of thousands of `tvEpisode` rows have no real
+title and aren't useful as mock post/reply subjects.
 
 ## Prerequisites
 
@@ -24,7 +44,7 @@ Edit [config.yaml](./config.yaml):
 
 | Key | Meaning |
 |---|---|
-| `tsv_path` | Path to `title.basics.tsv` (relative paths resolve against this directory) |
+| `tsv_path` | Path to a title.basics-formatted TSV (relative paths resolve against this directory) — defaults to the bundled sample, see above |
 | `start_row` / `end_row` | 1-indexed, inclusive row range to import, **not counting the header line** |
 | `domain` | Domain name to import into (e.g. `imdb`, `imdb/bigotry`) — must already exist in `posts.domain`; `resource_category` lookups and the imported `resource` rows are scoped to it |
 | `db_host`, `db_port`, `db_name`, `db_schema`, `db_user`, `db_password` | Must match `../posts/src/main/resources/application.yml` |

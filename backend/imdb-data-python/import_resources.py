@@ -8,6 +8,7 @@ built-in defaults below (none — every value must come from one of the two).
 import argparse
 import csv
 import itertools
+import re
 import sys
 from pathlib import Path
 
@@ -105,6 +106,17 @@ def na_to_none(value):
     return None if value == r"\N" else value
 
 
+# IMDB fills in a placeholder like "Episode #1.1" for tvEpisode rows whose
+# real title isn't known — there are tens of thousands of these, and they're
+# useless as mock post/reply subjects, so they're skipped on import rather
+# than imported as unnamed resources.
+GENERIC_EPISODE_TITLE_RE = re.compile(r"^episode[\s#-]*\d+(\.\d+)?$", re.IGNORECASE)
+
+
+def is_generic_episode_title(title):
+    return GENERIC_EPISODE_TITLE_RE.match(title) is not None
+
+
 def parse_tsv_row(row):
     tconst, title_type, primary_title, original_title, is_adult, start_year, end_year, runtime_minutes, genres = row
 
@@ -131,7 +143,11 @@ def read_rows(tsv_path, start_row, end_row):
         for line_num, row in itertools.islice(
             enumerate(reader, start=1), start_row - 1, end_row
         ):
-            yield line_num, parse_tsv_row(row)
+            parsed = parse_tsv_row(row)
+            _tconst, _title_type, primary_title, _data = parsed
+            if is_generic_episode_title(primary_title):
+                continue
+            yield line_num, parsed
 
 
 def main():

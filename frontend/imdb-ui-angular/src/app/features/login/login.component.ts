@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 import { AppHttpError } from '../../core/error.interceptor';
+import { DomainSelectionService } from '../../core/domain-selection.service';
 
 @Component({
   selector: 'app-login',
@@ -14,6 +15,12 @@ import { AppHttpError } from '../../core/error.interceptor';
 export class LoginComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly domainSelection = inject(DomainSelectionService);
+
+  /** The currently-selected domain option, so login can explain what it is. */
+  readonly currentDomain = computed(() =>
+    this.domainSelection.options.find((option) => option.value === this.domainSelection.selectedDomain()),
+  );
 
   /**
    * (ngSubmit) only works on a <form> backed by FormGroupDirective

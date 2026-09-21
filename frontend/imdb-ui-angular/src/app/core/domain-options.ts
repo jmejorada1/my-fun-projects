@@ -7,6 +7,8 @@ export interface DomainOption {
   label: string;
   /** False for a domain that's been named but has no backend data/seeding yet. */
   enabled: boolean;
+  /** One-line, user-facing explanation of what this domain is — shown on login/register. */
+  description: string;
 }
 
 /**
@@ -16,8 +18,19 @@ export interface DomainOption {
  * yet, this just reserves its spot in the UI.
  */
 export const DOMAIN_OPTIONS: readonly DomainOption[] = [
-  { value: 'imdb/bigotry', label: 'Big-O-Meter', enabled: true },
-  { value: 'imdb/standard', label: 'Movie-Meter', enabled: false },
+  {
+    value: 'imdb/bigotry',
+    label: 'Big-O-Meter',
+    enabled: true,
+    description:
+      'Flags movies, TV shows, and other titles for potentially biased content — racism, sexism, and LGBTQ+-phobia — and lets the community rate how severe each flag is.',
+  },
+  {
+    value: 'imdb/standard',
+    label: 'Movie-Meter',
+    enabled: false,
+    description: 'General movie and TV ratings and discussion — coming soon.',
+  },
 ];
 
 export const DEFAULT_DOMAIN = DOMAIN_OPTIONS[0].value;

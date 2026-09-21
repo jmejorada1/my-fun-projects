@@ -2,14 +2,22 @@
 # Any value here can be overridden per-run with the matching CLI flag,
 # e.g. `python3 import_resources.py --start-row 1 --end-row 500`.
 
-# Path to the IMDB title.basics.tsv file to read from.
-tsv_path: title.basics.tsv
+# Path to the title.basics-formatted TSV file to read from. Defaults to the
+# sample bundled in this repo (sample-data/title.basics.sample.tsv, 5000
+# rows: 500 of each resource_category title type) so this loader works out
+# of the box with no IMDB download. For larger-scale imports, download the
+# real title.basics.tsv (see ../README.md's "Loading IMDB data" section)
+# and point tsv_path at it instead — either directly in this file or via
+# `--tsv-path`.
+tsv_path: sample-data/title.basics.sample.tsv
 
 # Row range to import, 1-indexed, counting data rows only (the header line
-# is not counted). start_row=1 is the first title after the header.
-# The range is inclusive on both ends.
+# is not counted). start_row=1 is the first title after the header. The
+# range is inclusive on both ends. 1-5000 is the entire bundled sample;
+# narrow this (or point tsv_path at the full dataset) if you don't want
+# every sample row imported.
 start_row: 1
-end_row: 1000
+end_row: 5000
 
 # Domain to import into (must already exist in the `domain` table, e.g.
 # 'imdb' or 'imdb/bigotry') — resource_category lookups and the inserted

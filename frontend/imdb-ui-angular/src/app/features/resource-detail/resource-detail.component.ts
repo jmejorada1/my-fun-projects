@@ -9,8 +9,8 @@ import {
   ValidationErrors,
   Validators,
 } from '@angular/forms';
-import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { forkJoin, map } from 'rxjs';
+import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { forkJoin, map, skip } from 'rxjs';
 import { AuthService } from '../../core/auth.service';
 import { AppHttpError } from '../../core/error.interceptor';
 import { PostActivityService } from '../../core/post-activity.service';
@@ -34,6 +34,13 @@ interface CategorySummaryEntry {
   count: number;
   averageScore: number | null;
 }
+
+/** A reply's own bodyText + optional bigotry category/severity, one per post it's replying to. */
+type ReplyFormGroup = FormGroup<{
+  bodyText: FormControl<string>;
+  postTypeId: FormControl<number | null>;
+  score: FormControl<number | null>;
+}>;
 
 type PostSortColumn = 'post' | 'author' | 'category' | 'posted';
 type SortDirection = 'asc' | 'desc';
@@ -109,7 +116,7 @@ export class ResourceDetailComponent {
   private readonly destroyRef = inject(DestroyRef);
 
   private resourceId = 0;
-  private readonly replyControls = new Map<number, FormControl<string>>();
+  private readonly replyForms = new Map<number, ReplyFormGroup>();
 
   readonly resource = signal<Resource | null>(null);
   readonly posts = signal<Post[]>([]);
@@ -138,22 +145,19 @@ export class ResourceDetailComponent {
     const id = this.selectedPostTypeId();
     return id !== null && this.postTypes().find((t) => t.id === id)?.name === NO_BIGOTRY_TYPE_NAME;
   });
-  /** This movie's flags grouped by category — same top-level-posts-only data used elsewhere on this page. */
+  /**
+   * This movie's flags grouped by category — backend-aggregated (any post
+   * depth, not just the top-level posts loaded into `posts()`), same scope
+   * as /rankings. A flag on a reply the user hasn't expanded is still
+   * counted here even though it isn't in `posts()` at all.
+   */
   readonly categorySummary = computed<CategorySummaryEntry[]>(() => {
-    const totals = new Map<string, { total: number; count: number }>();
-    for (const post of this.posts()) {
-      for (const flag of post.flags) {
-        const entry = totals.get(flag.postType.name) ?? { total: 0, count: 0 };
-        entry.total += flag.score;
-        entry.count += 1;
-        totals.set(flag.postType.name, entry);
-      }
-    }
-    return Array.from(totals.entries())
-      .map(([name, { total, count }]) => ({
-        name,
-        count,
-        averageScore: name === NO_BIGOTRY_TYPE_NAME ? null : total / count,
+    const flagSummary = this.resource()?.flagSummary ?? [];
+    return flagSummary
+      .map((entry) => ({
+        name: entry.postTypeName,
+        count: entry.flagCount,
+        averageScore: entry.postTypeName === NO_BIGOTRY_TYPE_NAME ? null : entry.averageScore,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
   });
@@ -214,6 +218,19 @@ export class ResourceDetailComponent {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((id) => this.load(id));
+
+    // Refetches just the resource (for its flagSummary/postCount) whenever
+    // a post/reply/flag is created anywhere on this page — mirrors
+    // rankings-panel.component.ts's identical use of this signal. `posts()`
+    // itself is already updated locally (this.posts.update(...) at the
+    // various submit handlers below), but categorySummary is now sourced
+    // from the resource's backend-aggregated flagSummary instead, which
+    // this component has no other way to keep in sync. skip(1): same
+    // reason as rankings-panel — toObservable() replays the current value
+    // immediately, which would otherwise double up with `load()` above.
+    toObservable(this.postActivity.changed)
+      .pipe(skip(1), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.refreshResourceSummary());
 
     // A *separate* subscription from paramMap above: clicking another
     // post/reply for the movie you're already viewing only changes query
@@ -402,19 +419,62 @@ export class ResourceDetailComponent {
     return computeFlagSeverityClass(postTypeName, score);
   }
 
-  /** Lazily creates (and reuses) the reply textarea's control for a given post. */
-  getReplyControl(postId: number): FormControl<string> {
-    let control = this.replyControls.get(postId);
-    if (!control) {
-      control = new FormControl('', { nonNullable: true, validators: [requiredNonBlank] });
-      this.replyControls.set(postId, control);
+  /**
+   * Lazily creates (and reuses) a reply's form group — bodyText plus an
+   * optional bigotry category/severity, unlike the top-level form's
+   * required pair. `score` starts with no validators (category is
+   * optional); onReplyPostTypeChange toggles Validators.required onto it
+   * once a category is actually picked, same pairing rule the backend
+   * enforces server-side ("postTypeId and score must be provided together").
+   */
+  getReplyForm(postId: number): ReplyFormGroup {
+    let form = this.replyForms.get(postId);
+    if (!form) {
+      form = new FormGroup({
+        bodyText: new FormControl('', { nonNullable: true, validators: [requiredNonBlank] }),
+        postTypeId: new FormControl<number | null>(null),
+        score: new FormControl<number | null>(null),
+      });
+      this.replyForms.set(postId, form);
     }
-    return control;
+    return form;
+  }
+
+  /** Mirrors the top-level form's isNoBigotrySelected, scoped to one reply's own form. */
+  isReplyNoBigotrySelected(postId: number): boolean {
+    const id = this.getReplyForm(postId).controls.postTypeId.value;
+    return id !== null && this.postTypes().find((t) => t.id === id)?.name === NO_BIGOTRY_TYPE_NAME;
+  }
+
+  /**
+   * Mirrors the top-level form's score-locking effect, but as a (change)
+   * handler rather than an effect() — there's one form per post, created on
+   * demand, so there's no single control to attach a constructor-time
+   * effect to.
+   */
+  onReplyPostTypeChange(postId: number): void {
+    const form = this.getReplyForm(postId);
+    const scoreControl = form.controls.score;
+    if (this.isReplyNoBigotrySelected(postId)) {
+      scoreControl.setValue(0);
+      scoreControl.disable();
+      scoreControl.clearValidators();
+    } else if (form.controls.postTypeId.value !== null) {
+      scoreControl.enable();
+      scoreControl.setValue(null);
+      scoreControl.setValidators([Validators.required]);
+    } else {
+      // Category cleared back to "— None —" — severity becomes irrelevant again.
+      scoreControl.enable();
+      scoreControl.setValue(null);
+      scoreControl.clearValidators();
+    }
+    scoreControl.updateValueAndValidity();
   }
 
   /** True once the user has tried to submit a blank reply — drives the inline error message. */
   isReplyInvalid(postId: number): boolean {
-    const control = this.getReplyControl(postId);
+    const control = this.getReplyForm(postId).controls.bodyText;
     return control.invalid && control.touched;
   }
 
@@ -499,19 +559,34 @@ export class ResourceDetailComponent {
 
   submitReply(postId: number): void {
     const user = this.auth.currentUser();
-    const control = this.getReplyControl(postId);
-    if (!user || control.invalid || this.replySubmittingPostId() !== null) {
-      control.markAsTouched();
+    const form = this.getReplyForm(postId);
+    if (!user || form.invalid || this.replySubmittingPostId() !== null) {
+      form.markAllAsTouched();
       return;
     }
+
+    // postTypeId/score are optional here (unlike the top-level form) — both
+    // null just means "an unflagged reply," same as the old reply endpoint
+    // always sent. getRawValue() so a disabled, no-bigotry-locked score of 0
+    // still comes through, same reason submit() above uses it.
+    const { bodyText, postTypeId, score } = form.getRawValue();
 
     this.replySubmittingPostId.set(postId);
     this.replyError.set(null);
     this.postService
-      .reply(postId, { userId: user.id, bodyText: control.value.trim() })
+      .create({
+        username: user.username,
+        resourceId: this.resourceId,
+        parentPostId: postId,
+        bodyText: bodyText.trim(),
+        postTypeId: postTypeId ?? undefined,
+        score: score ?? undefined,
+      })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (reply) => {
+        next: (response) => {
+          const flags = response.flag ? [response.flag] : [];
+          const reply: Post = { ...response.post, flags };
           this.repliesByPost.update((byPost) => {
             const next = new Map(byPost);
             next.set(postId, [...(next.get(postId) ?? []), reply]);
@@ -525,7 +600,7 @@ export class ResourceDetailComponent {
           this.posts.update((posts) =>
             posts.map((p) => (p.id === postId ? { ...p, replyCount: p.replyCount + 1 } : p)),
           );
-          control.reset('');
+          form.reset({ bodyText: '', postTypeId: null, score: null });
           this.openReplyPostId.set(null);
           this.replySubmittingPostId.set(null);
           // Reply — stay on this page, no navigation.
@@ -566,6 +641,19 @@ export class ResourceDetailComponent {
           this.loadError.set(err instanceof AppHttpError ? err.message : 'Failed to load posts.');
           this.loading.set(false);
         },
+      });
+  }
+
+  /** Just the resource (for categorySummary/postCount) — not the posts list, which updates itself locally. */
+  private refreshResourceSummary(): void {
+    this.resourceService
+      .get(this.resourceId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (resource) => this.resource.set(resource),
+        // Best-effort — the summary just stays as of the last successful
+        // load rather than blocking or erroring the whole page over it.
+        error: () => {},
       });
   }
 

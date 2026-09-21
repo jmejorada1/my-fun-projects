@@ -53,7 +53,7 @@
   font-size: 0.85rem;
   border-radius: var(--radius-pill);
   background: var(--color-surface-alt);
-  border-color: transparent;
+  border-color: var(--color-border);
 }
 
 .search-form input:focus-visible {

@@ -3,3 +3,6 @@
 
 # Claude Code local runtime state
 .claude/scheduled_tasks.lock
+
+# Local Docker env overrides
+.env

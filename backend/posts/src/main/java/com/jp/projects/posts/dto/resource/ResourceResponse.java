@@ -5,11 +5,12 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * {@code postCount} and {@code flagSummary} are only populated by the
- * list/search endpoint (batch-loaded alongside the page, like
- * PostResponse's flags/replyCount) — a single-resource read leaves them
- * at their defaults since the resource-detail page already computes its
- * own summary from the posts it separately loads.
+ * {@code postCount} and {@code flagSummary} count posts/flags at any depth
+ * (top-level posts and replies alike) — same scope as {@code /rankings} —
+ * so they include flags the resource-detail page's own top-level-only post
+ * list can't see (e.g. a reply-only flag). Populated on both the
+ * single-resource read and the list/search endpoint (ResourceService.get /
+ * .list).
  */
 public record ResourceResponse(
         Long id,
