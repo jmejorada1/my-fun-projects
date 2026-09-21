@@ -10,7 +10,18 @@ import { ResourceDetailComponent } from './resource-detail.component';
 import { API_BASE_URL } from '../../core/api-config';
 import { errorInterceptor } from '../../core/error.interceptor';
 import { PostActivityService } from '../../core/post-activity.service';
+import { DOMAIN_OPTIONS_TOKEN } from '../../core/domain-options';
 import { ResourceFlagSummaryEntry } from '../../api/resource.service';
+
+// imdb-standard.config.ts ships with enabled: false (flips true once
+// backend seed data exists — plan §11 Phase 2b) — component-level tests of
+// its category-only behavior don't need that, so this override makes it
+// selectable purely for the test, same pattern
+// domain-selection.service.spec.ts already uses.
+const BOTH_DOMAINS_ENABLED = [
+  { value: 'imdb/bigotry', label: 'Big-O-Meter', enabled: true, description: 'Bigotry flagging.' },
+  { value: 'imdb/standard', label: 'Movie-Meter', enabled: true, description: 'Standard ratings.' },
+];
 
 const RESOURCE = {
   id: 1,
@@ -41,6 +52,7 @@ describe('ResourceDetailComponent', () => {
     postTypes: unknown[] = [{ id: 5, name: 'racism' }],
     queryParams: Record<string, string> = {},
     resourceOverrides: Partial<typeof RESOURCE> = {},
+    domain: 'imdb/bigotry' | 'imdb/standard' = 'imdb/bigotry',
   ) {
     await TestBed.configureTestingModule({
       imports: [ResourceDetailComponent],
@@ -48,6 +60,7 @@ describe('ResourceDetailComponent', () => {
         provideRouter([]),
         provideHttpClient(withInterceptors([errorInterceptor])),
         provideHttpClientTesting(),
+        { provide: DOMAIN_OPTIONS_TOKEN, useValue: BOTH_DOMAINS_ENABLED },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -64,6 +77,16 @@ describe('ResourceDetailComponent', () => {
     // afterward) that would otherwise reject with "cannot match routes".
     vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
+    // Seeded into storage rather than driven through DomainSelectionService
+    // .select() — select() logs out the current user when the domain
+    // changes underneath an active session (the real, intentional behavior
+    // — see domain-selection.service.ts), which would fire here since
+    // currentUser is about to be set below. Pre-seeding storage instead
+    // models "already had this domain selected, page loads" rather than
+    // "switched mid-session," which is what these tests actually want.
+    if (domain !== 'imdb/bigotry') {
+      localStorage.setItem('imdb-ui-angular.selectedDomain', domain);
+    }
     localStorage.setItem(
       'imdb-ui-angular.currentUser',
       JSON.stringify({ id: 1, username: 'jdoe', email: 'jdoe@example.com', firstName: null, lastName: null }),
@@ -1252,6 +1275,87 @@ describe('ResourceDetailComponent', () => {
 
       expect(fixture.componentInstance.conflictRemovalError()).toBe('boom');
       expect(fixture.componentInstance.conflictingPosts().length).toBe(1);
+    });
+  });
+
+  describe('imdb/standard (category-only rating domain)', () => {
+    const STANDARD_POST_TYPES = [
+      { id: 1, name: 'skip-it' },
+      { id: 2, name: 'it-was-okay' },
+      { id: 3, name: 'i-loved-it' },
+    ];
+
+    it('hides the severity picker entirely — no note, no dropdown', async () => {
+      const fixture = await createComponent([], STANDARD_POST_TYPES, {}, {}, 'imdb/standard');
+
+      fixture.componentInstance.form.controls.postTypeId.setValue(3);
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.isSeverityScoreMode()).toBe(false);
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.textContent).not.toContain('Severity is automatically set');
+      expect(el.querySelector('select[formControlName="score"]')).toBeNull();
+      // Still locked/disabled to the domain's fixed value under the hood,
+      // same mechanism as bigotry's "No Bigotry" — just never surfaced.
+      expect(fixture.componentInstance.form.controls.score.disabled).toBe(true);
+      expect(fixture.componentInstance.form.controls.score.value).toBe(0);
+    });
+
+    it('submits the domain\'s fixedScoreValue as score, and skips the conflict check entirely', async () => {
+      const fixture = await createComponent([], STANDARD_POST_TYPES, {}, {}, 'imdb/standard');
+      fixture.componentInstance.form.controls.postTypeId.setValue(3);
+      fixture.componentInstance.form.controls.bodyText.setValue('Loved it!');
+      fixture.detectChanges();
+
+      fixture.componentInstance.submit();
+
+      const req = httpMock.expectOne(`${API_BASE_URL}/posts`);
+      expect(req.request.body).toEqual({
+        username: 'jdoe',
+        resourceId: 1,
+        bodyText: 'Loved it!',
+        postTypeId: 3,
+        score: 0,
+      });
+      req.flush({
+        post: { id: 99, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'Loved it!', data: null, createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
+        flag: { id: 1, postId: 99, postType: { id: 3, name: 'i-loved-it' }, score: 0 },
+      });
+      flushResourceRefresh();
+      // No flushConflictCheck() here — neutralPostTypeName is null for this
+      // domain, so checkForConflictingPosts bails out before making the
+      // GET .../posts?size=200 request that flushConflictCheck expects. A
+      // leftover, unexpected request would fail afterEach's httpMock.verify().
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.conflictingPosts()).toEqual([]);
+    });
+
+    it('categorySummary entries are count-only (null averageScore) regardless of category', async () => {
+      const flagSummary: ResourceFlagSummaryEntry[] = [
+        { postTypeName: 'skip-it', flagCount: 3, averageScore: 0 },
+        { postTypeName: 'i-loved-it', flagCount: 12, averageScore: 0 },
+      ];
+      const fixture = await createComponent([], STANDARD_POST_TYPES, {}, { flagSummary }, 'imdb/standard');
+
+      const summary = fixture.componentInstance.categorySummary();
+      expect(summary.every((entry) => entry.averageScore === null)).toBe(true);
+      expect(summary.map((e) => e.count)).toEqual([12, 3]); // sorted by name: i-loved-it, skip-it
+    });
+
+    it('flag badges show just the category name, no "(score)" suffix', async () => {
+      const posts = [
+        {
+          id: 42, resourceId: 1, userId: 9, username: 'other-user', parentPostId: null, bodyText: 'Great movie.', data: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
+          flags: [{ id: 1, postId: 42, postType: { id: 3, name: 'i-loved-it' }, score: 0, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' }],
+          replyCount: 0,
+          resourceDisplayName: 'Carmencita',
+        },
+      ];
+      const fixture = await createComponent(posts, STANDARD_POST_TYPES, {}, {}, 'imdb/standard');
+
+      const badge = (fixture.nativeElement as HTMLElement).querySelector('.flags-col .flag-badge');
+      expect(badge?.textContent?.trim()).toBe('i-loved-it');
     });
   });
 });

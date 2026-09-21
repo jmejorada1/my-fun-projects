@@ -14,7 +14,7 @@ import { forkJoin, map, skip } from 'rxjs';
 import { AuthService } from '../../core/auth.service';
 import { AppHttpError } from '../../core/error.interceptor';
 import { PostActivityService } from '../../core/post-activity.service';
-import { NO_BIGOTRY_TYPE_NAME, flagSeverityClass as computeFlagSeverityClass } from '../../core/post-type.constants';
+import { DomainSelectionService } from '../../core/domain-selection.service';
 import { Post, PostService } from '../../api/post.service';
 import { Resource, ResourceService } from '../../api/resource.service';
 import { PostType } from '../../api/post-flag.service';
@@ -113,6 +113,7 @@ export class ResourceDetailComponent {
   private readonly postTypeService = inject(PostTypeService);
   private readonly auth = inject(AuthService);
   private readonly postActivity = inject(PostActivityService);
+  private readonly domainSelection = inject(DomainSelectionService);
   private readonly destroyRef = inject(DestroyRef);
 
   private resourceId = 0;
@@ -143,7 +144,8 @@ export class ResourceDetailComponent {
   readonly selectedPostTypeId = toSignal(this.form.controls.postTypeId.valueChanges, { initialValue: null });
   readonly isNoBigotrySelected = computed(() => {
     const id = this.selectedPostTypeId();
-    return id !== null && this.postTypes().find((t) => t.id === id)?.name === NO_BIGOTRY_TYPE_NAME;
+    const neutralPostTypeName = this.domainSelection.activeDomainConfig().neutralPostTypeName;
+    return id !== null && this.postTypes().find((t) => t.id === id)?.name === neutralPostTypeName;
   });
   /**
    * This movie's flags grouped by category — backend-aggregated (any post
@@ -153,11 +155,13 @@ export class ResourceDetailComponent {
    */
   readonly categorySummary = computed<CategorySummaryEntry[]>(() => {
     const flagSummary = this.resource()?.flagSummary ?? [];
+    const config = this.domainSelection.activeDomainConfig();
+    const countOnly = config.rating.mode === 'category-only';
     return flagSummary
       .map((entry) => ({
         name: entry.postTypeName,
         count: entry.flagCount,
-        averageScore: entry.postTypeName === NO_BIGOTRY_TYPE_NAME ? null : entry.averageScore,
+        averageScore: countOnly || entry.postTypeName === config.neutralPostTypeName ? null : entry.averageScore,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
   });
@@ -270,13 +274,22 @@ export class ResourceDetailComponent {
         error: () => this.postTypes.set([]),
       });
 
-    // "No Bigotry" is a neutral flag — the severity picker is meaningless
-    // for it, so lock the score to 0 and hide the picker (via
-    // isNoBigotrySelected in the template) rather than asking the user to
-    // pick a score for a category that only ever means "no bigotry found."
+    // The severity picker is meaningless (a) for a "no bigotry"-style
+    // neutral flag, same as before, or (b) for the whole form, in a
+    // category-only rating domain (docs/domain-configurability-plan.md §7)
+    // — either way, lock the score to a fixed value and hide the picker
+    // (via isSeverityScoreMode()/isNoBigotrySelected() in the template)
+    // rather than asking the user to pick a score that isn't meaningful.
+    // Disabling the control is also what excludes it from form.invalid —
+    // Validators.required stays attached throughout, it just never applies
+    // to a disabled control.
     effect(() => {
       const scoreControl = this.form.controls.score;
-      if (this.isNoBigotrySelected()) {
+      const config = this.domainSelection.activeDomainConfig();
+      if (config.rating.mode === 'category-only') {
+        scoreControl.setValue(config.rating.fixedScoreValue ?? 0);
+        scoreControl.disable();
+      } else if (this.isNoBigotrySelected()) {
         scoreControl.setValue(0);
         scoreControl.disable();
       } else if (scoreControl.disabled) {
@@ -284,6 +297,11 @@ export class ResourceDetailComponent {
         scoreControl.setValue(null);
       }
     });
+  }
+
+  /** Whether the active domain uses a numeric severity score at all — see DomainConfig.rating.mode. */
+  isSeverityScoreMode(): boolean {
+    return this.domainSelection.activeDomainConfig().rating.mode === 'severity-score';
   }
 
   submit(): void {
@@ -323,7 +341,8 @@ export class ResourceDetailComponent {
           this.postActivity.notifyPostOrReplyCreated();
 
           if (response.flag) {
-            const direction = response.flag.postType.name === NO_BIGOTRY_TYPE_NAME ? 'to-no-bigotry' : 'to-severity';
+            const neutralPostTypeName = this.domainSelection.activeDomainConfig().neutralPostTypeName;
+            const direction = response.flag.postType.name === neutralPostTypeName ? 'to-no-bigotry' : 'to-severity';
             this.checkForConflictingPosts(response.post.userId, response.post.id, direction);
           }
         },
@@ -416,7 +435,7 @@ export class ResourceDetailComponent {
    * always 0 but that means "clean," not "low severity."
    */
   flagSeverityClass(postTypeName: string, score: number): string {
-    return computeFlagSeverityClass(postTypeName, score);
+    return this.domainSelection.activeDomainConfig().badgeClassFor(postTypeName, score);
   }
 
   /**
@@ -443,7 +462,8 @@ export class ResourceDetailComponent {
   /** Mirrors the top-level form's isNoBigotrySelected, scoped to one reply's own form. */
   isReplyNoBigotrySelected(postId: number): boolean {
     const id = this.getReplyForm(postId).controls.postTypeId.value;
-    return id !== null && this.postTypes().find((t) => t.id === id)?.name === NO_BIGOTRY_TYPE_NAME;
+    const neutralPostTypeName = this.domainSelection.activeDomainConfig().neutralPostTypeName;
+    return id !== null && this.postTypes().find((t) => t.id === id)?.name === neutralPostTypeName;
   }
 
   /**
@@ -455,7 +475,12 @@ export class ResourceDetailComponent {
   onReplyPostTypeChange(postId: number): void {
     const form = this.getReplyForm(postId);
     const scoreControl = form.controls.score;
-    if (this.isReplyNoBigotrySelected(postId)) {
+    const config = this.domainSelection.activeDomainConfig();
+    if (config.rating.mode === 'category-only') {
+      scoreControl.setValue(config.rating.fixedScoreValue ?? 0);
+      scoreControl.disable();
+      scoreControl.clearValidators();
+    } else if (this.isReplyNoBigotrySelected(postId)) {
       scoreControl.setValue(0);
       scoreControl.disable();
       scoreControl.clearValidators();
@@ -717,13 +742,23 @@ export class ResourceDetailComponent {
     excludePostId: number,
     direction: 'to-no-bigotry' | 'to-severity',
   ): void {
+    const neutralPostTypeName = this.domainSelection.activeDomainConfig().neutralPostTypeName;
+    // No neutral-flag concept in this domain (e.g. a category-only rating
+    // domain) — there's nothing that could contradict, so skip the check
+    // entirely rather than fetching posts just to find no conflicts.
+    if (neutralPostTypeName === null) {
+      return;
+    }
+
     this.postService
       .listTopLevel(this.resourceId, 0, 200)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (page) => {
-          const isConflicting =
-            direction === 'to-no-bigotry' ? hasNonNoBigotryFlag : hasNoBigotryFlag;
+          const isConflicting = (post: Post) =>
+            direction === 'to-no-bigotry'
+              ? hasNonNoBigotryFlag(post, neutralPostTypeName)
+              : hasNoBigotryFlag(post, neutralPostTypeName);
           const conflicts = findConflictingPosts(page.content, userId, excludePostId, isConflicting);
           if (conflicts.length > 0) {
             this.conflictDirection.set(direction);
@@ -813,13 +848,13 @@ export class ResourceDetailComponent {
   }
 }
 
-/** Any score counts, including 0 (neutral): it's the *category* that contradicts "no bigotry," not the severity. */
-function hasNonNoBigotryFlag(post: Post): boolean {
-  return post.flags.some((flag) => flag.postType.name !== NO_BIGOTRY_TYPE_NAME);
+/** Any score counts, including 0 (neutral): it's the *category* that contradicts the neutral flag, not the severity. */
+function hasNonNoBigotryFlag(post: Post, neutralPostTypeName: string): boolean {
+  return post.flags.some((flag) => flag.postType.name !== neutralPostTypeName);
 }
 
-function hasNoBigotryFlag(post: Post): boolean {
-  return post.flags.some((flag) => flag.postType.name === NO_BIGOTRY_TYPE_NAME);
+function hasNoBigotryFlag(post: Post, neutralPostTypeName: string): boolean {
+  return post.flags.some((flag) => flag.postType.name === neutralPostTypeName);
 }
 
 /**

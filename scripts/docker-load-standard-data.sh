@@ -1,25 +1,30 @@
 #!/usr/bin/env bash
-# Seeds the imdb/bigotry domain with mock resources plus user1/user2/user3
-# posts, replies, and flags via the bigotry-loader one-off job — runs
-# standalone, without needing ./docker-run.sh already up first.
+# Seeds the imdb/standard domain with mock resources plus a small amount of
+# user1/user2/user3 posts and replies via the standard-loader one-off job —
+# runs standalone, without needing ./scripts/docker-run.sh already up first.
 #
 # Self-contained: the loader reads from the sample dataset baked into the
 # image (backend/imdb-data-python/sample-data/), so no IMDB download is
 # needed. To seed from the real, full title.basics.tsv instead, see the
-# bigotry-loader comment in docker-compose.yml for the ad hoc bind-mount
+# standard-loader comment in docker-compose.yml for the ad hoc bind-mount
 # command (this script doesn't support that — run docker compose directly).
 #
 # Starts (or reuses) postgres + posts just long enough for posts' Flyway
-# migrations to apply (frontend is not started), then runs bigotry-loader.
-# Containers are left running afterward — use ./docker-shutdown.sh when
-# you're done. Any arguments are forwarded to import_bigotry_data.py, e.g.:
-#   ./docker-load-bigotry-data.sh --total-posts 1000 --seed 42
-#   ./docker-load-bigotry-data.sh --start-row 1 --end-row 500
+# migrations to apply (frontend is not started), then runs standard-loader.
+# Containers are left running afterward — use ./scripts/docker-shutdown.sh
+# when you're done. Any arguments are forwarded to import_standard_data.py,
+# e.g.:
+#   ./scripts/docker-load-standard-data.sh --total-posts 200 --seed 42
+#   ./scripts/docker-load-standard-data.sh --start-row 1 --end-row 1000
 
 set -uo pipefail
 
+# This script lives in scripts/, but docker-compose.yml and every relative
+# build context (./backend/imdb-data-python, etc.) it points at are at the
+# repo root — run everything from there, not from scripts/ itself.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$ROOT_DIR"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "docker CLI not found — install Docker Desktop: https://www.docker.com/products/docker-desktop/" >&2
@@ -32,7 +37,7 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 echo "Building images..."
-if ! docker compose build posts bigotry-loader; then
+if ! docker compose build posts standard-loader; then
   echo "Build failed — see the error above." >&2
   exit 1
 fi
@@ -51,5 +56,5 @@ if ! "$SCRIPT_DIR/docker-wait-for-posts.sh"; then
 fi
 
 echo
-echo "Running bigotry-loader..."
-exec docker compose run --rm bigotry-loader "$@"
+echo "Running standard-loader..."
+exec docker compose run --rm standard-loader "$@"

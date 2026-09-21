@@ -1,6 +1,6 @@
 # imdb-data-python
 
-Two one-off scripts against the `posts-db` used by the [posts](../posts)
+Three one-off scripts against the `posts-db` used by the [posts](../posts)
 Spring Boot service. See `../posts/docs/design-spec.md` §4.3 for the target
 schema.
 
@@ -13,16 +13,26 @@ schema.
   [`bigotry-config.yaml`](./bigotry-config.yaml) for options; run
   `./.venv/bin/python3 import_bigotry_data.py --help` for the full flag
   list.
+- **`import_standard_data.py`** — the `imdb/standard` equivalent of
+  `import_bigotry_data.py`: imports resources idempotently, plus seeds
+  mock users `user1`/`user2`/`user3` and a small amount of posts/replies
+  rated `skip-it`/`it-was-okay`/`i-enjoyed-it`/`i-loved-it` (fixed score of
+  `0` — this domain has no severity to average). A separate script rather
+  than a generalization of `import_bigotry_data.py` — see its docstring and
+  `../imdb-data-python/CLAUDE.md`'s "Adding a new domain" for why. See its
+  docstring and [`standard-config.yaml`](./standard-config.yaml) for
+  options; run `./.venv/bin/python3 import_standard_data.py --help` for the
+  full flag list.
 
-Both default to [`sample-data/title.basics.sample.tsv`](./sample-data/title.basics.sample.tsv)
+All three default to [`sample-data/title.basics.sample.tsv`](./sample-data/title.basics.sample.tsv)
 — a 5000-row subset (500 rows per `resource_category` title type,
-`tt0000001`–`tt0260178`) checked into this repo, so either script runs with
+`tt0000001`–`tt0260178`) checked into this repo, so each script runs with
 no IMDB download required. Point `tsv_path`/`--tsv-path` at the real, full
 `title.basics.tsv` instead for larger-scale imports (see "Loading IMDB
-data" in the [root README](../../README.md)). Both scripts also skip rows
-whose `primaryTitle` is one of IMDB's generic placeholder episode titles
-(e.g. `Episode #1.1`) — tens of thousands of `tvEpisode` rows have no real
-title and aren't useful as mock post/reply subjects.
+data" in the [root README](../../README.md)). All three scripts also skip
+rows whose `primaryTitle` is one of IMDB's generic placeholder episode
+titles (e.g. `Episode #1.1`) — tens of thousands of `tvEpisode` rows have
+no real title and aren't useful as mock post/reply subjects.
 
 ## Prerequisites
 

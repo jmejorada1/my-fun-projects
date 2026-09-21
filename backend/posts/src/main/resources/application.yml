@@ -27,5 +27,8 @@ app:
   cors:
     # frontend/imdb-ui-angular/docs/design-spec.md §3.7. Comma-separated;
     # add the deployed UI's origin here once it exists — no code change
-    # needed.
+    # needed. This default is for running posts standalone (no Docker) —
+    # docker-compose.yml overrides it via APP_CORS_ALLOWED_ORIGINS, same
+    # Spring Boot relaxed-binding trick spring.datasource.url uses above,
+    # so it tracks docker-compose.yml/.env's FRONTEND_PORT automatically.
     allowed-origins: http://localhost:4200

@@ -23,6 +23,8 @@
    X-- drill down capabilities on side panels
    X-- when user adds a no-bigotry card on a resource, then can you remove previous severity cards from user if user agrees? In other words warn user first, with a floatable window that shows all the cards that will be removed in a clickable list. Allow them to drill down and view each post/reply before agreeing to delete cards, and add the no-bigotry card.
 
+   -- Add datagrid with pagination for search results?
+   -- polling or refresh polling?
 
    -- Scrollable table header?
    -- When a user scrolls down, can you maintain "back to search" and "back to top" links?
@@ -31,15 +33,16 @@
    -- Add back/forward buttons
 
 *** IMDB Data ****
-   -- Load imdb data, but ignore when primaryTitle is prefixed with Episode #   
+   X-- Load imdb data, but ignore when primaryTitle is prefixed with Episode #   
 
 *** Code Changes ****
 
-   -- organize app/api package
-        -- Do not hardcode localhost:4200 everywhere. Remove any hardcoded things. parameterize when possible
+   X-- organize app/api package
+        
+   X-- Do not hardcode localhost:4200 everywhere. Remove any hardcoded things. parameterize when possible
    
    
-   -- restructure code to be easily configurable by domain.
+   X-- restructure code to be easily configurable by domain.
         --- In other words, Can you make the domain and configurations parameterizable through a json file or datastructure/classes that can be processed? For example I want to add an imdb/standard domain that will have a different set of post-categories, for example:
                 - skip it
                 - It was okay
@@ -48,6 +51,8 @@
         And there will be no severity score to average. Just counts of the above chosen categories for rating a movie.
 
         Or would it be simpler to create a separate Angular (or React) UI project to handle this new "domain"?
+
+        Do not implement anything. Plan this in a new markdown file in imdb-ui-angular/docs directory
 
    
 
@@ -61,6 +66,12 @@
     - I enjoyed it
     - I loved it, 
 
+** IDP integration!!!! ***
+
+** IMPORTANT ***
+   * Security check for security vulns (like sql injection, etc.)
+   * Test race condition scenarios
+
 ** New TODO application:
       - Resource is todo item
       - post-categories:
@@ -68,3 +79,9 @@
                 In-Progress
                 Done
       - Add severity on "Waiting" state
+
+
+
+** Docs **
+   Add frontend ui flow diagram?
+   Archive existing docs.

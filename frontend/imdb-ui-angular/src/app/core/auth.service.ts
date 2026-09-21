@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
-import { API_BASE_URL } from './api-config';
+import { ApiConfigService } from './api-config';
 
 export interface AuthUser {
   id: number;
@@ -24,6 +24,7 @@ const STORAGE_KEY = 'imdb-ui-angular.currentUser';
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
+  private readonly apiConfig = inject(ApiConfigService);
 
   private readonly currentUserSignal = signal<AuthUser | null>(readFromStorage());
   readonly currentUser = this.currentUserSignal.asReadonly();
@@ -31,14 +32,14 @@ export class AuthService {
   /** Login: looks up an existing account. Errors (404) if none exists. */
   login(username: string): Observable<AuthUser> {
     return this.http
-      .get<AuthUser>(`${API_BASE_URL}/dev/users/by-username/${encodeURIComponent(username)}`)
+      .get<AuthUser>(`${this.apiConfig.baseUrl()}/dev/users/by-username/${encodeURIComponent(username)}`)
       .pipe(tap((user) => this.setCurrentUser(user)));
   }
 
   /** Register: always creates a new account. Errors (409) on a duplicate username/email. */
   register(username: string, email: string): Observable<AuthUser> {
     return this.http
-      .post<AuthUser>(`${API_BASE_URL}/dev/users`, { username, email })
+      .post<AuthUser>(`${this.apiConfig.baseUrl()}/dev/users`, { username, email })
       .pipe(tap((user) => this.setCurrentUser(user)));
   }
 

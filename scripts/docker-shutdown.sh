@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 # Stops the stack. By default the database volume is kept (so the next
-# `./docker-run.sh` comes back up with the same data) — pass --all to
-# wipe it too.
+# `./scripts/docker-run.sh` comes back up with the same data) — pass --all
+# to wipe it too.
 #
 # Usage:
-#   ./docker-shutdown.sh          # stop containers, keep the db volume
-#   ./docker-shutdown.sh --all    # stop containers, wipe the db volume
+#   ./scripts/docker-shutdown.sh          # stop containers, keep the db volume
+#   ./scripts/docker-shutdown.sh --all    # stop containers, wipe the db volume
 
 set -uo pipefail
 
+# This script lives in scripts/, but docker-compose.yml is at the repo root —
+# run everything from there, not from scripts/ itself.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$ROOT_DIR"
 
 WIPE_VOLUMES=false
 

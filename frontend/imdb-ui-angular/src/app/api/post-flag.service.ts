@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { API_BASE_URL } from '../core/api-config';
+import { ApiConfigService } from '../core/api-config';
 
 export interface PostType {
   id: number;
@@ -27,12 +27,13 @@ export interface PostFlagCreateRequest {
 @Injectable({ providedIn: 'root' })
 export class PostFlagService {
   private readonly http = inject(HttpClient);
+  private readonly apiConfig = inject(ApiConfigService);
 
   addOrUpdate(postId: number, request: PostFlagCreateRequest): Observable<PostFlag> {
-    return this.http.post<PostFlag>(`${API_BASE_URL}/posts/${postId}/flags`, request);
+    return this.http.post<PostFlag>(`${this.apiConfig.baseUrl()}/posts/${postId}/flags`, request);
   }
 
   listActive(postId: number): Observable<PostFlag[]> {
-    return this.http.get<PostFlag[]>(`${API_BASE_URL}/posts/${postId}/flags`);
+    return this.http.get<PostFlag[]>(`${this.apiConfig.baseUrl()}/posts/${postId}/flags`);
   }
 }

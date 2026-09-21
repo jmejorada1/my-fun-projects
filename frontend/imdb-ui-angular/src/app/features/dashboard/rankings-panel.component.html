@@ -16,8 +16,12 @@
             @for (item of ranking.resources; track item.resource.id) {
               <li>
                 <a [routerLink]="['/resources', item.resource.id]">{{ item.resource.displayName }}</a> —
-                avg {{ item.averageScore | number: '1.1-1' }}
-                ({{ item.flagCount }} flags)
+                @if (isCategoryOnly()) {
+                  {{ item.flagCount }} {{ item.flagCount === 1 ? 'pick' : 'picks' }}
+                } @else {
+                  avg {{ item.averageScore | number: '1.1-1' }}
+                  ({{ item.flagCount }} flags)
+                }
               </li>
             }
           </ol>

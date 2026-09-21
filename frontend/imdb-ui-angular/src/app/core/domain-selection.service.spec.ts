@@ -18,6 +18,15 @@ const TWO_ENABLED_OPTIONS = [
   { value: 'imdb/standard', label: 'Movie-Meter', enabled: true, description: 'Standard ratings.' },
 ];
 
+// A fake not-yet-enabled option, decoupled from imdb/standard's real
+// (now enabled — Phase 2b seeded its backend data) config state, so this
+// "reject a disabled domain" behavior stays covered regardless of which
+// real domains happen to be enabled.
+const ONE_DISABLED_OPTION = [
+  { value: 'imdb/bigotry', label: 'Big-O-Meter', enabled: true, description: 'Bigotry flagging.' },
+  { value: 'imdb/future', label: 'Future-Meter', enabled: false, description: 'Not yet.' },
+];
+
 describe('DomainSelectionService', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -38,7 +47,8 @@ describe('DomainSelectionService', () => {
   });
 
   it('ignores a stored domain that is not enabled and falls back to the default', () => {
-    localStorage.setItem(STORAGE_KEY, 'imdb/standard');
+    TestBed.overrideProvider(DOMAIN_OPTIONS_TOKEN, { useValue: ONE_DISABLED_OPTION });
+    localStorage.setItem(STORAGE_KEY, 'imdb/future');
     const service = TestBed.inject(DomainSelectionService);
     expect(service.selectedDomain()).toBe(DEFAULT_DOMAIN);
   });
@@ -49,9 +59,10 @@ describe('DomainSelectionService', () => {
     expect(service.selectedDomain()).toBe(DEFAULT_DOMAIN);
   });
 
-  it('select() ignores a listed-but-not-yet-enabled domain (movie-meter)', () => {
+  it('select() ignores a listed-but-not-yet-enabled domain', () => {
+    TestBed.overrideProvider(DOMAIN_OPTIONS_TOKEN, { useValue: ONE_DISABLED_OPTION });
     const service = TestBed.inject(DomainSelectionService);
-    service.select('imdb/standard');
+    service.select('imdb/future');
     expect(service.selectedDomain()).toBe(DEFAULT_DOMAIN);
   });
 

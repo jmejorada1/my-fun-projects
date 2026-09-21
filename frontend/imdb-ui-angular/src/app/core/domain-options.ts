@@ -1,4 +1,5 @@
 import { InjectionToken } from '@angular/core';
+import { DOMAIN_REGISTRY } from './domain/domain-registry';
 
 export interface DomainOption {
   /** Actual X-Domain header value sent to the backend. */
@@ -12,26 +13,15 @@ export interface DomainOption {
 }
 
 /**
+ * Derived from DOMAIN_REGISTRY (core/domain/domain-registry.ts) — picker
+ * metadata lives on each domain's DomainConfig now, so adding a domain
+ * never means editing this file (docs/domain-configurability-plan.md §5–§6).
  * The backend's actual domain names (`imdb/bigotry`, `imdb/standard`) are
- * internal — the picker shows a friendly label instead. `movie-meter`
- * (imdb/standard) is listed but disabled: it doesn't exist in the backend
- * yet, this just reserves its spot in the UI.
+ * internal — the picker shows each config's friendly `label` instead.
  */
-export const DOMAIN_OPTIONS: readonly DomainOption[] = [
-  {
-    value: 'imdb/bigotry',
-    label: 'Big-O-Meter',
-    enabled: true,
-    description:
-      'Flags movies, TV shows, and other titles for potentially biased content — racism, sexism, and LGBTQ+-phobia — and lets the community rate how severe each flag is.',
-  },
-  {
-    value: 'imdb/standard',
-    label: 'Movie-Meter',
-    enabled: false,
-    description: 'General movie and TV ratings and discussion — coming soon.',
-  },
-];
+export const DOMAIN_OPTIONS: readonly DomainOption[] = DOMAIN_REGISTRY.map(
+  ({ value, label, description, enabled }) => ({ value, label, description, enabled }),
+);
 
 export const DEFAULT_DOMAIN = DOMAIN_OPTIONS[0].value;
 

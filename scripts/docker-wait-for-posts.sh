@@ -9,8 +9,11 @@
 
 set -uo pipefail
 
+# This script lives in scripts/, but docker-compose.yml is at the repo root —
+# run everything from there, not from scripts/ itself.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$ROOT_DIR"
 
 for _ in $(seq 1 60); do
   if docker compose exec -T postgres psql -U postgres -d posts-db -c \

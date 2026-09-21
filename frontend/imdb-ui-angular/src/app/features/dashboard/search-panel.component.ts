@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { SearchStateService } from '../../core/search-state.service';
-import { NO_BIGOTRY_TYPE_NAME, flagSeverityClass } from '../../core/post-type.constants';
+import { DomainSelectionService } from '../../core/domain-selection.service';
 import { Resource, ResourceFlagSummaryEntry } from '../../api/resource.service';
 
 /**
@@ -24,6 +24,7 @@ import { Resource, ResourceFlagSummaryEntry } from '../../api/resource.service';
 })
 export class SearchPanelComponent {
   private readonly searchState = inject(SearchStateService);
+  private readonly domainSelection = inject(DomainSelectionService);
 
   readonly results = this.searchState.results;
   readonly loading = this.searchState.loading;
@@ -44,11 +45,14 @@ export class SearchPanelComponent {
     return resource.flagSummary.find((entry) => entry.postTypeName === postTypeName);
   }
 
-  isNoBigotry(postTypeName: string): boolean {
-    return postTypeName === NO_BIGOTRY_TYPE_NAME;
+  /** True when this category's cell should show a bare count instead of "avg X (count)" —
+   *  either a neutral flag (bigotry's "no-bigotry") or the whole domain has no severity to average. */
+  isCountOnly(postTypeName: string): boolean {
+    const config = this.domainSelection.activeDomainConfig();
+    return config.rating.mode === 'category-only' || postTypeName === config.neutralPostTypeName;
   }
 
   flagSeverityClass(postTypeName: string, score: number): string {
-    return flagSeverityClass(postTypeName, score);
+    return this.domainSelection.activeDomainConfig().badgeClassFor(postTypeName, score);
   }
 }

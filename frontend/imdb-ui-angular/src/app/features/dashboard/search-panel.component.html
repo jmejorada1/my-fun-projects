@@ -33,7 +33,7 @@
               <td class="flags-col">
                 @if (flagEntryFor(resource, category); as entry) {
                   <span class="flag-badge" [class]="flagSeverityClass(category, entry.averageScore)">
-                    @if (isNoBigotry(category)) {
+                    @if (isCountOnly(category)) {
                       {{ entry.flagCount }}
                     } @else {
                       avg {{ entry.averageScore | number: '1.1-1' }} ({{ entry.flagCount }})
