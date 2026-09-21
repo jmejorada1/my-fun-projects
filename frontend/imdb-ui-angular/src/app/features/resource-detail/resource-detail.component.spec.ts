@@ -1331,6 +1331,52 @@ describe('ResourceDetailComponent', () => {
       expect(fixture.componentInstance.conflictingPosts()).toEqual([]);
     });
 
+    it('still submits the fixedScoreValue on a second post, not a stale null from the first reset', async () => {
+      // Regression test: FormGroup.reset({..., score: null}) only preserves
+      // a control's disabled state when passed the boxed {value, disabled}
+      // form — a plain null leaves score's *value* stuck at null after the
+      // first successful post, since (unlike bigotry's severity-score
+      // domain) nothing here re-triggers the score-locking effect on a
+      // category-only domain's postTypeId reset. Left unfixed, every post
+      // after the first would submit score: null and get rejected by the
+      // backend's "postTypeId and score must be provided together" check.
+      const fixture = await createComponent([], STANDARD_POST_TYPES, {}, {}, 'imdb/standard');
+      const c = fixture.componentInstance;
+
+      c.form.controls.postTypeId.setValue(3);
+      c.form.controls.bodyText.setValue('Loved it!');
+      fixture.detectChanges();
+      c.submit();
+      httpMock.expectOne(`${API_BASE_URL}/posts`).flush({
+        post: { id: 99, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'Loved it!', data: null, createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
+        flag: { id: 1, postId: 99, postType: { id: 3, name: 'i-loved-it' }, score: 0 },
+      });
+      flushResourceRefresh();
+      fixture.detectChanges();
+
+      expect(c.form.controls.score.disabled).toBe(true);
+      expect(c.form.controls.score.value).toBe(0);
+
+      c.form.controls.postTypeId.setValue(1);
+      c.form.controls.bodyText.setValue('Actually, skip it.');
+      fixture.detectChanges();
+      c.submit();
+
+      const secondReq = httpMock.expectOne(`${API_BASE_URL}/posts`);
+      expect(secondReq.request.body).toEqual({
+        username: 'jdoe',
+        resourceId: 1,
+        bodyText: 'Actually, skip it.',
+        postTypeId: 1,
+        score: 0,
+      });
+      secondReq.flush({
+        post: { id: 100, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'Actually, skip it.', data: null, createdAt: '2026-01-02T00:01:00Z', updatedAt: '2026-01-02T00:01:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
+        flag: { id: 2, postId: 100, postType: { id: 1, name: 'skip-it' }, score: 0 },
+      });
+      flushResourceRefresh();
+    });
+
     it('categorySummary entries are count-only (null averageScore) regardless of category', async () => {
       const flagSummary: ResourceFlagSummaryEntry[] = [
         { postTypeName: 'skip-it', flagCount: 3, averageScore: 0 },

@@ -1,14 +1,5 @@
 <header class="app-toolbar">
-  <label class="domain-picker">
-    Domain:
-    <select name="domain" [value]="selectedDomain()" (change)="onDomainChange($event)">
-      @for (option of domainOptions; track option.value) {
-        <option [value]="option.value" [disabled]="!option.enabled">
-          {{ option.label }}{{ option.enabled ? '' : ' (coming soon)' }}
-        </option>
-      }
-    </select>
-  </label>
+  <span class="brand-name">{{ activeDomainConfig().label }}</span>
 
   @if (currentUser()) {
     @if (showBackToTop()) {
@@ -22,10 +13,23 @@
     </form>
   }
 
-  @if (currentUser(); as user) {
-    <div class="user-status">
-      <span>Hi {{ user.username }}</span>
-      <button type="button" class="link-button" (click)="logout()">Logout</button>
-    </div>
-  }
+  <div class="right-group">
+    <label class="domain-picker">
+      Domain:
+      <select name="domain" [value]="selectedDomain()" (change)="onDomainChange($event)">
+        @for (option of domainOptions; track option.value) {
+          <option [value]="option.value" [disabled]="!option.enabled">
+            {{ option.label }}{{ option.enabled ? '' : ' (coming soon)' }}
+          </option>
+        }
+      </select>
+    </label>
+
+    @if (currentUser(); as user) {
+      <div class="user-status">
+        <span>Hi {{ user.username }}</span>
+        <button type="button" class="link-button" (click)="logout()">Logout</button>
+      </div>
+    }
+  </div>
 </header>

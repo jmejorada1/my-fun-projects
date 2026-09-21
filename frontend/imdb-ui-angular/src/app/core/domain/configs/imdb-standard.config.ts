@@ -44,16 +44,11 @@ export const IMDB_STANDARD_CONFIG: DomainConfig = {
     '--color-primary-active': '#0369a1',
     '--color-primary-light': '#e0f2fe',
 
-    // Reskins the reused flag-badge--red/orange/yellow/green buckets
-    // (worst -> best) as grey -> blue -> teal -> gold instead of bigotry's
-    // literal red -> orange -> yellow -> green.
-    '--color-severity-red-bg': '#e2e8f0',
-    '--color-severity-red-text': '#475569',
-    '--color-severity-orange-bg': '#dbeafe',
-    '--color-severity-orange-text': '#1d4ed8',
-    '--color-severity-yellow-bg': '#ccfbf1',
-    '--color-severity-yellow-text': '#0f766e',
-    '--color-severity-green-bg': '#fef3c7',
-    '--color-severity-green-text': '#b45309',
+    // Reuses bigotry's literal red/yellow/green buckets as-is for
+    // skip-it/i-enjoyed-it/i-loved-it (worst -> best already matches
+    // red -> yellow -> green) and only reskins the orange bucket — used by
+    // it-was-okay — to a neutral grey instead of literal orange.
+    '--color-severity-orange-bg': '#e2e8f0',
+    '--color-severity-orange-text': '#475569',
   },
 };

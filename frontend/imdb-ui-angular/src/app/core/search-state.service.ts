@@ -1,5 +1,6 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, effect, inject, signal } from '@angular/core';
 import { Resource, ResourceService } from '../api/resource.service';
+import { AuthService } from './auth.service';
 import { AppHttpError } from './error.interceptor';
 
 /**
@@ -11,11 +12,28 @@ import { AppHttpError } from './error.interceptor';
 @Injectable({ providedIn: 'root' })
 export class SearchStateService {
   private readonly resourceService = inject(ResourceService);
+  private readonly auth = inject(AuthService);
 
   readonly results = signal<Resource[]>([]);
   readonly loading = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly hasSearched = signal(false);
+
+  constructor() {
+    // Resources are domain-scoped, but results/hasSearched here are a root
+    // singleton that otherwise outlives any one login session. Without
+    // this, switching domains (which logs the current user out first —
+    // see DomainSelectionService.select()) leaves the *previous* domain's
+    // search results on screen; clicking one navigates to a resourceId
+    // that doesn't exist in the newly-selected domain ("Resource <id> not
+    // found"). Reacting to every currentUser() transition — login,
+    // logout, and register — resets this on login as well as logout, so a
+    // fresh session never inherits another session's results either.
+    effect(() => {
+      this.auth.currentUser();
+      this.clear();
+    });
+  }
 
   search(term: string): void {
     this.loading.set(true);

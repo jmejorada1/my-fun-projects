@@ -282,21 +282,42 @@ export class ResourceDetailComponent {
     // rather than asking the user to pick a score that isn't meaningful.
     // Disabling the control is also what excludes it from form.invalid —
     // Validators.required stays attached throughout, it just never applies
-    // to a disabled control.
-    effect(() => {
-      const scoreControl = this.form.controls.score;
-      const config = this.domainSelection.activeDomainConfig();
-      if (config.rating.mode === 'category-only') {
-        scoreControl.setValue(config.rating.fixedScoreValue ?? 0);
-        scoreControl.disable();
-      } else if (this.isNoBigotrySelected()) {
-        scoreControl.setValue(0);
-        scoreControl.disable();
-      } else if (scoreControl.disabled) {
-        scoreControl.enable();
-        scoreControl.setValue(null);
-      }
-    });
+    // to a disabled control. In a severity-score domain this effect also
+    // reads isNoBigotrySelected() (which reads postTypeId), so resetting
+    // postTypeId to null re-triggers it and self-heals the score control;
+    // a category-only domain's branch never reads postTypeId, so submit()
+    // calls applyScoreLock() explicitly after its own form.reset() instead
+    // of relying on that same retrigger (see applyScoreLock's doc comment).
+    effect(() => this.applyScoreLock());
+  }
+
+  /**
+   * Locks (or unlocks) the top-level form's score control to match the
+   * active domain/category, per the effect above. Also called directly
+   * from submit()'s success handler: FormGroup.reset({..., score: null})
+   * only preserves a control's disabled state when passed the boxed
+   * `{value, disabled}` form — a plain `null` leaves score's *value*
+   * permanently null after the first successful post in a category-only
+   * domain, since nothing else re-triggers this effect for that domain
+   * (its branch never reads postTypeId). That stale null then survives
+   * client-side validation (the control is still disabled, so
+   * form.invalid never catches it) and gets submitted as-is, tripping the
+   * backend's "postTypeId and score must be provided together" check on
+   * every post after the first.
+   */
+  private applyScoreLock(): void {
+    const scoreControl = this.form.controls.score;
+    const config = this.domainSelection.activeDomainConfig();
+    if (config.rating.mode === 'category-only') {
+      scoreControl.setValue(config.rating.fixedScoreValue ?? 0);
+      scoreControl.disable();
+    } else if (this.isNoBigotrySelected()) {
+      scoreControl.setValue(0);
+      scoreControl.disable();
+    } else if (scoreControl.disabled) {
+      scoreControl.enable();
+      scoreControl.setValue(null);
+    }
   }
 
   /** Whether the active domain uses a numeric severity score at all — see DomainConfig.rating.mode. */
@@ -336,6 +357,10 @@ export class ResourceDetailComponent {
           const flags = response.flag ? [response.flag] : [];
           this.posts.update((posts) => [...posts, { ...response.post, flags }]);
           this.form.reset({ bodyText: '', postTypeId: null, score: null });
+          // Restores score's disabled/fixed-value lock immediately — see
+          // applyScoreLock's doc comment for why the reset above alone
+          // isn't enough for a category-only domain.
+          this.applyScoreLock();
           // The side panels (my-posts-panel, rankings-panel) load once and
           // stay mounted across navigation — nudge them to refetch.
           this.postActivity.notifyPostOrReplyCreated();

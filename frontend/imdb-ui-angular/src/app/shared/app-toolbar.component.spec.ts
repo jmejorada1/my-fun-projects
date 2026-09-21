@@ -44,6 +44,26 @@ describe('AppToolbarComponent', () => {
     expect(text).not.toContain('imdb/bigotry');
   });
 
+  it('shows a big brand name for the active domain, so it\'s obvious at a glance which app this is', () => {
+    const fixture = TestBed.createComponent(AppToolbarComponent);
+    fixture.detectChanges();
+
+    const brand = fixture.nativeElement.querySelector('.brand-name') as HTMLElement;
+    expect(brand?.textContent?.trim()).toBe('Big-O-Meter');
+  });
+
+  it('updates the brand name when the domain switches', () => {
+    TestBed.overrideProvider(DOMAIN_OPTIONS_TOKEN, { useValue: TWO_ENABLED_OPTIONS });
+    const fixture = TestBed.createComponent(AppToolbarComponent);
+    fixture.detectChanges();
+
+    TestBed.inject(DomainSelectionService).select('imdb/standard');
+    fixture.detectChanges();
+
+    const brand = fixture.nativeElement.querySelector('.brand-name') as HTMLElement;
+    expect(brand?.textContent?.trim()).toBe('Movie-Meter');
+  });
+
   it('renders a not-yet-enabled domain option as disabled with a "coming soon" note', () => {
     TestBed.overrideProvider(DOMAIN_OPTIONS_TOKEN, { useValue: ONE_DISABLED_OPTION });
     const fixture = TestBed.createComponent(AppToolbarComponent);
@@ -200,6 +220,22 @@ describe('AppToolbarComponent', () => {
 
       expect(searchSpy).not.toHaveBeenCalled();
       httpMock.expectNone(() => true);
+    });
+
+    it('resets the typed search term when the current user changes, e.g. a domain switch forcing a logout', () => {
+      // Regression test: this component is mounted once for the whole app,
+      // so its search box's own FormControl value would otherwise survive
+      // a domain switch (which logs the current user out — see
+      // DomainSelectionService.select()) and show a stale query after
+      // logging into the new domain.
+      const fixture = TestBed.createComponent(AppToolbarComponent);
+      fixture.detectChanges();
+      fixture.componentInstance.searchForm.controls.term.setValue('beauty and');
+
+      TestBed.inject(AuthService).logout();
+      TestBed.tick();
+
+      expect(fixture.componentInstance.searchForm.controls.term.value).toBe('');
     });
   });
 
