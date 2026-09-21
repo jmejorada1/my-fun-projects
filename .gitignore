@@ -6,3 +6,6 @@
 
 # Local Docker env overrides
 .env
+
+# Personal scratch notes
+TODO.txt

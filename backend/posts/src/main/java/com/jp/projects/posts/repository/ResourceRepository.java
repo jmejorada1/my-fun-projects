@@ -17,14 +17,20 @@ public interface ResourceRepository extends JpaRepository<Resource, Long> {
      * combinable (frontend/imdb-ui-angular/docs/design-spec.md §3.3).
      * {@code categoryId}/{@code search} are matched with
      * {@code = :param OR :param IS NULL} rather than four derived-query
-     * variants for every present/absent combination.
+     * variants for every present/absent combination. {@code search} is
+     * still a bind parameter (never concatenated — not SQL-injectable
+     * either way), but its value is also expected to arrive pre-escaped
+     * for LIKE metacharacters (see {@code ResourceService.escapeLikePattern})
+     * so a literal {@code %}/{@code _} in a user's search term doesn't act
+     * as an unintended wildcard; {@code ESCAPE '\'} tells Postgres which
+     * escape character to honor in the pattern.
      */
     @Query("""
         SELECT r FROM Resource r
         WHERE r.domainId = :domainId
           AND r.deletedAt IS NULL
           AND (:categoryId IS NULL OR r.categoryId = :categoryId)
-          AND (:search IS NULL OR LOWER(r.displayName) LIKE LOWER(CONCAT('%', :search, '%')))
+          AND (:search IS NULL OR LOWER(r.displayName) LIKE LOWER(CONCAT('%', :search, '%')) ESCAPE '\\')
         """)
     Page<Resource> search(@Param("domainId") Long domainId,
                            @Param("categoryId") Long categoryId,
