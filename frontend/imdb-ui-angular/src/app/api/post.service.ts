@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { API_BASE_URL } from '../core/api-config';
+import { ApiConfigService } from '../core/api-config';
 import { Page } from './page';
 import { PostFlag } from './post-flag.service';
 
@@ -46,26 +46,27 @@ export interface PostCreateResponse {
 @Injectable({ providedIn: 'root' })
 export class PostService {
   private readonly http = inject(HttpClient);
+  private readonly apiConfig = inject(ApiConfigService);
 
   listByUser(userId: number, page = 0, size = 20): Observable<Page<Post>> {
     const params = new HttpParams().set('page', page).set('size', size);
-    return this.http.get<Page<Post>>(`${API_BASE_URL}/users/${userId}/posts`, { params });
+    return this.http.get<Page<Post>>(`${this.apiConfig.baseUrl()}/users/${userId}/posts`, { params });
   }
 
   /** Top-level posts on a resource, i.e. its thread (design-spec.md §5, resource detail view). */
   listTopLevel(resourceId: number, page = 0, size = 20): Observable<Page<Post>> {
     const params = new HttpParams().set('page', page).set('size', size);
-    return this.http.get<Page<Post>>(`${API_BASE_URL}/resources/${resourceId}/posts`, { params });
+    return this.http.get<Page<Post>>(`${this.apiConfig.baseUrl()}/resources/${resourceId}/posts`, { params });
   }
 
   /** Existing replies to a post, fetched lazily when a thread row is expanded. */
   listReplies(postId: number, page = 0, size = 50): Observable<Page<Post>> {
     const params = new HttpParams().set('page', page).set('size', size);
-    return this.http.get<Page<Post>>(`${API_BASE_URL}/posts/${postId}/replies`, { params });
+    return this.http.get<Page<Post>>(`${this.apiConfig.baseUrl()}/posts/${postId}/replies`, { params });
   }
 
   create(request: PostCreateRequest): Observable<PostCreateResponse> {
-    return this.http.post<PostCreateResponse>(`${API_BASE_URL}/posts`, request);
+    return this.http.post<PostCreateResponse>(`${this.apiConfig.baseUrl()}/posts`, request);
   }
 
   /**
@@ -76,6 +77,6 @@ export class PostService {
    */
   delete(postId: number, userId: number): Observable<void> {
     const headers = new HttpHeaders({ 'X-User-Id': String(userId) });
-    return this.http.delete<void>(`${API_BASE_URL}/posts/${postId}`, { headers });
+    return this.http.delete<void>(`${this.apiConfig.baseUrl()}/posts/${postId}`, { headers });
   }
 }

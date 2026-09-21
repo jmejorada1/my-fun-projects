@@ -34,25 +34,36 @@ the full domain model.
 | `imdb-data-python` | [`backend/imdb-data-python`](backend/imdb-data-python) | Python | One-off scripts: `import_resources.py` imports a row range of IMDB's `title.basics.tsv` into the `posts-db.resource` table; `import_bigotry_data.py` additionally seeds mock users, posts, replies, and flags. Neither is a long-running service. |
 | `postgres` | — | Postgres 16 | Single database (`posts-db`), single schema (`posts`), owned by the `posts` service's migrations. |
 
-Two things wire the pieces together and are **not** overridden in Docker,
-by design — keeping them as-is meant zero changes to the existing
-codebases:
+All of this stack's host ports (`4200`/`8080`/`5433` above are just the
+defaults) live in one place — see [`.env.example`](.env.example). How the
+services actually pick those values up varies:
 
-- The frontend calls the API at `http://localhost:8080`
+- The frontend calls the API at `http://localhost:8080` by default
   ([`api-config.ts`](frontend/imdb-ui-angular/src/app/core/api-config.ts))
-  — this works from a container because it's the *browser*, not the
-  frontend container, making the call, straight to the host's published
-  `8080` port.
+  — **is** overridden in Docker, but not the way the other two are: this
+  is *browser* code, so a container-level env var can't reach it directly.
+  Instead, [`docker-entrypoint.sh`](frontend/imdb-ui-angular/docker-entrypoint.sh)
+  generates `/config.json` from `API_BASE_URL` when the frontend
+  *container* starts (not when the image is *built*), and the Angular app
+  fetches that file before it bootstraps. One built image works against
+  any backend URL this way — local docker-compose today, a real deployed
+  URL later — with just a container restart, no rebuild. `docker-compose.yml`
+  sets `API_BASE_URL` from the same `API_PORT` the API itself publishes
+  on, so the two can't drift apart either.
 - `posts` only allows CORS from `http://localhost:4200`
-  ([`application.yml`](backend/posts/src/main/resources/application.yml))
-  — which is why the frontend container is published on host port `4200`,
-  not some other port.
-
-The database connection *is* overridden — via Spring Boot's environment
-variable binding (`SPRING_DATASOURCE_URL`, etc. in
-[`docker-compose.yml`](docker-compose.yml)) — since `application.yml`
-otherwise points at `localhost`, which doesn't resolve to the `postgres`
-container from inside `posts`.
+  (default — `${FRONTEND_PORT:-4200}`, precisely;
+  [`application.yml`](backend/posts/src/main/resources/application.yml))
+  — **is** overridden, via `APP_CORS_ALLOWED_ORIGINS` in
+  [`docker-compose.yml`](docker-compose.yml), same Spring Boot relaxed
+  env-binding trick the database connection (below) uses. It derives from
+  the same `FRONTEND_PORT` the frontend container itself publishes on, so
+  the two can't drift out of sync with each other the way they could
+  before both were hardcoded separately.
+- The database connection *is* overridden too — via Spring Boot's
+  environment variable binding (`SPRING_DATASOURCE_URL`, etc. in
+  `docker-compose.yml`) — since `application.yml` otherwise points at
+  `localhost`, which doesn't resolve to the `postgres` container from
+  inside `posts`.
 
 ## Prerequisites
 
@@ -60,13 +71,15 @@ container from inside `posts`.
   locally — `docker compose version` should print something. That's the
   only install required; Java, Maven, Node, and Python all run inside the
   containers, not on your machine.
-- **Ports `4200` and `8080` free** on the host — `docker compose up`
-  publishes the frontend and API on those exact ports, so a locally-running
-  `ng serve` or `./mvnw spring-boot:run` will collide with it. Stop those
-  first if you have them running. (Postgres is published on `5433`, not
-  `5432`, specifically so it *doesn't* need to fight a local Postgres
-  install — a pgAdmin session pointed at your own local database is fine
-  to leave running.)
+- **Ports `4200` and `8080` free** on the host (defaults — see below) —
+  `docker compose up` publishes the frontend and API on those ports, so a
+  locally-running `ng serve` or `./mvnw spring-boot:run` will collide with
+  it. Stop those first if you have them running, or set `FRONTEND_PORT`/
+  `API_PORT` in `.env` (copy from [`.env.example`](.env.example)) to use
+  different ones instead. (Postgres is published on `5433`, not `5432` —
+  also a `POSTGRES_PORT`-overridable default — specifically so it *doesn't*
+  need to fight a local Postgres install; a pgAdmin session pointed at your
+  own local database is fine to leave running.)
 - **Nothing else to download** — `imdb-loader`/`bigotry-loader` (below) run
   against a 5000-row sample of IMDB's `title.basics.tsv` checked into the
   repo. A `title.basics.tsv` download is only needed if you want to import
@@ -107,7 +120,7 @@ container from inside `posts`.
    shot also works if your Compose version supports it — the bundled one
    in older Docker Desktop installs doesn't.)
 
-2. Open the app:
+2. Open the app (default ports — see `.env.example` if you've overridden them):
 
    - Frontend: <http://localhost:4200>
    - API / Swagger UI: <http://localhost:8080/swagger-ui.html>
@@ -136,8 +149,13 @@ container from inside `posts`.
    database and everything else untouched.
 
 No `.env` file is required — the stack runs with the same default DB
-password already in `application.yml`. To use a different one, copy
-[`.env.example`](.env.example) to `.env` and edit `POSTGRES_PASSWORD`.
+password already in `application.yml`, and the same default ports
+(`4200`/`8080`/`5433`) described throughout this README. To use a
+different password or ports, copy [`.env.example`](.env.example) to `.env`
+and edit `POSTGRES_PASSWORD` / `FRONTEND_PORT` / `API_PORT` /
+`POSTGRES_PORT` — that file is the single place all of this stack's ports
+are defined; `docker-compose.yml` and `scripts/docker-{precheck,run,
+reload}.sh` all read from it, so changing one there is enough.
 
 ### Loading IMDB data
 

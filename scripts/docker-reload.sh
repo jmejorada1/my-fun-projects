@@ -21,6 +21,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
 
+# Same .env docker-compose.yml itself reads for port interpolation (see
+# .env.example) — read here too so the URLs printed below match whatever
+# ports the stack actually came up on.
+[ -f .env ] && set -o allexport && source .env && set +o allexport
+FRONTEND_PORT="${FRONTEND_PORT:-4200}"
+API_PORT="${API_PORT:-8080}"
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "docker CLI not found — install Docker Desktop: https://www.docker.com/products/docker-desktop/" >&2
   exit 1
@@ -80,5 +87,5 @@ fi
 
 echo
 echo "Done. Updated: ${SERVICES[*]}"
-echo "  Frontend: http://localhost:4200"
-echo "  API:      http://localhost:8080/swagger-ui.html"
+echo "  Frontend: http://localhost:${FRONTEND_PORT}"
+echo "  API:      http://localhost:${API_PORT}/swagger-ui.html"

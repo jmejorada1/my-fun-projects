@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { API_BASE_URL } from '../core/api-config';
+import { ApiConfigService } from '../core/api-config';
 import { PostType } from './post-flag.service';
 
 export interface RankingResourceSummary {
@@ -29,8 +29,9 @@ export interface PostTypeRanking {
 @Injectable({ providedIn: 'root' })
 export class RankingService {
   private readonly http = inject(HttpClient);
+  private readonly apiConfig = inject(ApiConfigService);
 
   getRankings(): Observable<PostTypeRanking[]> {
-    return this.http.get<PostTypeRanking[]>(`${API_BASE_URL}/rankings`);
+    return this.http.get<PostTypeRanking[]>(`${this.apiConfig.baseUrl()}/rankings`);
   }
 }

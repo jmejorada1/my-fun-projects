@@ -13,8 +13,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
 
-# Keep in sync with the host-side `ports:` entries in docker-compose.yml.
-REQUIRED_PORTS=(4200 8080 5433)
+# Same .env docker-compose.yml itself reads for port interpolation (see
+# .env.example) — reading it here too is what keeps this list in sync with
+# the host-side `ports:` entries in docker-compose.yml without hand-editing
+# both places.
+[ -f .env ] && set -o allexport && source .env && set +o allexport
+REQUIRED_PORTS=("${FRONTEND_PORT:-4200}" "${API_PORT:-8080}" "${POSTGRES_PORT:-5433}")
 
 FAIL_COUNT=0
 

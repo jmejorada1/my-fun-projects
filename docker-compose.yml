@@ -6,13 +6,17 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-P@55w0rd}
     ports:
-      # Published on 5433, not 5432 — a local Postgres install (e.g. one
-      # pgAdmin is pointed at) commonly already owns 5432 on the host. The
-      # `posts` service still reaches this container over the internal
-      # Docker network on its actual 5432, unaffected by this mapping.
-      # Connect an external client (pgAdmin, psql) to localhost:5433 if
-      # you want to inspect the containerized DB.
-      - "5433:5432"
+      # Published on 5433 by default, not 5432 — a local Postgres install
+      # (e.g. one pgAdmin is pointed at) commonly already owns 5432 on the
+      # host. The `posts` service still reaches this container over the
+      # internal Docker network on its actual 5432, unaffected by this
+      # mapping. Connect an external client (pgAdmin, psql) to
+      # localhost:${POSTGRES_PORT:-5433} if you want to inspect the
+      # containerized DB. Override via .env (see .env.example) — the one
+      # place all of this stack's host ports are defined; scripts/*.sh and
+      # this file both read from it, so changing a port here is a
+      # one-line edit, not a hunt across the repo.
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -31,8 +35,14 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/posts-db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-P@55w0rd}
+      # Same relaxed-binding trick as SPRING_DATASOURCE_URL above, this
+      # time overriding application.yml's app.cors.allowed-origins — no
+      # code or config-file change needed there either. Must track
+      # FRONTEND_PORT below; both derive from the same .env value so they
+      # can't drift apart.
+      APP_CORS_ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-4200}
     ports:
-      - "8080:8080"
+      - "${API_PORT:-8080}:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -40,10 +50,19 @@ services:
   frontend:
     build:
       context: ./frontend/imdb-ui-angular
+    environment:
+      # Read by docker-entrypoint.sh at container *startup* (not baked in
+      # at `ng build` time) to generate /config.json, which the Angular
+      # app fetches before bootstrapping — see src/app/core/api-config.ts.
+      # One built image, any backend URL: change this without a rebuild,
+      # whether that's API_PORT below for local docker-compose, or a real
+      # domain for an actual deployment (AWS, k8s, ...).
+      API_BASE_URL: http://localhost:${API_PORT:-8080}
     ports:
-      # Must stay 4200 on the host: posts' application.yml hardcodes
-      # app.cors.allowed-origins to http://localhost:4200.
-      - "4200:80"
+      # Defaults to 4200 on the host — change via FRONTEND_PORT in .env,
+      # not here; the posts service's CORS origin (above) derives from the
+      # same variable, so the two can't go out of sync.
+      - "${FRONTEND_PORT:-4200}:80"
     depends_on:
       - posts
 

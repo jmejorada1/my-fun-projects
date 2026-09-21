@@ -37,11 +37,12 @@
 
 *** Code Changes ****
 
-   -- organize app/api package
-        -- Do not hardcode localhost:4200 everywhere. Remove any hardcoded things. parameterize when possible
+   X-- organize app/api package
+        
+   X-- Do not hardcode localhost:4200 everywhere. Remove any hardcoded things. parameterize when possible
    
    
-   -- restructure code to be easily configurable by domain.
+   X-- restructure code to be easily configurable by domain.
         --- In other words, Can you make the domain and configurations parameterizable through a json file or datastructure/classes that can be processed? For example I want to add an imdb/standard domain that will have a different set of post-categories, for example:
                 - skip it
                 - It was okay
@@ -65,6 +66,7 @@
     - I enjoyed it
     - I loved it, 
 
+** IDP integration!!!! ***
 
 ** IMPORTANT ***
    * Security check for security vulns (like sql injection, etc.)
@@ -81,4 +83,5 @@
 
 
 ** Docs **
-Add frontend ui flow diagram?
+   Add frontend ui flow diagram?
+   Archive existing docs.

@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { API_BASE_URL } from '../core/api-config';
+import { ApiConfigService } from '../core/api-config';
 import { Page } from './page';
 
 export interface ResourceCategory {
@@ -33,16 +33,17 @@ export interface Resource {
 @Injectable({ providedIn: 'root' })
 export class ResourceService {
   private readonly http = inject(HttpClient);
+  private readonly apiConfig = inject(ApiConfigService);
 
   search(term: string): Observable<Page<Resource>> {
     let params = new HttpParams();
     if (term) {
       params = params.set('search', term);
     }
-    return this.http.get<Page<Resource>>(`${API_BASE_URL}/resources`, { params });
+    return this.http.get<Page<Resource>>(`${this.apiConfig.baseUrl()}/resources`, { params });
   }
 
   get(id: number): Observable<Resource> {
-    return this.http.get<Resource>(`${API_BASE_URL}/resources/${id}`);
+    return this.http.get<Resource>(`${this.apiConfig.baseUrl()}/resources/${id}`);
   }
 }
