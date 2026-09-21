@@ -18,8 +18,8 @@ const BACK_TO_TOP_VIEWPORT_FRACTION = 0.5;
 /**
  * Global — mounted on every route, including login/register, since which
  * domain (and thus which account, if any) applies matters everywhere, not
- * just on the dashboard (design-spec.md's login/register split, decision
- * #9). The domain picker is always shown; the search box and "Hi
+ * just on the dashboard (design-spec.md §2 decision #1's login/register
+ * split). The domain picker is always shown; the search box and "Hi
  * <username>"/Logout only once logged in — search results land on the
  * dashboard's center panel (via SearchStateService), which sits behind
  * authGuard, so searching pre-login has nowhere to go.

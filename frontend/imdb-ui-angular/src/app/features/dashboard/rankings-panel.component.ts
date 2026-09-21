@@ -9,7 +9,7 @@ import { DomainSelectionService } from '../../core/domain-selection.service';
 import { PostTypeRanking, RankingService } from '../../api/ranking.service';
 import { PostService } from '../../api/post.service';
 
-/** Right panel — top 5 resources per post type (design-spec.md §3.5, §5). */
+/** Right panel — top 5 resources per post type (design-spec.md §3, §4). */
 @Component({
   selector: 'app-rankings-panel',
   imports: [DecimalPipe, RouterLink],

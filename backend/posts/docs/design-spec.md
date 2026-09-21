@@ -6,7 +6,7 @@ This document specifies the **domain-agnostic** schema: tables, columns,
 constraints, and the rules that hold regardless of which domain is using
 them. It deliberately avoids describing what a given domain's categories,
 flag types, or resources actually *are* — that's seed data, not schema, and
-lives in the Flyway migrations that seed each domain (see §4.3's pointers).
+lives in the Flyway migrations that seed each domain (see [§4.3](#43-table-definitions)'s pointers).
 For a narrative ERD walkthrough, see
 [`db-design-spec.md`](./db-design-spec.md). For how this generality is
 meant to serve more than the current IMDB domains, see
@@ -22,14 +22,16 @@ meant to serve more than the current IMDB domains, see
   - [4.2 Example Thread Shape](#42-example-thread-shape)
   - [4.3 Table Definitions](#43-table-definitions)
 - [5. Business Rules Summary](#5-business-rules-summary)
-- [6. Open Questions](#6-open-questions)
+- [6. Open Questions](#6-open-questions-not-yet-answered--do-not-build-against-these)
 - [7. Tech Stack](#7-tech-stack)
 
 ## 1. Overview
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 Users can create posts against a **resource** — a catalog item scoped to a
 **domain** (a partition that lets unrelated resource taxonomies share this
-same schema; see §2 decision #11). Other users can reply underneath any
+same schema; see [§2](#2-decision-log) decision #11). Other users can reply underneath any
 post, forming an unbounded comment thread per resource. A post can be
 flagged with one or more **post types** (a domain-defined taxonomy — e.g.
 content-warning categories, or a plain rating scale), each flag carrying
@@ -41,6 +43,8 @@ Today's seeded domains are both IMDB-catalog variants
 its specific categories/types), but nothing in this schema assumes that.
 
 ## 2. Decision Log
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 Confirmed decisions resolving gaps/ambiguities in the original
 `requirements.txt`:
@@ -69,13 +73,15 @@ requested explicitly (revisit if unwanted):
   a schema change.
 - **Reply scoping**: a reply always inherits its parent post's
   `resource_id` — it doesn't pick a new one. DB-enforced via composite FK
-  (§4.3).
+  ([§4.3](#43-table-definitions)).
 - **`resource.name`**: treated as a natural/external key from whatever
   system originates a domain's resources (e.g. IMDB's `tconst` for the
   `imdb/*` domains today), with `display_name` as the human-readable label.
-  Validation against that external source is an open question (§6).
+  Validation against that external source is an open question ([§6](#6-open-questions-not-yet-answered--do-not-build-against-these)).
 
 ## 3. Entity Overview
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 - **domain** — lookup table partitioning all other data (decision #11).
 - **app_user** — a registered user; author of posts. Scoped to a domain.
@@ -95,7 +101,11 @@ requested explicitly (revisit if unwanted):
 
 ## 4. Data Model
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 ### 4.1 Mermaid ER Diagram
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 ```mermaid
 erDiagram
@@ -191,9 +201,11 @@ erDiagram
 independently by a client — it's derived and DB-enforced via composite FKs
 (e.g. `resource (category_id, domain_id) → resource_category (id,
 domain_id)`), so it can never disagree with the row it's derived from —
-the same composite-FK SQL is repeated inline with each table below (§4.3).
+the same composite-FK SQL is repeated inline with each table below ([§4.3](#43-table-definitions)).
 
 ### 4.2 Example Thread Shape
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 Illustrates how `parent_post_id` produces unlimited nesting for a single
 resource, independent of what that resource represents:
@@ -213,6 +225,8 @@ flowchart TD
 ```
 
 ### 4.3 Table Definitions
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 **domain**
 
@@ -363,6 +377,8 @@ row's score rather than inserting a duplicate.
 
 ## 5. Business Rules Summary
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 1. A post always belongs to exactly one resource (directly, or via its
    thread's root post).
 2. `parent_post_id = NULL` marks a top-level post; non-null marks a reply,
@@ -382,11 +398,13 @@ row's score rather than inserting a duplicate.
 
 ## 6. Open Questions (not yet answered — do not build against these)
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 - **`POST /resources` validation**: should submitted resources be
   validated against the domain's external source dataset (e.g. IMDB's
   `title.basics.tsv` for the `imdb/*` domains), or can a resource be
   created arbitrarily with any `name`/`category`? Currently unvalidated
-  (§2 additional-defaults note on `resource.name`).
+  ([§2](#2-decision-log) additional-defaults note on `resource.name`).
 - **Cascading soft delete**: currently implemented as a write-time
   recursive cascade (decision #10) — is that the right trade-off long
   term, or should "hidden because an ancestor is deleted" instead be
@@ -399,6 +417,8 @@ row's score rather than inserting a duplicate.
 - **Moderation workflow**: deferred, TBD.
 
 ## 7. Tech Stack
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 Spring Boot (Spring REST + Spring Data JPA), PostgreSQL. Implementation
 detail: [`architecture.md`](./architecture.md).

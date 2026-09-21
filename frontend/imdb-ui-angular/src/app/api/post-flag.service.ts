@@ -23,7 +23,7 @@ export interface PostFlagCreateRequest {
   score: number;
 }
 
-/** Backs POST/GET /posts/{postId}/flags — design-spec.md §4. */
+/** Backs POST/GET /posts/{postId}/flags — backend/posts/docs/architecture.md §5. */
 @Injectable({ providedIn: 'root' })
 export class PostFlagService {
   private readonly http = inject(HttpClient);

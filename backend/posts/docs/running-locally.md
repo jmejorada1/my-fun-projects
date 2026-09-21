@@ -20,6 +20,8 @@ and how it's put together, see [`architecture.md`](./architecture.md).
 
 ## 1. Prerequisites
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 - **Java 25**, with `JAVA_HOME` pointed at it. A plain shell's `java
   -version` may already resolve to 25, but `JAVA_HOME` (which `./mvnw`
   uses) can still be pinned to an older JDK installed separately — check
@@ -32,15 +34,18 @@ and how it's put together, see [`architecture.md`](./architecture.md).
   ```
 - **PostgreSQL**, running locally and reachable at `localhost:5432`. No
   Docker required — a native install (Homebrew, `postgres.app`, etc.)
-  works fine, and Flyway creates the schema/tables for you (§4).
+  works fine, and Flyway creates the schema/tables for you
+  ([§4](#4-running-the-app)).
 - **Docker** — only needed if you want to run the Testcontainers-backed
-  repository/integration tests (§6). Not needed to build, run, or unit
+  repository/integration tests ([§6](#6-running-tests)). Not needed to build, run, or unit
   test the app.
 - The **Maven wrapper** (`./mvnw`), already checked into `backend/posts/`
   — no separate Maven install needed. All commands below are run from
   `backend/posts/`.
 
 ## 2. Install and Start PostgreSQL
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 If Postgres isn't already running:
 
@@ -66,6 +71,8 @@ just don't point this native setup at `5433` — the schema/migration state
 in the Docker volume is a separate database from your local one.
 
 ## 3. Connection Configuration
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 Defaults live in `src/main/resources/application.yml`:
 
@@ -115,6 +122,8 @@ A few things worth knowing about this config:
 
 ## 4. Running the App
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 ```bash
 cd backend/posts
 export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-25.jdk/Contents/Home  # adjust to your install
@@ -126,9 +135,11 @@ by `Started PostsApplication in N seconds`. The app listens on
 `http://localhost:8080`. A `Using generated security password: ...` line
 in the log is expected and harmless — it's Spring Security's default
 autoconfiguration output, unused since `SecurityConfig` permits every
-request while real auth remains unbuilt (`design-spec.md` §6).
+request while real auth remains unbuilt ([`design-spec.md`](./design-spec.md) §6).
 
 ## 5. Verifying It's Up
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 ```bash
 curl http://localhost:8080/domains
@@ -148,6 +159,8 @@ Or browse the API directly:
 
 ## 6. Running Tests
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 ```bash
 ./mvnw test                                     # full suite
 ./mvnw test -Dtest=PostServiceTest              # a single unit test — no Docker needed
@@ -161,9 +174,11 @@ Unit tests (service layer, repositories mocked) and `@WebMvcTest`s
 (controller layer, services mocked) never touch a database and don't need
 Docker. Repository (`@DataJpaTest`) and full integration
 (`@SpringBootTest`) tests spin up a real Postgres via Testcontainers —
-see §8 if that fails even though `docker info` works.
+see [§8](#8-troubleshooting) if that fails even though `docker info` works.
 
 ## 7. Creating Data Manually
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 Every write endpoint requires an `X-Domain` header (except `GET /domains`
 and `GET /domains/{id}`). A minimal walkthrough — create a user, a
@@ -197,17 +212,21 @@ end to end.
 To load realistic bulk data instead of hand-crafting a few rows with curl,
 the loaders in `backend/imdb-data-python` are normally run via Docker
 (`docker compose run --rm imdb-loader --domain <name>`, or the
-`./scripts/docker-load-*.sh` wrappers) — see the root `CLAUDE.md` and
-`backend/imdb-data-python/CLAUDE.md`. Running them standalone without
+`./scripts/docker-load-*.sh` wrappers) — see the root
+[`CLAUDE.md`](../../../CLAUDE.md) and
+[`backend/imdb-data-python/CLAUDE.md`](../../imdb-data-python/CLAUDE.md).
+Running them standalone without
 Docker means installing that project's own Python dependencies and
-pointing them at the Postgres connection from §3 directly; not covered
+pointing them at the Postgres connection from [§3](#3-connection-configuration) directly; not covered
 here since it's a separate component with its own local-run concerns.
 
 ## 8. Troubleshooting
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 - **`UnsupportedClassVersionError` / `release version 25 not supported`**
   — `JAVA_HOME` is pointed at an older JDK than this project's Java 25.
-  Override per-command rather than changing it globally (§1).
+  Override per-command rather than changing it globally ([§1](#1-prerequisites)).
 - **Testcontainers-backed tests fail with `Previous attempts to find a
   Docker environment failed`, even though `docker info` succeeds** — a
   known friction point with Testcontainers' Docker auto-detection on some
@@ -218,11 +237,11 @@ here since it's a separate component with its own local-run concerns.
   (`docker context ls` shows the active context if that doesn't resolve
   cleanly.) Not guaranteed to fix it. If it doesn't, skip Testcontainers
   tests locally and instead verify against a running instance directly —
-  start this app per §4, then exercise it via `curl` (§7) or query
+  start this app per [§4](#4-running-the-app), then exercise it via `curl` ([§7](#7-creating-data-manually)) or query
   Postgres directly.
 - **`./mvnw spring-boot:run` can't connect to Postgres** — confirm
   Postgres is actually running (`pg_isready`, or `brew services list`) and
-  that `posts-db` exists (`createdb posts-db`, §2). The `posts` *schema*
+  that `posts-db` exists (`createdb posts-db`, [§2](#2-install-and-start-postgresql)). The `posts` *schema*
   inside that database is created automatically by Flyway — don't create
   it manually.
 - **Port `8080` already in use** — another process (possibly the
@@ -232,4 +251,4 @@ here since it's a separate component with its own local-run concerns.
   frontend you're testing against at the new port.
 - **CORS errors from a browser-based frontend** — confirm
   `app.cors.allowed-origins` (or `APP_CORS_ALLOWED_ORIGINS`) includes the
-  exact origin the frontend is served from, including port (§3).
+  exact origin the frontend is served from, including port ([§3](#3-connection-configuration)).

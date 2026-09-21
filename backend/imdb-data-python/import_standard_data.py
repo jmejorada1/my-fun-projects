@@ -14,7 +14,8 @@ import_bigotry_data.py — see backend/imdb-data-python/CLAUDE.md's "Adding a
 new domain": imdb/standard has no severity score or neutral-flag concept, so
 every post gets exactly one of the four rating categories at a fixed score
 of 0 (matches the frontend — see imdb-standard.config.ts's
-rating.fixedScoreValue and domain-configurability-plan.md §9), rather than
+rating.fixedScoreValue and frontend/imdb-ui-angular/docs/design-spec.md §2
+decision #7), rather than
 bigotry's flag_probability/no-bigotry split.
 
 Unlike import_resources.py, the resource-import step here is idempotent:

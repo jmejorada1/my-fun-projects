@@ -37,6 +37,8 @@ your machine, see [`running-locally.md`](./running-locally.md).
 
 ## 1. What This Service Is
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 `posts` is a Spring Boot REST API providing a generic, reusable primitive:
 **threaded discussion against a catalog of resources, with optional
 categorized/scored flags on individual posts** — all partitioned by a
@@ -55,10 +57,12 @@ given, with no `imdb`/`bigotry` vocabulary anywhere in it.
 
 That same generality is why this backend is intended to eventually support
 a completely unrelated frontend — a to-do list app built in React — as a
-third domain, without a schema change. §8 works through what that would
+third domain, without a schema change. [§8](#8-multi-domain-design) works through what that would
 look like and where the current model would need to grow to support it.
 
 ## 2. Core Concepts (Domain-Agnostic)
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 The entity names below are deliberately generic — read them independent of
 IMDB, and the multi-domain intent stays visible:
@@ -78,12 +82,15 @@ an otherwise-generic column: `imdb/bigotry` uses it as a real severity
 scale, while `imdb/standard` sends the same constant score on every flag
 purely so it can reuse the existing schema for what's really just a rating
 count — a deliberate no-schema-change choice, not an oversight (see
-`frontend/imdb-ui-angular/docs/domain-configurability-plan.md` §9 for the
+[`frontend/imdb-ui-angular/docs/design-spec.md`](../../../frontend/imdb-ui-angular/docs/design-spec.md)
+§2 decision #7 for the
 frontend-side rationale). Everything else — the table shapes, the
 threading, the domain-scoping constraints — carries no assumption about
 what a "resource" or a "flag" *means*.
 
 ## 3. Component Architecture
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 Standard layered Spring MVC architecture — controllers depend on services,
 services depend on repositories, nothing skips a layer:
@@ -126,9 +133,11 @@ The dashed arrow marks the not-yet-built piece: a future React client would
 plug into the exact same controller layer, distinguished only by the
 `X-Domain` value it sends — no new controllers or services required unless
 its concept of "resource" needs fields the current model doesn't have
-(§8.5).
+([§8.5](#85-where-the-model-would-need-to-grow)).
 
 ## 4. Request Lifecycle
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 Every domain-scoped request follows the same shape, whether the caller is
 `imdb-ui-angular` today or a different frontend tomorrow:
@@ -172,9 +181,11 @@ how a client discovers which domain values are valid in the first place.
 
 ## 5. REST API Surface
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 Every endpoint below except `GET /domains` and `GET /domains/{id}` requires
-the `X-Domain` header (§4). Response bodies are DTOs generated from the
-entities in §7, not raw entities.
+the `X-Domain` header ([§4](#4-request-lifecycle)). Response bodies are DTOs generated from the
+entities in [§7](#7-data-model-at-a-glance), not raw entities.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -185,7 +196,7 @@ entities in §7, not raw entities.
 | GET | `/post-types` | List post types for the current domain |
 | GET | `/post-types/{id}` | Get one post type |
 | POST | `/resources` | Create a resource |
-| GET | `/resources` | Paginated list, optional `?categoryId=` filter |
+| GET | `/resources` | Paginated list, optional `?categoryId=` and/or `?search=` (case-insensitive, partial match on `displayName`) filters |
 | GET | `/resources/{id}` | Get one resource |
 | DELETE | `/resources/{id}` | Soft-delete a resource |
 | POST | `/posts` | Create a post — top-level if `parentPostId` is omitted, a reply if present; can flag it in the same call |
@@ -194,6 +205,7 @@ entities in §7, not raw entities.
 | GET | `/resources/{resourceId}/posts` | Paginated top-level posts for a resource |
 | GET | `/posts/{postId}/replies` | Paginated direct replies (one level, not the whole subtree) |
 | GET | `/posts/{postId}` | Get one post |
+| GET | `/users/{userId}/posts` | Paginated, all posts (top-level + replies) authored by that user, newest first |
 | PATCH | `/posts/{postId}` | Edit a post's body text |
 | DELETE | `/posts/{postId}` | Soft-delete a post (cascades to its reply subtree) |
 | POST | `/posts/{postId}/flags` | Add/update a flag on a post (upsert by type) |
@@ -203,15 +215,17 @@ entities in §7, not raw entities.
 
 Ownership checks (edit/delete a post, remove a flag) run against a
 client-supplied `userId`/`X-User-Id` — not yet security-enforced, since
-real auth doesn't exist (§9.2, `design-spec.md` §6). A temporary,
+real auth doesn't exist ([§9.2](#92-security--cors), [`design-spec.md`](./design-spec.md) §6). A temporary,
 `@Profile`-gated `/dev/users` CRUD API (`AppUserController`) exists only to
 create test users until real registration lands.
 
 For request/response field shapes and curl walkthroughs against a running
 instance, see [`running-locally.md`](./running-locally.md) §7, or generate
-them live from the OpenAPI docs (§9.3).
+them live from the OpenAPI docs ([§9.3](#93-api-documentation)).
 
 ## 6. Package Structure
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 Layer-based grouping, one package per architectural concern:
 
@@ -244,6 +258,8 @@ ever needed its own controllers/services rather than reusing the existing
 generic ones.
 
 ## 7. Data Model at a Glance
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 Full column definitions and the decision log behind each choice live in
 [`design-spec.md`](./design-spec.md) §4 and the narrative walkthrough in
@@ -312,20 +328,26 @@ and its `no-bigotry` counter-flag type (`V14`, `V16`), widening
 
 ## 8. Multi-Domain Design
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 This is the section that matters most for "can this backend support
 something other than IMDB" — the short answer is yes, by construction, and
 this walks through why.
 
 ### 8.1 How a request picks its domain
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 Every domain-scoped endpoint requires an `X-Domain` request header
 (`@RequestHeader("X-Domain") String domain` on every controller method
 except `DomainController`'s). There's no path-based or subdomain-based
 domain switch, and no per-DTO body field — a single header applies
 uniformly across the entire API surface without touching every request
-shape. See §4 for the resolution flow.
+shape. See [§4](#4-request-lifecycle) for the resolution flow.
 
 ### 8.2 How domain integrity is enforced
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 Three tables — `resource_category`, `post_type`, `app_user` — own a
 directly client-facing `domain_id`. Three more — `resource`, `post`,
@@ -336,9 +358,11 @@ enforced at the database level via composite foreign keys (e.g.
 This makes it structurally impossible — not just application-logic
 impossible — for a resource, post, or flag to disagree with the domain of
 the row it belongs to. Full rationale and the composite-FK SQL:
-`design-spec.md` §4.3.
+[`design-spec.md`](./design-spec.md) §4.3.
 
 ### 8.3 Adding a domain today: IMDB variants
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 Both existing domains needed **zero code changes** — each is one Flyway
 migration inserting a `domain` row plus its `resource_category` and
@@ -349,6 +373,8 @@ already-generic `imdb-loader --domain <name>`. See
 `backend/imdb-data-python/CLAUDE.md` for the loader side.
 
 ### 8.4 Fitting an unrelated app: a future React to-do list
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 A `todo` domain is a good test of how far the generic model actually
 stretches, since it's not just "another IMDB variant" — it has no
@@ -364,15 +390,17 @@ A plausible mapping onto the existing entities:
 | A todo-ui user | `AppUser`, domain-scoped the same as any other domain's users |
 
 Nothing above requires a schema migration beyond the same domain-seeding
-pattern §8.3 already uses — new `domain`, `resource_category`, and
+pattern [§8.3](#83-adding-a-domain-today-imdb-variants) already uses — new `domain`, `resource_category`, and
 `post_type` rows. The React frontend would talk to the exact same REST
-surface (§5) with `X-Domain: todo`, and `RankingController`'s "top
+surface ([§5](#5-rest-api-surface)) with `X-Domain: todo`, and `RankingController`'s "top
 resources per post type" view would, with no code change, become "which
 lists have the most `done` items" instead of "which titles are most
 flagged for racism" — that's the payoff of it having been built
-domain-agnostic from the start (§1).
+domain-agnostic from the start ([§1](#1-what-this-service-is)).
 
 ### 8.5 Where the model would need to grow
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 Being honest about the limits of "no schema change needed," rather than
 overselling it — a to-do app (or any sufficiently different domain) would
@@ -385,7 +413,7 @@ likely eventually want things this schema doesn't have a slot for yet:
 - **Resource ownership/visibility.** IMDB resources are public and shared
   across all users in a domain; a to-do list is normally private to its
   owner (or shared with a specific group). There's no ownership or
-  ACL concept on `Resource` today — `design-spec.md` §6's real-auth gap
+  ACL concept on `Resource` today — [`design-spec.md`](./design-spec.md) §6's real-auth gap
   would need to be resolved first, and an ownership model designed
   alongside it.
 - **Structured item state beyond a label.** A checkbox's checked/unchecked
@@ -395,14 +423,18 @@ likely eventually want things this schema doesn't have a slot for yet:
   change, but a `todo` domain leaning heavily on it would be worth
   revisiting as a first-class column addition once the shape stabilizes.
 
-None of this blocks starting a `todo` domain the way §8.4 describes — it's
+None of this blocks starting a `todo` domain the way [§8.4](#84-fitting-an-unrelated-app-a-future-react-to-do-list) describes — it's
 what to design next once that domain's real requirements are known, the
-same confirm-before-building approach `design-spec.md`'s decision log
+same confirm-before-building approach [`design-spec.md`](./design-spec.md)'s decision log
 already reflects for the `imdb/*` domains.
 
 ## 9. Cross-Cutting Concerns
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 ### 9.1 Error handling
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 `@RestControllerAdvice GlobalExceptionHandler` maps exceptions to RFC 7807
 `ProblemDetail` responses uniformly across every domain and every
@@ -418,18 +450,22 @@ controller:
 
 ### 9.2 Security & CORS
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 `spring-boot-starter-security` is present but auth is intentionally a
 placeholder — `SecurityConfig` permits every request
 (`authorizeHttpRequests(auth -> auth.anyRequest().permitAll())`). What it
 *does* actively configure is CORS: allowed origins come from
 `app.cors.allowed-origins`, overridable via `APP_CORS_ALLOWED_ORIGINS`
-(see root `CLAUDE.md`/README for how the Docker stack wires this to
+(see root [`CLAUDE.md`](../../../CLAUDE.md)/README for how the Docker stack wires this to
 `.env`'s `FRONTEND_PORT`). Because a future `todo-ui` React app would be
 served from a different origin than `imdb-ui-angular`, its origin will
-need adding to this same allow-list — one more place §8.4's new domain
+need adding to this same allow-list — one more place [§8.4](#84-fitting-an-unrelated-app-a-future-react-to-do-list)'s new domain
 touches config, not code.
 
 ### 9.3 API documentation
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 `springdoc-openapi-starter-webmvc-ui` generates OpenAPI docs from the
 existing controllers/DTOs with no extra annotation burden — browsable at
@@ -440,6 +476,8 @@ chooses at call time, not something that changes the documented surface.
 
 ### 9.4 Auditing
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 `created_at`/`updated_at` on every table are populated via Spring Data
 JPA auditing (`@CreatedDate`/`@LastModifiedDate`,
 `@EnableJpaAuditing` in `JpaAuditingConfig`) rather than DB defaults alone,
@@ -447,12 +485,14 @@ so the same mechanism applies uniformly regardless of domain.
 
 ## 10. Testing Architecture
 
+[↑ Back to Table of Contents](#table-of-contents)
+
 - **Unit** (`service` layer, repositories mocked) and **`@WebMvcTest`**
   (`web` layer, services mocked) run without Docker.
 - **`@DataJpaTest`** (repository layer) and **`@SpringBootTest`**
   (full integration flows) run against a real Postgres via Testcontainers
   — needed because H2 can't faithfully reproduce `jsonb`, partial unique
-  indexes, or the composite FKs domain-scoping depends on (§8.2).
+  indexes, or the composite FKs domain-scoping depends on ([§8.2](#82-how-domain-integrity-is-enforced)).
 - None of the test infrastructure is domain-specific; integration tests
   exercise whichever domain they seed via `DomainRepository`/a
   `ClientHttpRequestInterceptor` adding the header, the same mechanism any
@@ -460,13 +500,15 @@ so the same mechanism applies uniformly regardless of domain.
 
 Environment gotchas running these locally (JDK version, Testcontainers/
 Docker Desktop socket issues): see [`running-locally.md`](./running-locally.md)
-and the root `CLAUDE.md`.
+and the root [`CLAUDE.md`](../../../CLAUDE.md).
 
 ## 11. Related Documents
+
+[↑ Back to Table of Contents](#table-of-contents)
 
 | Document | Covers |
 |---|---|
 | [`design-spec.md`](./design-spec.md) | Canonical data model: tables, constraints, decision log |
 | [`db-design-spec.md`](./db-design-spec.md) | Plain-language ERD walkthrough |
 | [`running-locally.md`](./running-locally.md) | Running this service on your machine without Docker |
-| `frontend/imdb-ui-angular/docs/domain-configurability-plan.md` | How a domain's *frontend* behavior (rating mode, skin, business rules) is configured |
+| [`frontend/imdb-ui-angular/docs/architecture.md`](../../../frontend/imdb-ui-angular/docs/architecture.md) | How a domain's *frontend* behavior (rating mode, skin, business rules) is configured |

@@ -23,8 +23,9 @@ export interface PostTypeRanking {
 
 /**
  * Backs `GET /rankings` — deliberately domain-agnostic on the backend side
- * (design-spec.md §3.5); this client just renders whatever post types come
- * back for the configured domain.
+ * (backend/posts/docs/architecture.md §5); this client just renders
+ * whatever post types come back for the active domain (design-spec.md §2
+ * decision #6).
  */
 @Injectable({ providedIn: 'root' })
 export class RankingService {

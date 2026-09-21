@@ -41,7 +41,8 @@ export interface PostCreateResponse {
 /**
  * Backs the unified `POST /posts` (top-level posts and replies alike, via
  * an optional `parentPostId` — replies can carry a flag the same way top-
- * level posts do) and `GET /users/{userId}/posts` — design-spec.md §3.4, §5.
+ * level posts do) and `GET /users/{userId}/posts` — see
+ * backend/posts/docs/architecture.md §5 and design-spec.md §3.
  */
 @Injectable({ providedIn: 'root' })
 export class PostService {
@@ -53,7 +54,7 @@ export class PostService {
     return this.http.get<Page<Post>>(`${this.apiConfig.baseUrl()}/users/${userId}/posts`, { params });
   }
 
-  /** Top-level posts on a resource, i.e. its thread (design-spec.md §5, resource detail view). */
+  /** Top-level posts on a resource, i.e. its thread (design-spec.md §3, resource detail view). */
   listTopLevel(resourceId: number, page = 0, size = 20): Observable<Page<Post>> {
     const params = new HttpParams().set('page', page).set('size', size);
     return this.http.get<Page<Post>>(`${this.apiConfig.baseUrl()}/resources/${resourceId}/posts`, { params });

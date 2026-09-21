@@ -80,8 +80,8 @@ function clampPostColumnWidth(px: number): number {
 }
 
 /**
- * Clicking a search result lands here (design-spec.md §8's "resource
- * detail / posting UI" open question, now resolved): shows the resource,
+ * Clicking a search result lands here (design-spec.md §3's Resource Detail
+ * flow): shows the resource,
  * its existing top-level posts, and a form to add a new one — optionally
  * flagged with a bigotry category + severity score in the same submit,
  * via the backend's unified POST /posts.
@@ -125,8 +125,8 @@ export class ResourceDetailComponent {
   readonly loading = signal(true);
   readonly loadError = signal<string | null>(null);
 
-  // Newest-first by default, per design-spec.md §5's "most recent activity
-  // first" ordering — matches what the backend already returns, so this is
+  // Newest-first by default, matching what the backend already returns —
+  // this is
   // a no-op sort until the user picks a different column.
   readonly sortColumn = signal<PostSortColumn>('posted');
   readonly sortDirection = signal<SortDirection>('desc');
@@ -276,7 +276,7 @@ export class ResourceDetailComponent {
 
     // The severity picker is meaningless (a) for a "no bigotry"-style
     // neutral flag, same as before, or (b) for the whole form, in a
-    // category-only rating domain (docs/domain-configurability-plan.md §7)
+    // category-only rating domain (docs/architecture.md §4)
     // — either way, lock the score to a fixed value and hide the picker
     // (via isSeverityScoreMode()/isNoBigotrySelected() in the template)
     // rather than asking the user to pick a score that isn't meaningful.

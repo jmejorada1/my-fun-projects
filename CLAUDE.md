@@ -16,7 +16,7 @@ severity score, just counts. Both are the same underlying schema/app,
 scoped by a domain concept that runs end to end (DB → API → frontend) —
 see [`backend/posts/docs/design-spec.md`](backend/posts/docs/design-spec.md)
 for the data model and
-[`frontend/imdb-ui-angular/docs/domain-configurability-plan.md`](frontend/imdb-ui-angular/docs/domain-configurability-plan.md)
+[`frontend/imdb-ui-angular/docs/architecture.md`](frontend/imdb-ui-angular/docs/architecture.md)
 for how a domain's UI behavior (rating mode, skin, business rules) is
 configured on the frontend side.
 
