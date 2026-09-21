@@ -1,10 +1,13 @@
 # Overall Architecture
 
-A container-orchestration-level view of this system: what runs, how the
-pieces talk to each other, and how the design stays pluggable for new
-frontends, domains, and backend capabilities. For code-level detail, see
-the linked component docs — this one stays at the container/service
-boundary.
+Container-orchestration-level view of this system: what runs, how the
+pieces talk, and how the design stays pluggable for new frontends,
+domains, and backend capabilities. For code-level detail, see the linked
+component docs.
+
+**👉 Just want to see the app itself?** Jump straight to the
+[UI User Guide](frontend/imdb-ui-angular/docs/user-guide.md) for a
+walkthrough of the frontend screens.
 
 ## Table of Contents
 
@@ -21,11 +24,10 @@ A Spring Boot REST API (`posts`) backed by PostgreSQL, served to one or
 more Angular/React SPAs, orchestrated today with Docker Compose on a
 single host.
 
-Its defining trait: every table, service call, and endpoint is
-partitioned by a **domain** concept resolved from a request header, so
-unrelated frontends can share the same backend and database with no
-schema change. Two domains are live today: `imdb/bigotry` and
-`imdb/standard`.
+Every table, service call, and endpoint is partitioned by a **domain**
+concept resolved from a request header, so unrelated frontends can share
+the same backend and database with no schema change. Two domains are
+live today: `imdb/bigotry` and `imdb/standard`.
 
 - [§3](#3-pluggable-domain-model) — how the domain mechanism works
 - [§5](#5-aws-deployment-feasibility) — moving today's Compose setup to AWS
@@ -71,19 +73,18 @@ flowchart TB
     API -.->|optional call-out| LLM
 ```
 
-Solid lines are running today; dashed lines are planned ([§6](#6-planned-extensions)).
+Solid lines run today; dashed lines are planned ([§6](#6-planned-extensions)).
 
-Today's orchestration is a single `docker-compose.yml` at the repo root:
+One `docker-compose.yml` at the repo root:
 
 - **Services**: `postgres`, `posts`, `frontend` are long-running, started
   via `docker compose up`. `imdb-loader`, `bigotry-loader`, and
   `standard-loader` are one-off jobs under a `tools` compose profile —
-  excluded from `up`, run explicitly via `docker compose run --rm <job>`.
+  excluded from `up`, run via `docker compose run --rm <job>`.
 - **Networking**: services reach each other over Compose's internal DNS
-  by name (`posts` connects to `postgres:5432`, never a published host
-  port). Only human/browser-facing ports (`4200`, `8080`, `postgres` at
-  `5433` for direct inspection) are published, all overridable from one
-  `.env` file.
+  (`posts` connects to `postgres:5432`, never a published port). Only
+  human/browser-facing ports (`4200`, `8080`, `postgres` at `5433` for
+  direct inspection) are published, all overridable from one `.env` file.
 - **Images**: `posts` and `imdb-ui-angular` both build as multi-stage
   images (JDK → JRE; Node → nginx), keeping the runtime image free of
   build tooling.
@@ -92,8 +93,7 @@ Today's orchestration is a single `docker-compose.yml` at the repo root:
   The frontend's backend URL is written to `/config.json` by its
   entrypoint script at container *startup*, not baked into the JS bundle.
   Either image redeploys to a new environment with no rebuild — the
-  precondition for running under a different orchestrator later
-  ([§5](#5-aws-deployment-feasibility), [§6](#6-planned-extensions)).
+  precondition for [§5](#5-aws-deployment-feasibility)/[§6](#6-planned-extensions).
 
 ## 3. Pluggable Domain Model
 
@@ -156,30 +156,29 @@ flowchart TB
     SM -.->|env vars| API
 ```
 
-High-level migration steps, in the order they'd naturally happen:
+Migration steps, in the order they'd naturally happen:
 
 1. **Registry** — define the stack in **AWS CDK**; its
    `DockerImageAsset` construct builds the same multi-stage Dockerfiles
    already in the repo, unchanged, and pushes to a CDK-managed ECR repo
-   as part of `cdk deploy` — no separate CI step needed for a one-person
-   deploy.
+   as part of `cdk deploy` — no separate CI step needed.
 2. **Database** — provision RDS for PostgreSQL; point `posts` at it via
    `SPRING_DATASOURCE_URL`, the same env var Compose already sets, now
    sourced from Secrets Manager instead of `.env`.
 3. **Compute** — run `posts` and `frontend` as ECS tasks (task
    definitions replace `docker-compose.yml`'s service blocks 1:1), on
    one of three mutually exclusive launch options:
-   - **Fargate** — serverless; AWS runs the underlying instances, you
-     never manage them. The default assumed elsewhere in this doc.
-   - **EC2** (ECS's EC2 launch type, or just `docker compose up` on a
+   - **Fargate** — serverless, no instance management. The default
+     assumed elsewhere in this doc.
+   - **EC2** (ECS's EC2 launch type, or `docker compose up` on a
      long-lived instance) — cheaper at this app's current scale, no
-     Fargate per-task premium, but you manage the instances yourself
-     (patching, capacity, scaling). Worth revisiting once traffic or
-     team size justifies paying for Fargate's managed overhead.
+     Fargate per-task premium, but you manage the instances yourself.
+     Worth revisiting once traffic or team size justifies Fargate's
+     managed overhead.
    - **EKS** — the substitute if the Kubernetes goal in
      [§6](#6-planned-extensions) is pursued instead of ECS; adds its own
      $0.10/hr control-plane fee on top of whichever of the above runs
-     the actual worker nodes.
+     the worker nodes.
 4. **Batch jobs** — run the three loaders as scheduled/on-demand ECS
    tasks (EventBridge Scheduler or manual `RunTask`), mirroring how
    Compose's `tools` profile already keeps them out of the long-running
@@ -194,10 +193,10 @@ High-level migration steps, in the order they'd naturally happen:
    into Secrets Manager / Parameter Store, injected as task-definition
    env vars — same relaxed-binding mechanism, just a different source.
 7. **Deploys** — `cdk deploy` from your own machine already covers
-   build, push, and stack/service update in one command, which is enough
-   for a solo deploy. A GitHub Actions workflow (none exists yet, only a
-   PR template is checked in) running `cdk deploy` on merge is the
-   natural next step if this stops being a one-person operation.
+   build, push, and stack/service update in one command, enough for a
+   solo deploy. A GitHub Actions workflow (none exists yet, only a PR
+   template is checked in) running `cdk deploy` on merge is the natural
+   next step if this stops being a one-person operation.
 
 ## 6. Planned Extensions
 
