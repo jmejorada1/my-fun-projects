@@ -50,7 +50,7 @@ public class Post {
     /**
      * Derived from {@code resource}'s domain, never set independently by a
      * client — enforced via composite FKs to {@code resource (id, domain_id)}
-     * and {@code app_user (id, domain_id)} (domain-scoping-spec.md D12/D13).
+     * and {@code app_user (id, domain_id)} (design-spec.md §4.3).
      */
     @Column(name = "domain_id", nullable = false)
     private Long domainId;

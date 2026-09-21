@@ -45,7 +45,7 @@ public class PostFlag {
     /**
      * Derived from {@code post}'s domain, never set independently by a
      * client — enforced via composite FKs to {@code post (id, domain_id)}
-     * and {@code post_type (id, domain_id)} (domain-scoping-spec.md D12).
+     * and {@code post_type (id, domain_id)} (design-spec.md §4.3).
      */
     @Column(name = "domain_id", nullable = false)
     private Long domainId;

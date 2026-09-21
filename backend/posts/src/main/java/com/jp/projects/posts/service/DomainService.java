@@ -31,7 +31,7 @@ public class DomainService {
 
     /**
      * Resolves the {@code X-Domain} header value every domain-scoped
-     * endpoint requires (domain-scoping-spec.md D6/D15). Callers only ever
+     * endpoint requires (architecture.md §8.1). Callers only ever
      * need {@code getId()} off the result.
      */
     public Domain requireByName(String name) {

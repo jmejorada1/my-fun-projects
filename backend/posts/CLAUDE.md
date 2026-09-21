@@ -79,27 +79,24 @@ see `frontend/imdb-ui-angular/docs/domain-configurability-plan.md`.
 
 ### Docs are the source of truth for the data model — read before changing it
 
-`docs/` contains a chain of specs that must stay consistent with each
-other and with the code:
+`docs/` contains a chain of living specs that must stay consistent with
+each other and with the code:
 
-- `docs/requirements.txt` — original raw product requirements (rough draft,
-  superseded by the specs below wherever they differ).
 - `docs/design-spec.md` — the canonical data model: table definitions,
-  constraints, and a running "Assumptions & Decisions" / "Resolved
-  Questions" / "Open Questions" log. Every non-obvious modeling choice
-  (soft-delete strategy, threading depth, category taxonomy, cascade
-  behavior, domain scoping) is recorded here with its rationale.
+  constraints, and a running decision log. Every non-obvious modeling
+  choice (soft-delete strategy, threading depth, category taxonomy,
+  cascade behavior, domain scoping) is recorded here with its rationale.
 - `docs/db-design-spec.md` — plain-language, relationship-by-relationship
   narrative walkthrough of the ER diagram, for faster onboarding.
-- `docs/implementation-spec-spring-boot.md` — the Spring Boot build plan
-  this was originally built from: package layout, Flyway migration
-  conventions, entity/repository/service conventions (including
-  transaction boundaries), the REST endpoint surface, and error handling.
+- `docs/architecture.md` — components, request lifecycle, REST API
+  surface, package layout, and how the domain-scoping design is meant to
+  support more than the current IMDB domains.
+- `docs/running-locally.md` — running this service without Docker.
 
-Before changing the data model, check these docs' decision-log / "Open
-Questions" sections. If you find a gap they don't already cover, add it to
-the relevant doc using the same decision-log / open-questions format
-rather than deciding silently in code.
+Before changing the data model, check `design-spec.md`'s decision log /
+"Open Questions" section. If you find a gap it doesn't already cover, add
+it using the same decision-log / open-questions format rather than
+deciding silently in code.
 
 ### Tech stack specifics
 

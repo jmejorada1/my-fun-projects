@@ -196,8 +196,8 @@ same technique the `parent_post_id`/`resource_id` same-thread constraint
 above already uses, just one column wider. The practical effect: it's
 impossible at the database level for a post to reference a resource from a
 different domain, or to be flagged with a type that belongs to some other
-domain. Full rationale and the trade-offs of enforcing this end-to-end:
-[`domain-scoping-spec.md`](./domain-scoping-spec.md).
+domain. See `design-spec.md` decision #11 and §4.3 for the column-level
+detail.
 
 ## Putting It Together: One Example
 

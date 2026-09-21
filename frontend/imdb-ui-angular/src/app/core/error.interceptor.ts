@@ -12,7 +12,7 @@ interface ProblemDetail {
 /**
  * Wraps every failed request in an {@link AppHttpError} carrying a
  * ready-to-display message, so components don't each need to know how to
- * unpack a ProblemDetail body (implementation-spec-spring-boot.md §11).
+ * unpack a ProblemDetail body (backend/posts/docs/architecture.md §9.1).
  */
 export class AppHttpError extends Error {
   constructor(

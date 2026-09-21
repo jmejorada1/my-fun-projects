@@ -52,7 +52,7 @@ class PostsFlowIntegrationTest {
     private TestRestTemplate restTemplate;
 
     // Every business endpoint requires an X-Domain header
-    // (domain-scoping-spec.md D6/D15); adding it once here keeps the calls
+    // (architecture.md §8.1); adding it once here keeps the calls
     // below unchanged rather than threading it through every request.
     @BeforeEach
     void addDomainHeader() {
@@ -66,7 +66,7 @@ class PostsFlowIntegrationTest {
      * create resource -> post -> reply -> flag it twice (two types) ->
      * re-flag the same type (verify upsert, not a duplicate row) ->
      * soft-delete the top-level post -> verify the reply subtree is hidden
-     * from the list endpoints (implementation-spec-spring-boot.md §14).
+     * from the list endpoints (architecture.md §10).
      */
     @Test
     void fullThreadLifecycle() throws Exception {

@@ -39,8 +39,7 @@ public class ResourceService {
 
         // Must be a real lookup (not getReferenceById) because it also
         // proves the category belongs to this domain — resource.domainId
-        // is derived from it, not client-supplied (domain-scoping-spec.md
-        // D11).
+        // is derived from it, not client-supplied (design-spec.md §4.3).
         ResourceCategory category = resourceCategoryRepository
                 .findByIdAndDomainId(request.categoryId(), domainId)
                 .orElseThrow(() -> EntityNotFoundException.of("ResourceCategory", request.categoryId()));

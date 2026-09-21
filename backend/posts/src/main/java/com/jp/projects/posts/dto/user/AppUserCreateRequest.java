@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.Map;
 
-// Temporary, dev-only (implementation-spec-spring-boot.md §8). Backs
+// Temporary, dev-only (architecture.md §5). Backs
 // registration (§19) — username and email are both explicitly collected
 // on the register form, so both are required here.
 public record AppUserCreateRequest(

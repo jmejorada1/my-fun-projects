@@ -11,8 +11,8 @@ How to install, run, build, and test this app. See
   this app talks to) and CORS configured to allow `http://localhost:4200`
   (`app.cors.allowed-origins` in `backend/posts/src/main/resources/application.yml`
   — already set up). Without it, every screen in this app will show a
-  network-error state. See `backend/posts/docs/implementation-spec-spring-boot.md`
-  Appendix A, or just run:
+  network-error state. See `backend/posts/docs/running-locally.md`, or
+  just run:
   ```bash
   cd backend/posts && ./start-posts-server.sh
   ```

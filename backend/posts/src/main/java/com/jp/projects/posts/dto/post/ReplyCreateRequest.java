@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import java.util.Map;
 
 public record ReplyCreateRequest(
-        @NotNull Long userId,          // see the ownership caveat in implementation-spec-spring-boot.md §8
+        @NotNull Long userId,          // see the ownership caveat in architecture.md §5
         @NotBlank String bodyText,
         Map<String, Object> data
 ) {}

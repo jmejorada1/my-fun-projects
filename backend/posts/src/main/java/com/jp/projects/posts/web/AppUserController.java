@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Temporary, dev-only (implementation-spec-spring-boot.md §8, §19). Unblocks
+ * Temporary, dev-only (architecture.md §5). Unblocks
  * manual testing until real registration/auth exists — delete this
  * controller (and AppUserService, if nothing else needs it by then) once it
  * does. Guarded so it can't accidentally ship live.

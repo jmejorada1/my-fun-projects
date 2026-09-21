@@ -219,7 +219,7 @@ public class PostService {
     /**
      * Explicit cross-domain author check for the endpoints that take a raw
      * {@code userId} rather than resolving one by username within this
-     * domain already (domain-scoping-spec.md D13) — the unified
+     * domain already (design-spec.md §4.3) — the unified
      * {@code createPost} entry point gets this for free from its
      * domain-scoped username lookup instead. Returns the resolved
      * {@link AppUser} so callers building a new {@code Post} can set its

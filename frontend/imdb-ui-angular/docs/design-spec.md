@@ -5,7 +5,7 @@ request in `requirements-notes.txt`.
 Source: [`requirements-notes.txt`](./requirements-notes.txt)
 Backend: [`backend/posts`](../../../backend/posts) — REST API this UI
 consumes. See `backend/posts/docs/design-spec.md` and
-`implementation-spec-spring-boot.md` for what already exists.
+`backend/posts/docs/architecture.md` for what already exists.
 
 ## Table of Contents
 
@@ -33,7 +33,7 @@ lgbtq-phobia) and lets users discuss them. Three areas on one page:
 Login is a placeholder: entering an email is enough to identify (or
 create) a user — no password, matching the backend's current
 not-yet-authenticated `userId` pattern
-(`backend/posts/docs/implementation-spec-spring-boot.md` §8). A dedicated
+(`backend/posts/docs/architecture.md` §5). A dedicated
 `login-ui` project is planned for later; this one gets its own login
 screen for now.
 
