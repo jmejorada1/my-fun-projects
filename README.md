@@ -1,5 +1,11 @@
 # my-fun-projects
 
+**👉 [QUICKSTART.md](QUICKSTART.md) — spin up the full stack in Docker and
+start exploring in minutes.**
+
+See also: [OVERALL-ARCHITECTURE.md](OVERALL-ARCHITECTURE.md) — container
+topology, the pluggable domain model, and AWS deployment notes.
+
 Users flag IMDB titles (movies, TV, video games) with categorized,
 severity-scored posts — e.g. `racism`, `sexism`, `lgbtq-phobic`, or a
 `no-bigotry` counter-flag — and reply in threaded comments underneath. See

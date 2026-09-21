@@ -58,6 +58,13 @@ see which titles are trending in each rating category. What differs is
 
 [↑ Back to Table of Contents](#table-of-contents)
 
+> [!WARNING]
+> **Use a private/incognito browser window for the best experience.**
+> Your session and domain choice persist to `localStorage`, so a regular
+> window may carry over a login or domain from a previous visit.
+> Incognito gives you a clean slate — handy for trying different
+> communities or the different mock users below.
+
 ### 2.1 Choosing a Community
 
 [↑ Back to Table of Contents](#table-of-contents)
