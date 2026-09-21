@@ -1,7 +1,9 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from './auth.service';
 import { DEFAULT_DOMAIN, DOMAIN_OPTIONS_TOKEN, DomainOption } from './domain-options';
+import { DomainConfig } from './domain/domain-config.model';
+import { DOMAIN_REGISTRY } from './domain/domain-registry';
 
 const STORAGE_KEY = 'imdb-ui-angular.selectedDomain';
 
@@ -18,6 +20,17 @@ export class DomainSelectionService {
 
   private readonly selectedDomainSignal = signal<string>(this.readFromStorage());
   readonly selectedDomain = this.selectedDomainSignal.asReadonly();
+
+  /** The active domain's behavioral config (rating mode, badge coloring,
+   *  etc.) — see core/domain/domain-config.model.ts. */
+  readonly activeDomainConfig = computed<DomainConfig>(() => {
+    const domain = this.selectedDomain();
+    const config = DOMAIN_REGISTRY.find((c) => c.value === domain);
+    if (!config) {
+      throw new Error(`No DomainConfig registered for domain "${domain}"`);
+    }
+    return config;
+  });
 
   select(domain: string): void {
     const option = this.options.find((o) => o.value === domain);

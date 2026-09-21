@@ -77,3 +77,8 @@
                 In-Progress
                 Done
       - Add severity on "Waiting" state
+
+
+
+** Docs **
+Add frontend ui flow diagram?
