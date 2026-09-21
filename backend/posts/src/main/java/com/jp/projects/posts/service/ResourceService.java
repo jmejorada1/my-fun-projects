@@ -60,7 +60,20 @@ public class ResourceService {
     }
 
     public ResourceResponse get(Long id, String domain) {
-        return resourceMapper.toResponse(getActive(id, domain));
+        Resource resource = getActive(id, domain);
+        List<Long> resourceIds = List.of(id);
+
+        // Same aggregation list() uses below, scoped to one resource — post
+        // counts/flag summaries include replies, not just top-level posts
+        // (no parent_post_id filter in either underlying query), so this
+        // stays consistent with /rankings rather than the frontend's
+        // previous top-level-only client-side summary.
+        Map<Long, Long> postCountByResourceId = postCountByResourceId(resourceIds);
+        Map<Long, List<ResourceFlagSummaryEntry>> flagSummaryByResourceId = flagSummaryByResourceId(resourceIds);
+
+        return resourceMapper.toResponse(resource,
+                postCountByResourceId.getOrDefault(id, 0L),
+                flagSummaryByResourceId.getOrDefault(id, List.of()));
     }
 
     public Page<ResourceResponse> list(Long categoryId, String search, String domain, Pageable pageable) {
@@ -68,22 +81,32 @@ public class ResourceService {
         Page<Resource> resources = resourceRepository.search(domainId, categoryId, search, pageable);
 
         List<Long> resourceIds = resources.getContent().stream().map(Resource::getId).toList();
-        Map<Long, Long> postCountByResourceId = resourceIds.isEmpty()
-                ? Map.of()
-                : postRepository.countByResourceIdIn(resourceIds).stream()
-                        .collect(Collectors.toMap(PostRepository.ResourcePostCount::getResourceId,
-                                PostRepository.ResourcePostCount::getPostCount));
-        Map<Long, List<ResourceFlagSummaryEntry>> flagSummaryByResourceId = resourceIds.isEmpty()
-                ? Map.of()
-                : postFlagRepository.findFlagSummaryByResourceIdIn(resourceIds).stream()
-                        .collect(Collectors.groupingBy(PostFlagRepository.ResourceFlagSummaryRow::getResourceId,
-                                Collectors.mapping(row -> new ResourceFlagSummaryEntry(
-                                        row.getPostTypeName(), row.getAvgScore(), row.getFlagCount()),
-                                        Collectors.toList())));
+        Map<Long, Long> postCountByResourceId = postCountByResourceId(resourceIds);
+        Map<Long, List<ResourceFlagSummaryEntry>> flagSummaryByResourceId = flagSummaryByResourceId(resourceIds);
 
         return resources.map(resource -> resourceMapper.toResponse(resource,
                 postCountByResourceId.getOrDefault(resource.getId(), 0L),
                 flagSummaryByResourceId.getOrDefault(resource.getId(), List.of())));
+    }
+
+    private Map<Long, Long> postCountByResourceId(List<Long> resourceIds) {
+        if (resourceIds.isEmpty()) {
+            return Map.of();
+        }
+        return postRepository.countByResourceIdIn(resourceIds).stream()
+                .collect(Collectors.toMap(PostRepository.ResourcePostCount::getResourceId,
+                        PostRepository.ResourcePostCount::getPostCount));
+    }
+
+    private Map<Long, List<ResourceFlagSummaryEntry>> flagSummaryByResourceId(List<Long> resourceIds) {
+        if (resourceIds.isEmpty()) {
+            return Map.of();
+        }
+        return postFlagRepository.findFlagSummaryByResourceIdIn(resourceIds).stream()
+                .collect(Collectors.groupingBy(PostFlagRepository.ResourceFlagSummaryRow::getResourceId,
+                        Collectors.mapping(row -> new ResourceFlagSummaryEntry(
+                                row.getPostTypeName(), row.getAvgScore(), row.getFlagCount()),
+                                Collectors.toList())));
     }
 
     @Transactional

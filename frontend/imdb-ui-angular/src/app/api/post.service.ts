@@ -33,20 +33,15 @@ export interface PostCreateRequest {
   data?: Record<string, unknown> | null;
 }
 
-export interface ReplyCreateRequest {
-  userId: number;
-  bodyText: string;
-  data?: Record<string, unknown> | null;
-}
-
 export interface PostCreateResponse {
   post: Post;
   flag: PostFlag | null;
 }
 
 /**
- * Backs the unified `POST /posts`, `POST /posts/{id}/replies`, and
- * `GET /users/{userId}/posts` endpoints — design-spec.md §3.4, §5.
+ * Backs the unified `POST /posts` (top-level posts and replies alike, via
+ * an optional `parentPostId` — replies can carry a flag the same way top-
+ * level posts do) and `GET /users/{userId}/posts` — design-spec.md §3.4, §5.
  */
 @Injectable({ providedIn: 'root' })
 export class PostService {
@@ -71,10 +66,6 @@ export class PostService {
 
   create(request: PostCreateRequest): Observable<PostCreateResponse> {
     return this.http.post<PostCreateResponse>(`${API_BASE_URL}/posts`, request);
-  }
-
-  reply(postId: number, request: ReplyCreateRequest): Observable<Post> {
-    return this.http.post<Post>(`${API_BASE_URL}/posts/${postId}/replies`, request);
   }
 
   /**

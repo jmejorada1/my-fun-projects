@@ -48,13 +48,38 @@ services:
       - posts
 
   # One-off data-load job, not a long-running service — excluded from
-  # `docker compose up` via the "tools" profile. Run explicitly, e.g.:
-  #   docker compose run --rm imdb-loader --start-row 1 --end-row 10000
+  # `docker compose up` via the "tools" profile. Self-contained by default:
+  # config.yaml's tsv_path points at the sample dataset baked into the
+  # image (backend/imdb-data-python/sample-data/), and its default
+  # start_row/end_row (1-5000) covers that entire sample. Run explicitly,
+  # e.g. to import just a subset:
+  #   docker compose run --rm imdb-loader --start-row 1 --end-row 1000
+  #
+  # To import the real, full title.basics.tsv instead (after downloading
+  # it into backend/imdb-data-python/ — see README's "Loading IMDB data"),
+  # bind-mount it in ad hoc and point --tsv-path at it:
+  #   docker compose run --rm -v "$(pwd)/backend/imdb-data-python/title.basics.tsv:/app/full-title.basics.tsv:ro" \
+  #     imdb-loader --tsv-path /app/full-title.basics.tsv --start-row 1 --end-row 50000
   imdb-loader:
     build:
       context: ./backend/imdb-data-python
-    volumes:
-      - ./backend/imdb-data-python/title.basics.tsv:/app/title.basics.tsv:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: ["tools"]
+
+  # Seeds imdb/bigotry with resources (the entire 5000-row bundled sample
+  # by default) plus mock users/posts/replies/flags for local testing. Same
+  # image as imdb-loader, different entrypoint. Self-contained by default
+  # (see imdb-loader above) — no IMDB download needed. Run explicitly, e.g.:
+  #   docker compose run --rm bigotry-loader --total-posts 1000
+  #
+  # To seed from the real, full title.basics.tsv instead, bind-mount it ad
+  # hoc the same way as imdb-loader above, pointing --tsv-path at it.
+  bigotry-loader:
+    build:
+      context: ./backend/imdb-data-python
+    entrypoint: ["python3", "import_bigotry_data.py", "--db-host", "postgres", "--db-port", "5432"]
     depends_on:
       postgres:
         condition: service_healthy

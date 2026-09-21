@@ -23,9 +23,9 @@ export interface Resource {
   category: ResourceCategory;
   createdAt: string;
   updatedAt: string;
-  /** Only populated by the list/search endpoint; 0 on a single-resource GET. */
+  /** Counts posts at any depth (top-level + replies), on both list/search and single-resource GET. */
   postCount: number;
-  /** Same list-endpoint-only caveat as `postCount` — empty on a single-resource GET. */
+  /** Same any-depth scope as `postCount` — includes reply-only flags, not just top-level posts'. */
   flagSummary: ResourceFlagSummaryEntry[];
 }
 

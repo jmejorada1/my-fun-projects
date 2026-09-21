@@ -10,6 +10,7 @@ import { ResourceDetailComponent } from './resource-detail.component';
 import { API_BASE_URL } from '../../core/api-config';
 import { errorInterceptor } from '../../core/error.interceptor';
 import { PostActivityService } from '../../core/post-activity.service';
+import { ResourceFlagSummaryEntry } from '../../api/resource.service';
 
 const RESOURCE = {
   id: 1,
@@ -19,7 +20,7 @@ const RESOURCE = {
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
   postCount: 0,
-  flagSummary: [],
+  flagSummary: [] as ResourceFlagSummaryEntry[],
 };
 
 const DEFAULT_TOP_LEVEL_POSTS = [
@@ -39,6 +40,7 @@ describe('ResourceDetailComponent', () => {
     topLevelPosts: unknown[] = DEFAULT_TOP_LEVEL_POSTS,
     postTypes: unknown[] = [{ id: 5, name: 'racism' }],
     queryParams: Record<string, string> = {},
+    resourceOverrides: Partial<typeof RESOURCE> = {},
   ) {
     await TestBed.configureTestingModule({
       imports: [ResourceDetailComponent],
@@ -71,7 +73,7 @@ describe('ResourceDetailComponent', () => {
     fixture.detectChanges();
 
     httpMock.expectOne(`${API_BASE_URL}/post-types`).flush(postTypes);
-    httpMock.expectOne((r) => r.url === `${API_BASE_URL}/resources/1`).flush(RESOURCE);
+    httpMock.expectOne((r) => r.url === `${API_BASE_URL}/resources/1`).flush({ ...RESOURCE, ...resourceOverrides });
     httpMock
       .expectOne((r) => r.url === `${API_BASE_URL}/resources/1/posts`)
       .flush({
@@ -96,6 +98,22 @@ describe('ResourceDetailComponent', () => {
     httpMock
       .expectOne((r) => r.url === `${API_BASE_URL}/resources/1/posts` && r.params.get('size') === '200')
       .flush({ content, totalElements: content.length, totalPages: 1, number: 0, size: 200 });
+  }
+
+  /**
+   * Creating/removing a post, reply, or flag notifies PostActivityService,
+   * which this component (like rankings-panel) also listens to itself now,
+   * to refetch its own resource summary — tests that trigger any of those
+   * actions need to drain this GET too, same reason as flushConflictCheck.
+   * TestBed.tick() flushes the effect toObservable() uses internally —
+   * without it the refresh's HTTP request hasn't been made yet at all (same
+   * as rankings-panel.component.spec.ts's identical use of this signal).
+   */
+  function flushResourceRefresh(resourceOverrides: Partial<typeof RESOURCE> = {}): void {
+    TestBed.tick();
+    httpMock
+      .expectOne((r) => r.url === `${API_BASE_URL}/resources/1` && r.method === 'GET')
+      .flush({ ...RESOURCE, ...resourceOverrides });
   }
 
   beforeEach(() => localStorage.clear());
@@ -146,26 +164,40 @@ describe('ResourceDetailComponent', () => {
   });
 
   it('summarizes flags per category, averaging severity except for "no-bigotry" (a count instead)', async () => {
-    const fixture = await createComponent([
+    // categorySummary is sourced from the resource's backend-aggregated
+    // flagSummary (any post depth), not computed from the top-level posts
+    // shown below — so this test's posts are just display filler; the
+    // flagSummary override is what categorySummary actually reflects.
+    const fixture = await createComponent(
+      [
+        {
+          id: 1, resourceId: 1, userId: 1, username: 'a', parentPostId: null, bodyText: 'x', data: null,
+          createdAt: '', updatedAt: '',
+          flags: [
+            { id: 1, postId: 1, postType: { id: 5, name: 'racism' }, score: 4, createdAt: '', updatedAt: '' },
+            { id: 2, postId: 1, postType: { id: 6, name: 'no-bigotry' }, score: 0, createdAt: '', updatedAt: '' },
+          ],
+          replyCount: 0, resourceDisplayName: 'Carmencita',
+        },
+        {
+          id: 2, resourceId: 1, userId: 1, username: 'b', parentPostId: null, bodyText: 'y', data: null,
+          createdAt: '', updatedAt: '',
+          flags: [
+            { id: 3, postId: 2, postType: { id: 5, name: 'racism' }, score: 2, createdAt: '', updatedAt: '' },
+            { id: 4, postId: 2, postType: { id: 6, name: 'no-bigotry' }, score: 0, createdAt: '', updatedAt: '' },
+          ],
+          replyCount: 0, resourceDisplayName: 'Carmencita',
+        },
+      ],
+      [{ id: 5, name: 'racism' }],
+      {},
       {
-        id: 1, resourceId: 1, userId: 1, username: 'a', parentPostId: null, bodyText: 'x', data: null,
-        createdAt: '', updatedAt: '',
-        flags: [
-          { id: 1, postId: 1, postType: { id: 5, name: 'racism' }, score: 4, createdAt: '', updatedAt: '' },
-          { id: 2, postId: 1, postType: { id: 6, name: 'no-bigotry' }, score: 0, createdAt: '', updatedAt: '' },
+        flagSummary: [
+          { postTypeName: 'no-bigotry', averageScore: 0, flagCount: 2 },
+          { postTypeName: 'racism', averageScore: 3, flagCount: 2 },
         ],
-        replyCount: 0, resourceDisplayName: 'Carmencita',
       },
-      {
-        id: 2, resourceId: 1, userId: 1, username: 'b', parentPostId: null, bodyText: 'y', data: null,
-        createdAt: '', updatedAt: '',
-        flags: [
-          { id: 3, postId: 2, postType: { id: 5, name: 'racism' }, score: 2, createdAt: '', updatedAt: '' },
-          { id: 4, postId: 2, postType: { id: 6, name: 'no-bigotry' }, score: 0, createdAt: '', updatedAt: '' },
-        ],
-        replyCount: 0, resourceDisplayName: 'Carmencita',
-      },
-    ]);
+    );
 
     expect(fixture.componentInstance.categorySummary()).toEqual([
       { name: 'no-bigotry', count: 2, averageScore: null },
@@ -187,6 +219,28 @@ describe('ResourceDetailComponent', () => {
 
     expect(fixture.componentInstance.categorySummary()).toEqual([]);
     expect((fixture.nativeElement as HTMLElement).querySelector('.flag-summary')).toBeNull();
+  });
+
+  it('includes a flag that only exists on an unloaded reply, not just the visible top-level posts', async () => {
+    // Regression test: a reply's flag used to be invisible here entirely,
+    // because the summary was computed from `posts()` (top-level only —
+    // replies are fetched lazily, only once a thread is expanded), while
+    // /rankings aggregates flags at any post depth. The top-level post
+    // below carries no flags at all; the lgbtq-phobic entry can only have
+    // come from the resource's backend-aggregated flagSummary.
+    const fixture = await createComponent(
+      [
+        { id: 1, resourceId: 1, userId: 1, username: 'a', parentPostId: null, bodyText: 'x', data: null, createdAt: '', updatedAt: '', flags: [], replyCount: 1, resourceDisplayName: 'Carmencita' },
+      ],
+      [{ id: 5, name: 'racism' }],
+      {},
+      { flagSummary: [{ postTypeName: 'lgbtq-phobic', averageScore: 5, flagCount: 1 }] },
+    );
+
+    expect(fixture.componentInstance.categorySummary()).toEqual([
+      { name: 'lgbtq-phobic', count: 1, averageScore: 5 },
+    ]);
+    expect((fixture.nativeElement as HTMLElement).querySelector('.flag-summary')).not.toBeNull();
   });
 
   it('shows the expand caret and reply count when a post has replies', async () => {
@@ -305,6 +359,7 @@ describe('ResourceDetailComponent', () => {
       post: { id: 99, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'Worth flagging.', data: null, createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
       flag: { id: 1, postId: 99, postType: { id: 5, name: 'racism' }, score: 4 },
     });
+    flushResourceRefresh();
     flushConflictCheck(DEFAULT_TOP_LEVEL_POSTS);
   });
 
@@ -348,6 +403,7 @@ describe('ResourceDetailComponent', () => {
       post: { id: 99, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'Worth flagging.', data: null, createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
       flag: { id: 1, postId: 99, postType: { id: 5, name: 'racism' }, score: 4 },
     });
+    flushResourceRefresh();
     flushConflictCheck(DEFAULT_TOP_LEVEL_POSTS);
     fixture.detectChanges();
 
@@ -382,6 +438,7 @@ describe('ResourceDetailComponent', () => {
       post: { id: 101, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'Neutral on this one.', data: null, createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
       flag: { id: 2, postId: 101, postType: { id: 5, name: 'racism' }, score: 0 },
     });
+    flushResourceRefresh();
     flushConflictCheck(DEFAULT_TOP_LEVEL_POSTS);
   });
 
@@ -397,31 +454,129 @@ describe('ResourceDetailComponent', () => {
       number: 0,
       size: 50,
     });
-    fixture.componentInstance.getReplyControl(42).setValue('I agree.');
+    fixture.componentInstance.getReplyForm(42).controls.bodyText.setValue('I agree.');
     fixture.componentInstance.submitReply(42);
 
-    const req = httpMock.expectOne(`${API_BASE_URL}/posts/42/replies`);
-    expect(req.request.body).toEqual({ userId: 1, bodyText: 'I agree.' });
-    req.flush({
-      id: 200,
-      resourceId: 1,
-      userId: 1,
+    const req = httpMock.expectOne(`${API_BASE_URL}/posts`);
+    expect(req.request.body).toEqual({
       username: 'jdoe',
+      resourceId: 1,
       parentPostId: 42,
       bodyText: 'I agree.',
-      data: null,
-      createdAt: '2026-01-02T00:00:00Z',
-      updatedAt: '2026-01-02T00:00:00Z',
-      flags: [],
-      replyCount: 0,
-      resourceDisplayName: 'Carmencita',
+      postTypeId: undefined,
+      score: undefined,
     });
+    req.flush({
+      post: {
+        id: 200,
+        resourceId: 1,
+        userId: 1,
+        username: 'jdoe',
+        parentPostId: 42,
+        bodyText: 'I agree.',
+        data: null,
+        createdAt: '2026-01-02T00:00:00Z',
+        updatedAt: '2026-01-02T00:00:00Z',
+        flags: [],
+        replyCount: 0,
+        resourceDisplayName: 'Carmencita',
+      },
+      flag: null,
+    });
+    flushResourceRefresh();
 
     expect(navigateSpy).not.toHaveBeenCalled();
     expect(fixture.componentInstance.repliesFor(42).length).toBe(1);
     expect(fixture.componentInstance.repliesFor(42)[0].bodyText).toBe('I agree.');
     // The reply form collapses back after a successful post.
     expect(fixture.componentInstance.openReplyPostId()).toBeNull();
+  });
+
+  it('lets a reply carry an optional bigotry category + severity, via the unified /posts endpoint', async () => {
+    const fixture = await createComponent(DEFAULT_TOP_LEVEL_POSTS, [{ id: 5, name: 'racism' }]);
+
+    fixture.componentInstance.toggleReply(42);
+    httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/42/replies` && r.method === 'GET').flush({
+      content: [], totalElements: 0, totalPages: 0, number: 0, size: 50,
+    });
+    const replyForm = fixture.componentInstance.getReplyForm(42);
+    replyForm.controls.bodyText.setValue('This is actually pretty bad.');
+    replyForm.controls.postTypeId.setValue(5);
+    fixture.componentInstance.onReplyPostTypeChange(42);
+    replyForm.controls.score.setValue(4);
+    fixture.componentInstance.submitReply(42);
+
+    const req = httpMock.expectOne(`${API_BASE_URL}/posts`);
+    expect(req.request.body).toEqual({
+      username: 'jdoe',
+      resourceId: 1,
+      parentPostId: 42,
+      bodyText: 'This is actually pretty bad.',
+      postTypeId: 5,
+      score: 4,
+    });
+    req.flush({
+      post: {
+        id: 202, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: 42, bodyText: 'This is actually pretty bad.', data: null,
+        createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita',
+      },
+      flag: { id: 9, postId: 202, postType: { id: 5, name: 'racism' }, score: 4 },
+    });
+    flushResourceRefresh();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.repliesFor(42)[0].flags).toEqual([
+      { id: 9, postId: 202, postType: { id: 5, name: 'racism' }, score: 4 },
+    ]);
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('racism (4)');
+  });
+
+  it('requires a severity once a category is picked for a reply, but stays optional otherwise', async () => {
+    const fixture = await createComponent(DEFAULT_TOP_LEVEL_POSTS, [{ id: 5, name: 'racism' }]);
+
+    fixture.componentInstance.toggleReply(42);
+    httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/42/replies` && r.method === 'GET').flush({
+      content: [], totalElements: 0, totalPages: 0, number: 0, size: 50,
+    });
+    const replyForm = fixture.componentInstance.getReplyForm(42);
+    replyForm.controls.bodyText.setValue('Picked a category, not a severity.');
+    replyForm.controls.postTypeId.setValue(5);
+    fixture.componentInstance.onReplyPostTypeChange(42);
+
+    fixture.componentInstance.submitReply(42);
+
+    httpMock.expectNone((r) => r.url === `${API_BASE_URL}/posts` && r.method === 'POST');
+    expect(replyForm.controls.score.invalid).toBe(true);
+    expect(replyForm.controls.score.touched).toBe(true);
+  });
+
+  it('auto-sets a no-bigotry reply\'s severity to 0, same as the top-level form', async () => {
+    const fixture = await createComponent(DEFAULT_TOP_LEVEL_POSTS, [{ id: 5, name: 'racism' }, { id: 6, name: 'no-bigotry' }]);
+
+    fixture.componentInstance.toggleReply(42);
+    httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/42/replies` && r.method === 'GET').flush({
+      content: [], totalElements: 0, totalPages: 0, number: 0, size: 50,
+    });
+    const replyForm = fixture.componentInstance.getReplyForm(42);
+    replyForm.controls.bodyText.setValue('Seems fine to me.');
+    replyForm.controls.postTypeId.setValue(6);
+    fixture.componentInstance.onReplyPostTypeChange(42);
+
+    expect(fixture.componentInstance.isReplyNoBigotrySelected(42)).toBe(true);
+    expect(replyForm.controls.score.value).toBe(0);
+    expect(replyForm.controls.score.disabled).toBe(true);
+
+    fixture.componentInstance.submitReply(42);
+    const req = httpMock.expectOne(`${API_BASE_URL}/posts`);
+    expect(req.request.body).toEqual({
+      username: 'jdoe',
+      resourceId: 1,
+      parentPostId: 42,
+      bodyText: 'Seems fine to me.',
+      postTypeId: 6,
+      score: 0,
+    });
   });
 
   it('focuses the reply textarea when the reply form opens', async () => {
@@ -469,12 +624,16 @@ describe('ResourceDetailComponent', () => {
     httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/43/replies` && r.method === 'GET').flush({
       content: [], totalElements: 0, totalPages: 0, number: 0, size: 50,
     });
-    fixture.componentInstance.getReplyControl(43).setValue('First reply.');
+    fixture.componentInstance.getReplyForm(43).controls.bodyText.setValue('First reply.');
     fixture.componentInstance.submitReply(43);
-    httpMock.expectOne(`${API_BASE_URL}/posts/43/replies`).flush({
-      id: 201, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: 43, bodyText: 'First reply.', data: null,
-      createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita',
+    httpMock.expectOne(`${API_BASE_URL}/posts`).flush({
+      post: {
+        id: 201, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: 43, bodyText: 'First reply.', data: null,
+        createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita',
+      },
+      flag: null,
     });
+    flushResourceRefresh();
     fixture.detectChanges();
 
     expect(fixture.componentInstance.posts().find((p) => p.id === 43)?.replyCount).toBe(1);
@@ -495,7 +654,7 @@ describe('ResourceDetailComponent', () => {
     });
     fixture.componentInstance.submitReply(42);
 
-    httpMock.expectNone((r) => r.url === `${API_BASE_URL}/posts/42/replies` && r.method === 'POST');
+    httpMock.expectNone((r) => r.url === `${API_BASE_URL}/posts` && r.method === 'POST');
   });
 
   it('does not submit a whitespace-only reply', async () => {
@@ -505,10 +664,10 @@ describe('ResourceDetailComponent', () => {
     httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/42/replies` && r.method === 'GET').flush({
       content: [], totalElements: 0, totalPages: 0, number: 0, size: 50,
     });
-    fixture.componentInstance.getReplyControl(42).setValue('   ');
+    fixture.componentInstance.getReplyForm(42).controls.bodyText.setValue('   ');
     fixture.componentInstance.submitReply(42);
 
-    httpMock.expectNone((r) => r.url === `${API_BASE_URL}/posts/42/replies` && r.method === 'POST');
+    httpMock.expectNone((r) => r.url === `${API_BASE_URL}/posts` && r.method === 'POST');
     expect(fixture.componentInstance.isReplyInvalid(42)).toBe(true);
   });
 
@@ -519,10 +678,10 @@ describe('ResourceDetailComponent', () => {
     httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/42/replies` && r.method === 'GET').flush({
       content: [], totalElements: 0, totalPages: 0, number: 0, size: 50,
     });
-    fixture.componentInstance.getReplyControl(42).setValue('  I agree.  ');
+    fixture.componentInstance.getReplyForm(42).controls.bodyText.setValue('  I agree.  ');
     fixture.componentInstance.submitReply(42);
 
-    const req = httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/42/replies` && r.method === 'POST');
+    const req = httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts` && r.method === 'POST');
     expect(req.request.body.bodyText).toBe('I agree.');
   });
 
@@ -541,7 +700,7 @@ describe('ResourceDetailComponent', () => {
     fixture.detectChanges();
     expect(el.textContent).toContain('Write something before posting a reply.');
 
-    fixture.componentInstance.getReplyControl(42).setValue('Now filled in.');
+    fixture.componentInstance.getReplyForm(42).controls.bodyText.setValue('Now filled in.');
     fixture.detectChanges();
     expect(el.textContent).not.toContain('Write something before posting a reply.');
   });
@@ -778,6 +937,7 @@ describe('ResourceDetailComponent', () => {
         post: { id: 99, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'Worth flagging.', data: null, createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
         flag: { id: 1, postId: 99, postType: { id: 5, name: 'racism' }, score: 4 },
       });
+      flushResourceRefresh();
       flushConflictCheck(DEFAULT_TOP_LEVEL_POSTS);
 
       expect(notifySpy).toHaveBeenCalledTimes(1);
@@ -791,12 +951,16 @@ describe('ResourceDetailComponent', () => {
       httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/42/replies` && r.method === 'GET').flush({
         content: [], totalElements: 0, totalPages: 0, number: 0, size: 50,
       });
-      fixture.componentInstance.getReplyControl(42).setValue('I agree.');
+      fixture.componentInstance.getReplyForm(42).controls.bodyText.setValue('I agree.');
       fixture.componentInstance.submitReply(42);
-      httpMock.expectOne(`${API_BASE_URL}/posts/42/replies`).flush({
-        id: 200, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: 42, bodyText: 'I agree.', data: null,
-        createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita',
+      httpMock.expectOne(`${API_BASE_URL}/posts`).flush({
+        post: {
+          id: 200, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: 42, bodyText: 'I agree.', data: null,
+          createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita',
+        },
+        flag: null,
       });
+      flushResourceRefresh();
 
       expect(notifySpy).toHaveBeenCalledTimes(1);
     });
@@ -944,6 +1108,7 @@ describe('ResourceDetailComponent', () => {
         post: { id: newPostId, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'All clear here.', data: null, createdAt: '2026-01-03T00:00:00Z', updatedAt: '2026-01-03T00:00:00Z', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
         flag: { id: 3, postId: newPostId, postType: { id: 6, name: 'no-bigotry' }, score: 0 },
       });
+      flushResourceRefresh();
     }
 
     it('offers to remove a prior same-user severity post, excluding other users\' posts and the new post itself', async () => {
@@ -983,6 +1148,7 @@ describe('ResourceDetailComponent', () => {
         post: { id: 100, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'Another racist post.', data: null, createdAt: '', updatedAt: '', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
         flag: { id: 4, postId: 100, postType: { id: 5, name: 'racism' }, score: 3 },
       });
+      flushResourceRefresh();
       // PRIOR_RACIST_POST isn't "no-bigotry"-flagged, so there's nothing to conflict with.
       flushConflictCheck([PRIOR_RACIST_POST]);
 
@@ -1004,6 +1170,7 @@ describe('ResourceDetailComponent', () => {
         post: { id: 100, resourceId: 1, userId: 1, username: 'jdoe', parentPostId: null, bodyText: 'Actually, this is racist.', data: null, createdAt: '', updatedAt: '', flags: [], replyCount: 0, resourceDisplayName: 'Carmencita' },
         flag: { id: 6, postId: 100, postType: { id: 5, name: 'racism' }, score: 4 },
       });
+      flushResourceRefresh();
       flushConflictCheck([priorNoBigotryPost]);
 
       expect(fixture.componentInstance.conflictingPosts().map((p) => p.id)).toEqual([20]);
@@ -1025,6 +1192,7 @@ describe('ResourceDetailComponent', () => {
       const deleteReq = httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/99` && r.method === 'DELETE');
       expect(deleteReq.request.headers.get('X-User-Id')).toBe('1');
       deleteReq.flush(null);
+      flushResourceRefresh();
 
       expect(fixture.componentInstance.conflictingPosts()).toEqual([]);
       // The new post is gone; the prior conflicting post is untouched.
@@ -1063,6 +1231,7 @@ describe('ResourceDetailComponent', () => {
       const deleteReq = httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/10` && r.method === 'DELETE');
       expect(deleteReq.request.headers.get('X-User-Id')).toBe('1');
       deleteReq.flush(null);
+      flushResourceRefresh();
 
       expect(fixture.componentInstance.conflictingPosts()).toEqual([]);
       expect(fixture.componentInstance.posts().some((p) => p.id === 10)).toBe(false);

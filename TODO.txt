@@ -34,10 +34,22 @@
    -- Load imdb data, but ignore when primaryTitle is prefixed with Episode #   
 
 *** Code Changes ****
-   -- restructure code to be easily configurable by domain.
-   -- organize app/api package
-   -- Do not hardcode localhost:4200 everywhere. Remove any hardcoded things. parameterize when possible
 
+   -- organize app/api package
+        -- Do not hardcode localhost:4200 everywhere. Remove any hardcoded things. parameterize when possible
+   
+   
+   -- restructure code to be easily configurable by domain.
+        --- In other words, Can you make the domain and configurations parameterizable through a json file or datastructure/classes that can be processed? For example I want to add an imdb/standard domain that will have a different set of post-categories, for example:
+                - skip it
+                - It was okay
+                - I enjoyed it
+                - I loved it, 
+        And there will be no severity score to average. Just counts of the above chosen categories for rating a movie.
+
+        Or would it be simpler to create a separate Angular (or React) UI project to handle this new "domain"?
+
+   
 
    --- LLM Service API???
         -- Add an LLM summarizing the search results

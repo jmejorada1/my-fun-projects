@@ -8,9 +8,15 @@
   box-shadow: var(--shadow-lg);
 }
 
+.login h1 {
+  text-align: center;
+}
+
 .subtitle {
   color: var(--color-text-muted);
   margin-top: -0.5rem;
+  text-align: center;
+  margin-bottom: 1.5rem;
 }
 
 form {

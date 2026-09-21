@@ -7,11 +7,30 @@
 # repeat runs. Any arguments are forwarded to `up`, e.g.:
 #   ./docker-run.sh -d              # detached
 #   ./docker-run.sh posts frontend  # only start these services
+#
+# The one argument NOT forwarded to `up` is `bigotry-data` — pull it out
+# anywhere in the argument list to also seed mock imdb/bigotry data
+# (resources + user1/user2/user3 posts/replies/flags) after startup, e.g.:
+#   ./docker-run.sh bigotry-data     # start the stack, then seed it
+# This forces the stack up detached (regardless of other args) so the
+# seeding job can run against it, then leaves it running in the
+# background — use ./docker-shutdown.sh to stop it, same as any other
+# detached run.
 
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
+
+LOAD_BIGOTRY_DATA=false
+UP_ARGS=()
+for arg in "$@"; do
+  if [ "$arg" = "bigotry-data" ]; then
+    LOAD_BIGOTRY_DATA=true
+  else
+    UP_ARGS+=("$arg")
+  fi
+done
 
 if ! "$SCRIPT_DIR/docker-precheck.sh"; then
   echo
@@ -29,8 +48,41 @@ if ! docker compose build; then
   exit 1
 fi
 
+if [ "$LOAD_BIGOTRY_DATA" = false ]; then
+  echo
+  echo "Build complete — starting docker compose..."
+  echo
+
+  exec docker compose up "${UP_ARGS[@]+"${UP_ARGS[@]}"}"
+fi
+
 echo
-echo "Build complete — starting docker compose..."
+echo "Build complete — starting docker compose (detached, so mock bigotry data can be seeded)..."
 echo
 
-exec docker compose up "$@"
+if ! docker compose up -d "${UP_ARGS[@]+"${UP_ARGS[@]}"}"; then
+  echo
+  echo "Failed to start docker compose — see the error above."
+  exit 1
+fi
+
+echo
+echo "Waiting for posts' Flyway migrations to apply (up to 2 min)..."
+if ! "$SCRIPT_DIR/docker-wait-for-posts.sh"; then
+  exit 1
+fi
+
+echo
+echo "Seeding mock bigotry data..."
+if ! docker compose run --rm bigotry-loader; then
+  echo
+  echo "bigotry-loader failed — see the error above. The stack is still running."
+  exit 1
+fi
+
+echo
+echo "Stack is running (detached) with mock bigotry data loaded."
+echo "  Frontend: http://localhost:4200"
+echo "  API:      http://localhost:8080/swagger-ui.html"
+echo "  Logs:     docker compose logs -f"
+echo "  Stop:     ./docker-shutdown.sh"

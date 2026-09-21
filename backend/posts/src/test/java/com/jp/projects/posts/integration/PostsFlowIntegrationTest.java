@@ -10,6 +10,7 @@ import com.jp.projects.posts.dto.post.TopLevelPostCreateRequest;
 import com.jp.projects.posts.dto.postflag.PostFlagCreateRequest;
 import com.jp.projects.posts.dto.postflag.PostFlagResponse;
 import com.jp.projects.posts.dto.resource.ResourceCreateRequest;
+import com.jp.projects.posts.dto.resource.ResourceFlagSummaryEntry;
 import com.jp.projects.posts.dto.resource.ResourceResponse;
 import com.jp.projects.posts.dto.user.AppUserCreateRequest;
 import com.jp.projects.posts.dto.user.AppUserResponse;
@@ -100,6 +101,14 @@ class PostsFlowIntegrationTest {
         restTemplate.postForObject("/posts/" + topLevel.id() + "/flags",
                 new PostFlagCreateRequest(user.id(), 1L, 5), PostFlagResponse.class);
 
+        // flag the REPLY too, with a type the top-level post doesn't have —
+        // this is the scenario that used to slip past the resource-detail
+        // page's summary (computed only from top-level posts) while still
+        // correctly showing up in /rankings (which aggregates any post
+        // depth); the resource-level assertions below check it's included.
+        restTemplate.postForObject("/posts/" + reply.id() + "/flags",
+                new PostFlagCreateRequest(user.id(), 101L, 3), PostFlagResponse.class);
+
         ResponseEntity<PostFlagResponse[]> flags = restTemplate.getForEntity(
                 "/posts/" + topLevel.id() + "/flags", PostFlagResponse[].class);
         assertThat(flags.getBody()).hasSize(2);
@@ -152,7 +161,7 @@ class PostsFlowIntegrationTest {
                 .orElseThrow();
         assertThat(searchResult.get("postCount").asLong()).isEqualTo(2L); // top-level post + its reply
         JsonNode flagSummary = searchResult.get("flagSummary");
-        assertThat(flagSummary.size()).isEqualTo(2);
+        assertThat(flagSummary.size()).isEqualTo(3);
         assertThat(StreamSupport.stream(flagSummary.spliterator(), false)
                 .filter(f -> f.get("postTypeName").asText().equals("racism"))
                 .map(f -> f.get("averageScore").asDouble()))
@@ -160,6 +169,25 @@ class PostsFlowIntegrationTest {
         assertThat(StreamSupport.stream(flagSummary.spliterator(), false)
                 .filter(f -> f.get("postTypeName").asText().equals("sexism"))
                 .map(f -> f.get("flagCount").asLong()))
+                .containsExactly(1L);
+        // the reply-only flag, aggregated in alongside the top-level post's
+        assertThat(StreamSupport.stream(flagSummary.spliterator(), false)
+                .filter(f -> f.get("postTypeName").asText().equals("lgbtq-phobic"))
+                .map(f -> f.get("averageScore").asDouble()))
+                .containsExactly(3.0);
+
+        // the single-resource read (what the resource-detail page's route
+        // loads) reports the same aggregated postCount/flagSummary as the
+        // list/search endpoint above, including the reply's flag — it used
+        // to hardcode postCount=0 and flagSummary=[] instead of actually
+        // computing them
+        ResourceResponse singleResource = restTemplate.getForObject(
+                "/resources/" + resource.id(), ResourceResponse.class);
+        assertThat(singleResource.postCount()).isEqualTo(2L); // top-level post + its reply
+        assertThat(singleResource.flagSummary()).hasSize(3);
+        assertThat(singleResource.flagSummary())
+                .filteredOn(f -> f.postTypeName().equals("lgbtq-phobic"))
+                .extracting(ResourceFlagSummaryEntry::flagCount)
                 .containsExactly(1L);
 
         // soft-delete the top-level post

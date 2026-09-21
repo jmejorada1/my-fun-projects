@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 import { AppHttpError } from '../../core/error.interceptor';
+import { DomainSelectionService } from '../../core/domain-selection.service';
 
 @Component({
   selector: 'app-register',
@@ -14,6 +15,13 @@ import { AppHttpError } from '../../core/error.interceptor';
 export class RegisterComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly domainSelection = inject(DomainSelectionService);
+
+  /** The currently-selected domain option, so register shows its friendly
+   * name instead of the raw backend domain value (e.g. "imdb/bigotry"). */
+  readonly currentDomain = computed(() =>
+    this.domainSelection.options.find((option) => option.value === this.domainSelection.selectedDomain()),
+  );
 
   // [formGroup] on the <form> is required for (ngSubmit) to fire at all —
   // see the identical bug fixed in login.component.ts.

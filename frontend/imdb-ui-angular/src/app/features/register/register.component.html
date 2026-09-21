@@ -1,5 +1,7 @@
 <main class="register">
-  <h1>imdb/bigotry</h1>
+  @if (currentDomain(); as domain) {
+    <h1>{{ domain.label }}</h1>
+  }
   <p class="subtitle">Create an account.</p>
 
   <form [formGroup]="form" (ngSubmit)="submit()">

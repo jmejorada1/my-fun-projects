@@ -31,7 +31,7 @@ the full domain model.
 |---|---|---|---|
 | `posts` | [`backend/posts`](backend/posts) | Spring Boot 4 / Java 25 | REST API for resources, posts, replies, and flags. Owns the schema via Flyway migrations, applied automatically on startup. |
 | `imdb-ui-angular` | [`frontend/imdb-ui-angular`](frontend/imdb-ui-angular) | Angular 22 | SPA served as static files via nginx. Calls `posts` directly from the browser. |
-| `imdb-data-python` | [`backend/imdb-data-python`](backend/imdb-data-python) | Python | One-off script that imports a row range of IMDB's `title.basics.tsv` into the `posts-db.resource` table. Not a long-running service. |
+| `imdb-data-python` | [`backend/imdb-data-python`](backend/imdb-data-python) | Python | One-off scripts: `import_resources.py` imports a row range of IMDB's `title.basics.tsv` into the `posts-db.resource` table; `import_bigotry_data.py` additionally seeds mock users, posts, replies, and flags. Neither is a long-running service. |
 | `postgres` | — | Postgres 16 | Single database (`posts-db`), single schema (`posts`), owned by the `posts` service's migrations. |
 
 Two things wire the pieces together and are **not** overridden in Docker,
@@ -67,10 +67,10 @@ container from inside `posts`.
   `5432`, specifically so it *doesn't* need to fight a local Postgres
   install — a pgAdmin session pointed at your own local database is fine
   to leave running.)
-- **To load IMDB data** (optional, only needed for the `imdb-loader` job
-  below): `title.basics.tsv` downloaded from
-  [IMDB's non-commercial datasets](https://datasets.imdbws.com/) — it's
-  ~1GB and gitignored, so it isn't in the repo.
+- **Nothing else to download** — `imdb-loader`/`bigotry-loader` (below) run
+  against a 5000-row sample of IMDB's `title.basics.tsv` checked into the
+  repo. A `title.basics.tsv` download is only needed if you want to import
+  the real, full dataset instead (see "Loading IMDB data" below).
 
 ## How to run (Docker)
 
@@ -88,6 +88,19 @@ container from inside `posts`.
    automatically on boot), and `frontend`. Any arguments you pass are
    forwarded to that `up` command, e.g. `./docker-run.sh -d` to run
    detached, or `./docker-run.sh posts` to start just one service.
+
+   Pass `bigotry-data` (anywhere in the arguments) to also seed mock
+   `imdb/bigotry` data — resources plus `user1`/`user2`/`user3`
+   posts/replies/flags — right after startup:
+
+   ```bash
+   ./docker-run.sh bigotry-data
+   ```
+
+   This one forces the stack up detached (so the seeding job can run
+   against it, regardless of any other arguments) and leaves it running in
+   the background afterward — see "Seeding mock bigotry data" below for
+   what gets loaded and how to load more later.
 
    (Or run the steps yourself: `./docker-precheck.sh`, then
    `docker compose build`, then `docker compose up`. `up --build` in one
@@ -109,6 +122,19 @@ container from inside `posts`.
    (Equivalent to `docker compose down` / `docker compose down -v`, if you
    prefer to run those directly.)
 
+4. Made a code change and want it live without restarting everything?
+
+   ```bash
+   ./docker-reload.sh            # rebuild + redeploy both frontend and posts
+   ./docker-reload.sh frontend   # frontend only
+   ./docker-reload.sh backend    # posts only
+   ```
+
+   Unlike `docker-run.sh`, this skips the port-free precheck (which would
+   otherwise fail since the running stack's own containers already hold
+   those ports) and only touches the service(s) you name, leaving the
+   database and everything else untouched.
+
 No `.env` file is required — the stack runs with the same default DB
 password already in `application.yml`. To use a different one, copy
 [`.env.example`](.env.example) to `.env` and edit `POSTGRES_PASSWORD`.
@@ -116,16 +142,20 @@ password already in `application.yml`. To use a different one, copy
 ### Loading IMDB data
 
 `imdb-loader` is a one-off job, not a service that starts with `up` — run
-it explicitly whenever you want to (re-)import a row range:
+it explicitly whenever you want to (re-)import a row range. It's
+self-contained by default: it reads from the 5000-row sample TSV checked
+into [`backend/imdb-data-python/sample-data/`](backend/imdb-data-python/sample-data/)
+(no download needed), and its default `start_row`/`end_row` (1-5000)
+imports that entire sample:
 
-1. Download `title.basics.tsv` (from IMDB's non-commercial datasets) into
-   `backend/imdb-data-python/`.
-2. Make sure `postgres` and `posts` are already running (step 1 above).
-3. Run the loader, passing whatever range/domain you need — these become
-   CLI flags on [`import_resources.py`](backend/imdb-data-python/import_resources.py):
+1. Make sure `postgres` and `posts` are already running (step 1 above).
+2. Run the loader — with no arguments it imports the whole bundled sample,
+   or pass a narrower range/different domain, which become CLI flags on
+   [`import_resources.py`](backend/imdb-data-python/import_resources.py):
 
    ```bash
-   docker compose run --rm imdb-loader --start-row 1 --end-row 10000 --domain imdb/bigotry
+   docker compose run --rm imdb-loader --domain imdb/bigotry
+   docker compose run --rm imdb-loader --start-row 1 --end-row 1000 --domain imdb/bigotry
    ```
 
    Use `imdb/bigotry`, not `imdb` — it's the only domain the frontend's
@@ -136,6 +166,48 @@ it explicitly whenever you want to (re-)import a row range:
    Re-run with a later `--start-row` to import further ranges; see
    [`backend/imdb-data-python/README.md`](backend/imdb-data-python/README.md)
    for the full flag list and failure behavior.
+
+   To import beyond the bundled sample's 5000 rows, download the real,
+   full `title.basics.tsv` from
+   [IMDB's non-commercial datasets](https://datasets.imdbws.com/) into
+   `backend/imdb-data-python/`, then bind-mount it in ad hoc and point
+   `--tsv-path` at it:
+
+   ```bash
+   docker compose run --rm -v "$(pwd)/backend/imdb-data-python/title.basics.tsv:/app/full-title.basics.tsv:ro" \
+     imdb-loader --tsv-path /app/full-title.basics.tsv --start-row 1 --end-row 50000 --domain imdb/bigotry
+   ```
+
+### Seeding mock bigotry data
+
+`bigotry-loader` is a second one-off job, also excluded from `up`, that
+seeds `imdb/bigotry` with the entire 5000-row bundled sample as resources
+plus mock users `user1`/`user2`/`user3` and synthetic posts, replies, and
+flags for local UI testing — `user1` posts least, `user3` posts most.
+
+The easiest way to run it, standalone, without the rest of the stack
+already up:
+
+```bash
+./docker-load-bigotry-data.sh
+```
+
+[`docker-load-bigotry-data.sh`](docker-load-bigotry-data.sh) starts (or
+reuses) just `postgres` + `posts` — enough for Flyway migrations to apply —
+then runs `bigotry-loader`; the frontend is never started. Any arguments
+are forwarded to the loader, e.g.
+`./docker-load-bigotry-data.sh --total-posts 1000 --seed 42`.
+
+(Or, if `postgres`/`posts` are already running via `./docker-run.sh`, run
+the job directly: `docker compose run --rm bigotry-loader`.)
+
+These become CLI flags on
+[`import_bigotry_data.py`](backend/imdb-data-python/import_bigotry_data.py);
+see that script's docstring and
+[`bigotry-config.yaml`](backend/imdb-data-python/bigotry-config.yaml) for
+the full option list. Resource import is idempotent (already-imported
+tconsts are skipped), but posts/replies/flags are not — re-running adds
+another batch on top of what's already there.
 
 ### Rebuilding after code changes
 

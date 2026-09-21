@@ -12,11 +12,12 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface ResourceMapper {
 
+    /** Only for a just-created resource (ResourceService.create) — genuinely 0 posts/flags, not a stand-in for the real aggregation. */
     @Mapping(target = "postCount", constant = "0L")
     @Mapping(target = "flagSummary", expression = "java(java.util.List.of())")
     ResourceResponse toResponse(Resource resource);
 
-    /** Same mapping, plus the resource's batch-loaded stats — see ResourceService.list. */
+    /** Same mapping, plus the resource's aggregated stats — see ResourceService.get/list. */
     @Mapping(target = "postCount", source = "postCount")
     @Mapping(target = "flagSummary", source = "flagSummary")
     ResourceResponse toResponse(Resource resource, long postCount, List<ResourceFlagSummaryEntry> flagSummary);
