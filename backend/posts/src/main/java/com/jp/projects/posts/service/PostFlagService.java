@@ -4,8 +4,8 @@ import com.jp.projects.posts.dto.postflag.PostFlagCreateRequest;
 import com.jp.projects.posts.dto.postflag.PostFlagResponse;
 import com.jp.projects.posts.entity.Post;
 import com.jp.projects.posts.entity.PostFlag;
-import com.jp.projects.posts.exception.EntityNotFoundException;
 import com.jp.projects.posts.exception.ForbiddenOperationException;
+import com.jp.projects.posts.exception.NotFoundException;
 import com.jp.projects.posts.mapper.PostFlagMapper;
 import com.jp.projects.posts.repository.PostFlagRepository;
 import com.jp.projects.posts.repository.PostRepository;
@@ -25,14 +25,13 @@ public class PostFlagService {
     private final PostRepository postRepository;
     private final PostTypeRepository postTypeRepository;
     private final PostFlagMapper postFlagMapper;
-    private final DomainService domainService;
 
     @Transactional
-    public PostFlagResponse addOrUpdateFlag(Long postId, PostFlagCreateRequest request, String domain) {
-        Long domainId = domainService.requireByName(domain).getId();
+    public PostFlagResponse addOrUpdateFlag(Long postId, PostFlagCreateRequest request, DomainRef domain) {
+        Long domainId = domain.id();
         requireActivePost(postId, domainId);
         postTypeRepository.findByIdAndDomainId(request.postTypeId(), domainId)
-                .orElseThrow(() -> EntityNotFoundException.of("PostType", request.postTypeId()));
+                .orElseThrow(() -> NotFoundException.of("PostType", request.postTypeId()));
 
         // `request.userId()` is accepted per the unenforced-acting-user
         // pattern (architecture.md §5) but post_flag has
@@ -51,23 +50,22 @@ public class PostFlagService {
         return postFlagMapper.toResponse(flag);
     }
 
-    public List<PostFlagResponse> listActiveFlags(Long postId, String domain) {
-        Long domainId = domainService.requireByName(domain).getId();
-        requireActivePost(postId, domainId);
+    public List<PostFlagResponse> listActiveFlags(Long postId, DomainRef domain) {
+        requireActivePost(postId, domain.id());
         return postFlagRepository.findByPostIdAndDeletedAtIsNull(postId).stream()
                 .map(postFlagMapper::toResponse)
                 .toList();
     }
 
     @Transactional
-    public void removeFlag(Long flagId, Long actingUserId, String domain) {
-        Long domainId = domainService.requireByName(domain).getId();
+    public void removeFlag(Long flagId, Long actingUserId, DomainRef domain) {
+        Long domainId = domain.id();
         PostFlag flag = postFlagRepository.findById(flagId)
                 .filter(f -> f.getDeletedAt() == null && f.getDomainId().equals(domainId))
-                .orElseThrow(() -> EntityNotFoundException.of("PostFlag", flagId));
+                .orElseThrow(() -> NotFoundException.of("PostFlag", flagId));
 
         Post post = postRepository.findByIdAndDomainIdAndDeletedAtIsNull(flag.getPostId(), domainId)
-                .orElseThrow(() -> EntityNotFoundException.of("Post", flag.getPostId()));
+                .orElseThrow(() -> NotFoundException.of("Post", flag.getPostId()));
 
         if (!post.getUserId().equals(actingUserId)) {
             throw new ForbiddenOperationException(
@@ -78,6 +76,6 @@ public class PostFlagService {
 
     private void requireActivePost(Long postId, Long domainId) {
         postRepository.findByIdAndDomainIdAndDeletedAtIsNull(postId, domainId)
-                .orElseThrow(() -> EntityNotFoundException.of("Post", postId));
+                .orElseThrow(() -> NotFoundException.of("Post", postId));
     }
 }

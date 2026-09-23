@@ -1,15 +1,16 @@
 package com.jp.projects.posts.mapper;
 
 import com.jp.projects.posts.dto.postflag.PostFlagResponse;
-import com.jp.projects.posts.dto.posttype.PostTypeResponse;
 import com.jp.projects.posts.entity.PostFlag;
-import com.jp.projects.posts.entity.PostType;
 import org.mapstruct.Mapper;
 
-@Mapper(componentModel = "spring")
+/**
+ * Maps the nested {@code postType} through {@link PostTypeMapper} rather
+ * than a second {@code toResponse} overload of its own — that overload was
+ * the only reason {@code PostTypeService} injected this flag mapper.
+ */
+@Mapper(componentModel = "spring", uses = PostTypeMapper.class)
 public interface PostFlagMapper {
 
     PostFlagResponse toResponse(PostFlag postFlag);
-
-    PostTypeResponse toResponse(PostType postType);
 }

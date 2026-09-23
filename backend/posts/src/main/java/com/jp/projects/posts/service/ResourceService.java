@@ -5,7 +5,7 @@ import com.jp.projects.posts.dto.resource.ResourceFlagSummaryEntry;
 import com.jp.projects.posts.dto.resource.ResourceResponse;
 import com.jp.projects.posts.entity.Resource;
 import com.jp.projects.posts.entity.ResourceCategory;
-import com.jp.projects.posts.exception.EntityNotFoundException;
+import com.jp.projects.posts.exception.NotFoundException;
 import com.jp.projects.posts.mapper.ResourceMapper;
 import com.jp.projects.posts.repository.PostFlagRepository;
 import com.jp.projects.posts.repository.PostRepository;
@@ -31,18 +31,17 @@ public class ResourceService {
     private final PostRepository postRepository;
     private final PostFlagRepository postFlagRepository;
     private final ResourceMapper resourceMapper;
-    private final DomainService domainService;
 
     @Transactional
-    public ResourceResponse create(ResourceCreateRequest request, String domain) {
-        Long domainId = domainService.requireByName(domain).getId();
+    public ResourceResponse create(ResourceCreateRequest request, DomainRef domain) {
+        Long domainId = domain.id();
 
         // Must be a real lookup (not getReferenceById) because it also
         // proves the category belongs to this domain — resource.domainId
         // is derived from it, not client-supplied (design-spec.md §4.3).
         ResourceCategory category = resourceCategoryRepository
                 .findByIdAndDomainId(request.categoryId(), domainId)
-                .orElseThrow(() -> EntityNotFoundException.of("ResourceCategory", request.categoryId()));
+                .orElseThrow(() -> NotFoundException.of("ResourceCategory", request.categoryId()));
 
         // No pre-check on `name` uniqueness — that would be a race-prone
         // check-then-insert. The DB's unique constraint is the source of
@@ -58,7 +57,7 @@ public class ResourceService {
         return resourceMapper.toResponse(resourceRepository.save(resource));
     }
 
-    public ResourceResponse get(Long id, String domain) {
+    public ResourceResponse get(Long id, DomainRef domain) {
         Resource resource = getActive(id, domain);
         List<Long> resourceIds = List.of(id);
 
@@ -75,9 +74,8 @@ public class ResourceService {
                 flagSummaryByResourceId.getOrDefault(id, List.of()));
     }
 
-    public Page<ResourceResponse> list(Long categoryId, String search, String domain, Pageable pageable) {
-        Long domainId = domainService.requireByName(domain).getId();
-        Page<Resource> resources = resourceRepository.search(domainId, categoryId, escapeLikePattern(search), pageable);
+    public Page<ResourceResponse> list(Long categoryId, String search, DomainRef domain, Pageable pageable) {
+        Page<Resource> resources = resourceRepository.searchByDisplayName(domain.id(), categoryId, search, pageable);
 
         List<Long> resourceIds = resources.getContent().stream().map(Resource::getId).toList();
         Map<Long, Long> postCountByResourceId = postCountByResourceId(resourceIds);
@@ -109,35 +107,13 @@ public class ResourceService {
     }
 
     @Transactional
-    public void softDelete(Long id, String domain) {
+    public void softDelete(Long id, DomainRef domain) {
         Resource resource = getActive(id, domain);
         resource.setDeletedAt(Instant.now());
     }
 
-    private Resource getActive(Long id, String domain) {
-        Long domainId = domainService.requireByName(domain).getId();
-        return resourceRepository.findByIdAndDomainIdAndDeletedAtIsNull(id, domainId)
-                .orElseThrow(() -> EntityNotFoundException.of("Resource", id));
-    }
-
-    /**
-     * Escapes LIKE metacharacters ({@code \}, {@code %}, {@code _}) in a
-     * user-supplied search term before it's wrapped in {@code %...%} and
-     * bound into {@link ResourceRepository#search}'s query. Without this, a
-     * literal {@code %} or {@code _} in someone's search text would act as
-     * an unintended wildcard (e.g. searching for "50%" would match any
-     * title containing "50" followed by anything) rather than being
-     * matched literally — not SQL-injectable either way (the value is
-     * always a bind parameter), just a correctness/hardening fix so the
-     * search behaves as a plain substring match.
-     */
-    private static String escapeLikePattern(String search) {
-        if (search == null) {
-            return null;
-        }
-        return search
-                .replace("\\", "\\\\")
-                .replace("%", "\\%")
-                .replace("_", "\\_");
+    private Resource getActive(Long id, DomainRef domain) {
+        return resourceRepository.findByIdAndDomainIdAndDeletedAtIsNull(id, domain.id())
+                .orElseThrow(() -> NotFoundException.of("Resource", id));
     }
 }

@@ -11,8 +11,9 @@ import com.jp.projects.posts.dto.postflag.PostFlagResponse;
 import com.jp.projects.posts.entity.AppUser;
 import com.jp.projects.posts.entity.Post;
 import com.jp.projects.posts.entity.Resource;
-import com.jp.projects.posts.exception.EntityNotFoundException;
 import com.jp.projects.posts.exception.ForbiddenOperationException;
+import com.jp.projects.posts.exception.InvalidRequestException;
+import com.jp.projects.posts.exception.NotFoundException;
 import com.jp.projects.posts.mapper.PostFlagMapper;
 import com.jp.projects.posts.mapper.PostMapper;
 import com.jp.projects.posts.repository.AppUserRepository;
@@ -40,7 +41,6 @@ public class PostService {
     private final PostFlagRepository postFlagRepository;
     private final PostMapper postMapper;
     private final PostFlagMapper postFlagMapper;
-    private final DomainService domainService;
 
     /**
      * Unified creation entry point: a top-level post when
@@ -52,14 +52,14 @@ public class PostService {
      * a flag is applied to the new post in the same transaction.
      */
     @Transactional
-    public PostCreateResponse createPost(PostCreateRequest request, String domain) {
+    public PostCreateResponse createPost(PostCreateRequest request, DomainRef domain) {
         if ((request.postTypeId() == null) != (request.score() == null)) {
-            throw new IllegalArgumentException("postTypeId and score must be provided together");
+            throw new InvalidRequestException("postTypeId and score must be provided together");
         }
-        Long domainId = domainService.requireByName(domain).getId();
+        Long domainId = domain.id();
 
         AppUser author = appUserRepository.findByDomainIdAndUsername(domainId, request.username())
-                .orElseThrow(() -> new EntityNotFoundException(
+                .orElseThrow(() -> new NotFoundException(
                         "AppUser with username '" + request.username() + "' not found"));
 
         Long effectiveResourceId;
@@ -68,7 +68,7 @@ public class PostService {
             effectiveResourceId = parent.getResourceId();
         } else {
             resourceRepository.findByIdAndDomainIdAndDeletedAtIsNull(request.resourceId(), domainId)
-                    .orElseThrow(() -> EntityNotFoundException.of("Resource", request.resourceId()));
+                    .orElseThrow(() -> NotFoundException.of("Resource", request.resourceId()));
             effectiveResourceId = request.resourceId();
         }
 
@@ -83,20 +83,25 @@ public class PostService {
                 .build();
         post = postRepository.save(post);
 
+        // Map before flagging, not after: addOrUpdateFlag's upsert is a
+        // @Modifying query with clearAutomatically = true, which detaches
+        // `post` from the persistence context.
+        PostResponse postResponse = postMapper.toResponse(post);
+
         PostFlagResponse flag = null;
         if (request.postTypeId() != null) {
             flag = postFlagService.addOrUpdateFlag(post.getId(),
                     new PostFlagCreateRequest(author.getId(), request.postTypeId(), request.score()), domain);
         }
 
-        return new PostCreateResponse(postMapper.toResponse(post), flag);
+        return new PostCreateResponse(postResponse, flag);
     }
 
     @Transactional
-    public PostResponse createTopLevelPost(Long resourceId, TopLevelPostCreateRequest request, String domain) {
-        Long domainId = domainService.requireByName(domain).getId();
+    public PostResponse createTopLevelPost(Long resourceId, TopLevelPostCreateRequest request, DomainRef domain) {
+        Long domainId = domain.id();
         resourceRepository.findByIdAndDomainIdAndDeletedAtIsNull(resourceId, domainId)
-                .orElseThrow(() -> EntityNotFoundException.of("Resource", resourceId));
+                .orElseThrow(() -> NotFoundException.of("Resource", resourceId));
         AppUser author = requireUserInDomain(request.userId(), domainId);
 
         Post post = Post.builder()
@@ -112,8 +117,8 @@ public class PostService {
     }
 
     @Transactional
-    public PostResponse createReply(Long parentPostId, ReplyCreateRequest request, String domain) {
-        Long domainId = domainService.requireByName(domain).getId();
+    public PostResponse createReply(Long parentPostId, ReplyCreateRequest request, DomainRef domain) {
+        Long domainId = domain.id();
         Post parent = getActive(parentPostId, domainId);
         AppUser author = requireUserInDomain(request.userId(), domainId);
 
@@ -131,42 +136,45 @@ public class PostService {
         return postMapper.toResponse(postRepository.save(reply));
     }
 
-    public PostResponse get(Long postId, String domain) {
-        Long domainId = domainService.requireByName(domain).getId();
-        return postMapper.toResponse(getActive(postId, domainId));
+    public PostResponse get(Long postId, DomainRef domain) {
+        return postMapper.toResponse(getActive(postId, domain.id()));
     }
 
-    public Page<PostResponse> listTopLevel(Long resourceId, String domain, Pageable pageable) {
-        Long domainId = domainService.requireByName(domain).getId();
+    public Page<PostResponse> listTopLevel(Long resourceId, DomainRef domain, Pageable pageable) {
+        Long domainId = domain.id();
         resourceRepository.findByIdAndDomainIdAndDeletedAtIsNull(resourceId, domainId)
-                .orElseThrow(() -> EntityNotFoundException.of("Resource", resourceId));
-        return mapWithFlags(postRepository
-                .findByDomainIdAndResourceIdAndParentPostIdIsNullAndDeletedAtIsNull(domainId, resourceId, pageable));
+                .orElseThrow(() -> NotFoundException.of("Resource", resourceId));
+        return toResponsePage(postRepository
+                .findByDomainIdAndResourceIdAndParentPostIdIsNullAndDeletedAtIsNull(domainId, resourceId, pageable),
+                domainId);
     }
 
-    public Page<PostResponse> listReplies(Long parentPostId, String domain, Pageable pageable) {
-        Long domainId = domainService.requireByName(domain).getId();
+    public Page<PostResponse> listReplies(Long parentPostId, DomainRef domain, Pageable pageable) {
+        Long domainId = domain.id();
         getActive(parentPostId, domainId);
-        return mapWithFlags(postRepository
-                .findByDomainIdAndParentPostIdAndDeletedAtIsNull(domainId, parentPostId, pageable));
+        return toResponsePage(postRepository
+                .findByDomainIdAndParentPostIdAndDeletedAtIsNull(domainId, parentPostId, pageable), domainId);
     }
 
     /** All posts (top-level + replies) authored by a user — design-spec.md §3.4. */
-    public Page<PostResponse> listByUser(Long userId, String domain, Pageable pageable) {
-        Long domainId = domainService.requireByName(domain).getId();
+    public Page<PostResponse> listByUser(Long userId, DomainRef domain, Pageable pageable) {
+        Long domainId = domain.id();
         requireUserInDomain(userId, domainId);
-        return mapWithFlags(postRepository
-                .findByDomainIdAndUserIdAndDeletedAtIsNull(domainId, userId, pageable));
+        return toResponsePage(postRepository
+                .findByDomainIdAndUserIdAndDeletedAtIsNull(domainId, userId, pageable), domainId);
     }
 
     /**
-     * Batch-loads a page's post flags, reply counts, and resource titles in
-     * three queries total (avoiding N+1) and attaches each post's to its
-     * mapped response — list endpoints show a post's category/score, reply
-     * count, and (most usefully for by-user, which spans many resources)
-     * movie title inline; single-post reads/writes don't need any of it.
+     * Turns a page of posts into a page of responses, batch-loading the
+     * three things the list endpoints add on top of a plain post — its
+     * flags, its active reply count, and its resource's title — in three
+     * queries total rather than per row.
+     *
+     * <p>Single-post reads/writes deliberately leave all three unset: the
+     * caller is already on that resource's page. (By-user is the case that
+     * most needs the title, since those posts span many resources.)
      */
-    private Page<PostResponse> mapWithFlags(Page<Post> posts) {
+    private Page<PostResponse> toResponsePage(Page<Post> posts, Long domainId) {
         List<Long> postIds = posts.getContent().stream().map(Post::getId).toList();
         Map<Long, List<PostFlagResponse>> flagsByPostId = postIds.isEmpty()
                 ? Map.of()
@@ -179,9 +187,13 @@ public class PostService {
                         .collect(Collectors.toMap(PostRepository.ReplyCount::getParentPostId,
                                 PostRepository.ReplyCount::getReplyCount));
         List<Long> resourceIds = posts.getContent().stream().map(Post::getResourceId).distinct().toList();
+        // Domain-scoped and soft-delete-filtered like every other resource
+        // lookup in this service. The IDs come from already-domain-scoped
+        // posts so this can't currently narrow the result — it keeps the
+        // invariant local instead of relying on the caller to hold it.
         Map<Long, String> resourceDisplayNameById = resourceIds.isEmpty()
                 ? Map.of()
-                : resourceRepository.findAllById(resourceIds).stream()
+                : resourceRepository.findByIdInAndDomainIdAndDeletedAtIsNull(resourceIds, domainId).stream()
                         .collect(Collectors.toMap(Resource::getId, Resource::getDisplayName));
         return posts.map(post -> postMapper.toResponse(post,
                 flagsByPostId.getOrDefault(post.getId(), List.of()),
@@ -190,9 +202,8 @@ public class PostService {
     }
 
     @Transactional
-    public PostResponse updatePostText(Long postId, PostUpdateRequest request, String domain) {
-        Long domainId = domainService.requireByName(domain).getId();
-        Post post = getActive(postId, domainId);
+    public PostResponse updatePostText(Long postId, PostUpdateRequest request, DomainRef domain) {
+        Post post = getActive(postId, domain.id());
         requireOwner(post, request.userId());
         // Silently overwrites body_text in place — no edit history, per the
         // confirmed decision (design-spec.md §6).
@@ -201,9 +212,8 @@ public class PostService {
     }
 
     @Transactional
-    public void deletePost(Long postId, Long actingUserId, String domain) {
-        Long domainId = domainService.requireByName(domain).getId();
-        Post post = getActive(postId, domainId);
+    public void deletePost(Long postId, Long actingUserId, DomainRef domain) {
+        Post post = getActive(postId, domain.id());
         requireOwner(post, actingUserId);
         // Ownership check and cascade run in the same transaction as the
         // @Modifying query requires an existing one, and a failed cascade
@@ -213,7 +223,7 @@ public class PostService {
 
     private Post getActive(Long postId, Long domainId) {
         return postRepository.findByIdAndDomainIdAndDeletedAtIsNull(postId, domainId)
-                .orElseThrow(() -> EntityNotFoundException.of("Post", postId));
+                .orElseThrow(() -> NotFoundException.of("Post", postId));
     }
 
     /**
@@ -229,7 +239,7 @@ public class PostService {
      */
     private AppUser requireUserInDomain(Long userId, Long domainId) {
         return appUserRepository.findByIdAndDomainId(userId, domainId)
-                .orElseThrow(() -> EntityNotFoundException.of("AppUser", userId));
+                .orElseThrow(() -> NotFoundException.of("AppUser", userId));
     }
 
     private void requireOwner(Post post, Long actingUserId) {

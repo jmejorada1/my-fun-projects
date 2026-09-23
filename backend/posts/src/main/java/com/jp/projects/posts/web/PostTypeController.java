@@ -1,12 +1,12 @@
 package com.jp.projects.posts.web;
 
 import com.jp.projects.posts.dto.posttype.PostTypeResponse;
+import com.jp.projects.posts.service.DomainRef;
 import com.jp.projects.posts.service.PostTypeService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -18,12 +18,12 @@ public class PostTypeController {
     private final PostTypeService postTypeService;
 
     @GetMapping
-    public List<PostTypeResponse> list(@RequestHeader("X-Domain") String domain) {
+    public List<PostTypeResponse> list(@CurrentDomain DomainRef domain) {
         return postTypeService.listAll(domain);
     }
 
     @GetMapping("/{id}")
-    public PostTypeResponse get(@PathVariable Long id, @RequestHeader("X-Domain") String domain) {
+    public PostTypeResponse get(@PathVariable Long id, @CurrentDomain DomainRef domain) {
         return postTypeService.get(id, domain);
     }
 }

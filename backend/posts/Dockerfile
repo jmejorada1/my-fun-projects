@@ -13,7 +13,13 @@ RUN ./mvnw -B clean package -DskipTests
 
 FROM eclipse-temurin:25-jre
 WORKDIR /app
+
+# Run unprivileged (CLAUDE.md, Docker code style). The jar is owned by root
+# and only read by the app, so nothing in /app needs to be writable.
+RUN groupadd --system --gid 1001 spring \
+    && useradd --system --uid 1001 --gid spring --no-create-home spring
 COPY --from=build /app/target/*.jar app.jar
+USER spring:spring
 
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]

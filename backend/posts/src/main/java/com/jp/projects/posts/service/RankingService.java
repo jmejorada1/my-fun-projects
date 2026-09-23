@@ -1,9 +1,9 @@
 package com.jp.projects.posts.service;
 
-import com.jp.projects.posts.dto.posttype.PostTypeResponse;
 import com.jp.projects.posts.dto.ranking.PostTypeRankingResponse;
 import com.jp.projects.posts.dto.ranking.RankedResourceResponse;
 import com.jp.projects.posts.dto.ranking.RankingResourceSummary;
+import com.jp.projects.posts.mapper.PostTypeMapper;
 import com.jp.projects.posts.repository.PostFlagRepository;
 import com.jp.projects.posts.repository.PostTypeRankingRow;
 import com.jp.projects.posts.repository.PostTypeRepository;
@@ -22,15 +22,15 @@ public class RankingService {
 
     private final PostTypeRepository postTypeRepository;
     private final PostFlagRepository postFlagRepository;
-    private final DomainService domainService;
+    private final PostTypeMapper postTypeMapper;
 
     /**
      * design-spec.md §3.5 — one entry per {@code post_type} in the domain
      * (even ones with no flags yet, which get an empty {@code resources}
      * list), each with its top-5 ranked resources.
      */
-    public List<PostTypeRankingResponse> getRankings(String domain) {
-        Long domainId = domainService.requireByName(domain).getId();
+    public List<PostTypeRankingResponse> getRankings(DomainRef domain) {
+        Long domainId = domain.id();
 
         Map<Long, List<PostTypeRankingRow>> rowsByPostType = postFlagRepository
                 .findTopRankedResourcesByPostType(domainId).stream()
@@ -38,7 +38,7 @@ public class RankingService {
 
         return postTypeRepository.findAllByDomainId(domainId).stream()
                 .map(postType -> new PostTypeRankingResponse(
-                        new PostTypeResponse(postType.getId(), postType.getName()),
+                        postTypeMapper.toResponse(postType),
                         rowsByPostType.getOrDefault(postType.getId(), List.of()).stream()
                                 .map(this::toRankedResource)
                                 .toList()))

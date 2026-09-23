@@ -13,11 +13,11 @@ import com.jp.projects.posts.dto.post.PostResponse;
 import com.jp.projects.posts.dto.post.PostUpdateRequest;
 import com.jp.projects.posts.dto.post.ReplyCreateRequest;
 import com.jp.projects.posts.entity.AppUser;
-import com.jp.projects.posts.entity.Domain;
 import com.jp.projects.posts.entity.Post;
 import com.jp.projects.posts.entity.Resource;
-import com.jp.projects.posts.exception.EntityNotFoundException;
 import com.jp.projects.posts.exception.ForbiddenOperationException;
+import com.jp.projects.posts.exception.InvalidRequestException;
+import com.jp.projects.posts.exception.NotFoundException;
 import com.jp.projects.posts.mapper.PostMapper;
 import com.jp.projects.posts.repository.AppUserRepository;
 import com.jp.projects.posts.repository.PostRepository;
@@ -34,7 +34,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class PostServiceTest {
 
     private static final Long DOMAIN_ID = 1L;
-    private static final Domain DOMAIN = Domain.builder().id(DOMAIN_ID).name("imdb").build();
+    // The resolved X-Domain header, supplied by CurrentDomainArgumentResolver
+    // in production. Services no longer look it up themselves, so there is
+    // nothing left to stub per test.
+    private static final DomainRef DOMAIN = new DomainRef(DOMAIN_ID, "imdb");
 
     @Mock
     private PostRepository postRepository;
@@ -46,15 +49,12 @@ class PostServiceTest {
     private PostFlagService postFlagService;
     @Mock
     private PostMapper postMapper;
-    @Mock
-    private DomainService domainService;
 
     @InjectMocks
     private PostService postService;
 
     @Test
     void createReply_derivesResourceIdFromParent_ratherThanClient() {
-        when(domainService.requireByName("imdb")).thenReturn(DOMAIN);
         Post parent = Post.builder().id(1L).domainId(DOMAIN_ID).resourceId(42L).userId(1L).bodyText("root").build();
         when(postRepository.findByIdAndDomainIdAndDeletedAtIsNull(1L, DOMAIN_ID)).thenReturn(Optional.of(parent));
         when(appUserRepository.findByIdAndDomainId(2L, DOMAIN_ID))
@@ -67,7 +67,7 @@ class PostServiceTest {
         });
 
         ReplyCreateRequest request = new ReplyCreateRequest(2L, "a reply", null);
-        PostResponse response = postService.createReply(1L, request, "imdb");
+        PostResponse response = postService.createReply(1L, request, DOMAIN);
 
         assertThat(response.resourceId()).isEqualTo(42L);
         assertThat(response.parentPostId()).isEqualTo(1L);
@@ -76,39 +76,35 @@ class PostServiceTest {
 
     @Test
     void createReply_missingParent_throwsNotFound() {
-        when(domainService.requireByName("imdb")).thenReturn(DOMAIN);
         when(postRepository.findByIdAndDomainIdAndDeletedAtIsNull(99L, DOMAIN_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> postService.createReply(99L, new ReplyCreateRequest(1L, "x", null), "imdb"))
-                .isInstanceOf(EntityNotFoundException.class);
+        assertThatThrownBy(() -> postService.createReply(99L, new ReplyCreateRequest(1L, "x", null), DOMAIN))
+                .isInstanceOf(NotFoundException.class);
     }
 
     @Test
     void updatePostText_wrongUser_throwsForbidden() {
-        when(domainService.requireByName("imdb")).thenReturn(DOMAIN);
         Post post = Post.builder().id(1L).domainId(DOMAIN_ID).resourceId(1L).userId(1L).bodyText("original").build();
         when(postRepository.findByIdAndDomainIdAndDeletedAtIsNull(1L, DOMAIN_ID)).thenReturn(Optional.of(post));
 
         PostUpdateRequest request = new PostUpdateRequest(999L, "hacked");
 
-        assertThatThrownBy(() -> postService.updatePostText(1L, request, "imdb"))
+        assertThatThrownBy(() -> postService.updatePostText(1L, request, DOMAIN))
                 .isInstanceOf(ForbiddenOperationException.class);
     }
 
     @Test
     void deletePost_ownerVerified_cascadesToSubtree() {
-        when(domainService.requireByName("imdb")).thenReturn(DOMAIN);
         Post post = Post.builder().id(1L).domainId(DOMAIN_ID).resourceId(1L).userId(1L).bodyText("root").build();
         when(postRepository.findByIdAndDomainIdAndDeletedAtIsNull(1L, DOMAIN_ID)).thenReturn(Optional.of(post));
 
-        postService.deletePost(1L, 1L, "imdb");
+        postService.deletePost(1L, 1L, DOMAIN);
 
         verify(postRepository).softDeleteSubtree(eq(1L));
     }
 
     @Test
     void createPost_topLevel_resolvesAuthorByUsername() {
-        when(domainService.requireByName("imdb")).thenReturn(DOMAIN);
         AppUser author = AppUser.builder().id(7L).domainId(DOMAIN_ID).username("jdoe").build();
         when(appUserRepository.findByDomainIdAndUsername(DOMAIN_ID, "jdoe")).thenReturn(Optional.of(author));
         when(resourceRepository.findByIdAndDomainIdAndDeletedAtIsNull(5L, DOMAIN_ID))
@@ -121,7 +117,7 @@ class PostServiceTest {
         });
 
         PostCreateRequest request = new PostCreateRequest("jdoe", 5L, null, "hello", null, null, null);
-        PostCreateResponse response = postService.createPost(request, "imdb");
+        PostCreateResponse response = postService.createPost(request, DOMAIN);
 
         assertThat(response.post().userId()).isEqualTo(7L);
         assertThat(response.post().username()).isEqualTo("jdoe");
@@ -131,7 +127,6 @@ class PostServiceTest {
 
     @Test
     void createPost_withParent_derivesResourceIdAndIgnoresClientValue() {
-        when(domainService.requireByName("imdb")).thenReturn(DOMAIN);
         AppUser author = AppUser.builder().id(7L).domainId(DOMAIN_ID).username("jdoe").build();
         when(appUserRepository.findByDomainIdAndUsername(DOMAIN_ID, "jdoe")).thenReturn(Optional.of(author));
         Post parent = Post.builder().id(3L).domainId(DOMAIN_ID).resourceId(42L).userId(1L).bodyText("root").build();
@@ -145,28 +140,27 @@ class PostServiceTest {
 
         // resourceId=999 deliberately wrong/stale — should be ignored in favor of the parent's
         PostCreateRequest request = new PostCreateRequest("jdoe", 999L, 3L, "a reply", null, null, null);
-        PostCreateResponse response = postService.createPost(request, "imdb");
+        PostCreateResponse response = postService.createPost(request, DOMAIN);
 
         assertThat(response.post().resourceId()).isEqualTo(42L);
         assertThat(response.post().parentPostId()).isEqualTo(3L);
     }
 
     @Test
-    void createPost_postTypeWithoutScore_throwsIllegalArgument() {
+    void createPost_postTypeWithoutScore_throwsInvalidRequest() {
         PostCreateRequest request = new PostCreateRequest("jdoe", 5L, null, "hello", 1L, null, null);
 
-        assertThatThrownBy(() -> postService.createPost(request, "imdb"))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> postService.createPost(request, DOMAIN))
+                .isInstanceOf(InvalidRequestException.class);
     }
 
     @Test
     void createPost_unknownUsername_throwsNotFound() {
-        when(domainService.requireByName("imdb")).thenReturn(DOMAIN);
         when(appUserRepository.findByDomainIdAndUsername(DOMAIN_ID, "ghost")).thenReturn(Optional.empty());
 
         PostCreateRequest request = new PostCreateRequest("ghost", 5L, null, "hello", null, null, null);
 
-        assertThatThrownBy(() -> postService.createPost(request, "imdb"))
-                .isInstanceOf(EntityNotFoundException.class);
+        assertThatThrownBy(() -> postService.createPost(request, DOMAIN))
+                .isInstanceOf(NotFoundException.class);
     }
 }

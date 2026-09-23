@@ -21,8 +21,6 @@ public interface PostFlagRepository extends JpaRepository<PostFlag, Long> {
     @Query("SELECT pf FROM PostFlag pf JOIN FETCH pf.postType WHERE pf.postId IN :postIds AND pf.deletedAt IS NULL")
     List<PostFlag> findByPostIdInAndDeletedAtIsNull(@Param("postIds") Collection<Long> postIds);
 
-    boolean existsByPostIdAndPostTypeIdAndDeletedAtIsNull(Long postId, Long postTypeId);
-
     Optional<PostFlag> findByPostIdAndPostTypeIdAndDeletedAtIsNull(Long postId, Long postTypeId);
 
     /**
@@ -45,16 +43,6 @@ public interface PostFlagRepository extends JpaRepository<PostFlag, Long> {
                            @Param("score") Short score,
                            @Param("domainId") Long domainId);
 
-    /**
-     * Backs {@code GET /rankings} (design-spec.md §3.5): for each
-     * {@code post_type} in the domain, the 5 resources with the highest
-     * average score among their active flags of that type. Flags on a
-     * soft-deleted post, and soft-deleted resources, are excluded —
-     * consistent with the rest of the API's {@code deletedAt} filtering.
-     * Ranks with a window function (unavailable in JPQL), hence native SQL;
-     * results are grouped by post type in {@code RankingService}, which
-     * also fills in post types with zero flags (absent here entirely).
-     */
     /**
      * Batch variant for a page of search results: each resource's active
      * flags grouped by category, with an average score and count per
@@ -81,6 +69,19 @@ public interface PostFlagRepository extends JpaRepository<PostFlag, Long> {
         Long getFlagCount();
     }
 
+    /**
+     * Backs {@code GET /rankings} (design-spec.md §3.5): for each
+     * {@code post_type} in the domain, the 5 resources with the highest
+     * average score among their active flags of that type. Flags on a
+     * soft-deleted post, and soft-deleted resources, are excluded —
+     * consistent with the rest of the API's {@code deletedAt} filtering.
+     * Ranks with a window function (unavailable in JPQL), hence native SQL;
+     * results are grouped by post type in {@code RankingService}, which
+     * also fills in post types with zero flags (absent here entirely).
+     *
+     * <p>Backed by {@code idx_post_flag_rankings}
+     * ({@code V18__add_search_and_ranking_indexes.sql}).
+     */
     @Query(value = """
         WITH scored AS (
             SELECT

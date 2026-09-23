@@ -2,6 +2,7 @@ package com.jp.projects.posts.web;
 
 import com.jp.projects.posts.dto.postflag.PostFlagCreateRequest;
 import com.jp.projects.posts.dto.postflag.PostFlagResponse;
+import com.jp.projects.posts.service.DomainRef;
 import com.jp.projects.posts.service.PostFlagService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -29,20 +30,20 @@ public class PostFlagController {
     @ResponseStatus(HttpStatus.OK)
     public PostFlagResponse addOrUpdateFlag(@PathVariable Long postId,
                                              @Valid @RequestBody PostFlagCreateRequest request,
-                                             @RequestHeader("X-Domain") String domain) {
+                                             @CurrentDomain DomainRef domain) {
         return postFlagService.addOrUpdateFlag(postId, request, domain);
     }
 
     @GetMapping
     public List<PostFlagResponse> listActiveFlags(@PathVariable Long postId,
-                                                   @RequestHeader("X-Domain") String domain) {
+                                                   @CurrentDomain DomainRef domain) {
         return postFlagService.listActiveFlags(postId, domain);
     }
 
     @DeleteMapping("/{flagId}")
     public ResponseEntity<Void> removeFlag(@PathVariable Long postId, @PathVariable Long flagId,
                                             @RequestHeader("X-User-Id") Long actingUserId,
-                                            @RequestHeader("X-Domain") String domain) {
+                                            @CurrentDomain DomainRef domain) {
         postFlagService.removeFlag(flagId, actingUserId, domain);
         return ResponseEntity.noContent().build();
     }

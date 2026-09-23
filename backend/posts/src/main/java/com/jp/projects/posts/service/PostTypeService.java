@@ -2,8 +2,8 @@ package com.jp.projects.posts.service;
 
 import com.jp.projects.posts.dto.posttype.PostTypeResponse;
 import com.jp.projects.posts.entity.PostType;
-import com.jp.projects.posts.exception.EntityNotFoundException;
-import com.jp.projects.posts.mapper.PostFlagMapper;
+import com.jp.projects.posts.exception.NotFoundException;
+import com.jp.projects.posts.mapper.PostTypeMapper;
 import com.jp.projects.posts.repository.PostTypeRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -16,20 +16,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class PostTypeService {
 
     private final PostTypeRepository postTypeRepository;
-    private final PostFlagMapper postFlagMapper;
-    private final DomainService domainService;
+    private final PostTypeMapper postTypeMapper;
 
-    public List<PostTypeResponse> listAll(String domain) {
-        Long domainId = domainService.requireByName(domain).getId();
-        return postTypeRepository.findAllByDomainId(domainId).stream()
-                .map(postFlagMapper::toResponse)
+    public List<PostTypeResponse> listAll(DomainRef domain) {
+        return postTypeRepository.findAllByDomainId(domain.id()).stream()
+                .map(postTypeMapper::toResponse)
                 .toList();
     }
 
-    public PostTypeResponse get(Long id, String domain) {
-        Long domainId = domainService.requireByName(domain).getId();
-        PostType postType = postTypeRepository.findByIdAndDomainId(id, domainId)
-                .orElseThrow(() -> EntityNotFoundException.of("PostType", id));
-        return postFlagMapper.toResponse(postType);
+    public PostTypeResponse get(Long id, DomainRef domain) {
+        PostType postType = postTypeRepository.findByIdAndDomainId(id, domain.id())
+                .orElseThrow(() -> NotFoundException.of("PostType", id));
+        return postTypeMapper.toResponse(postType);
     }
 }

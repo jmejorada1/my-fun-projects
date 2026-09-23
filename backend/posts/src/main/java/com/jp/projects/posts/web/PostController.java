@@ -6,6 +6,7 @@ import com.jp.projects.posts.dto.post.PostResponse;
 import com.jp.projects.posts.dto.post.PostUpdateRequest;
 import com.jp.projects.posts.dto.post.ReplyCreateRequest;
 import com.jp.projects.posts.dto.post.TopLevelPostCreateRequest;
+import com.jp.projects.posts.service.DomainRef;
 import com.jp.projects.posts.service.PostService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +41,7 @@ public class PostController {
     @PostMapping("/posts")
     @ResponseStatus(HttpStatus.CREATED)
     public PostCreateResponse createPost(@Valid @RequestBody PostCreateRequest request,
-                                          @RequestHeader("X-Domain") String domain) {
+                                          @CurrentDomain DomainRef domain) {
         return postService.createPost(request, domain);
     }
 
@@ -48,13 +49,13 @@ public class PostController {
     @ResponseStatus(HttpStatus.CREATED)
     public PostResponse createTopLevelPost(@PathVariable Long resourceId,
                                             @Valid @RequestBody TopLevelPostCreateRequest request,
-                                            @RequestHeader("X-Domain") String domain) {
+                                            @CurrentDomain DomainRef domain) {
         return postService.createTopLevelPost(resourceId, request, domain);
     }
 
     @GetMapping("/resources/{resourceId}/posts")
     public Page<PostResponse> listTopLevelPosts(@PathVariable Long resourceId, Pageable pageable,
-                                                 @RequestHeader("X-Domain") String domain) {
+                                                 @CurrentDomain DomainRef domain) {
         return postService.listTopLevel(resourceId, domain, pageable);
     }
 
@@ -62,18 +63,18 @@ public class PostController {
     @ResponseStatus(HttpStatus.CREATED)
     public PostResponse createReply(@PathVariable Long postId,
                                      @Valid @RequestBody ReplyCreateRequest request,
-                                     @RequestHeader("X-Domain") String domain) {
+                                     @CurrentDomain DomainRef domain) {
         return postService.createReply(postId, request, domain);
     }
 
     @GetMapping("/posts/{postId}/replies")
     public Page<PostResponse> listReplies(@PathVariable Long postId, Pageable pageable,
-                                           @RequestHeader("X-Domain") String domain) {
+                                           @CurrentDomain DomainRef domain) {
         return postService.listReplies(postId, domain, pageable);
     }
 
     @GetMapping("/posts/{postId}")
-    public PostResponse get(@PathVariable Long postId, @RequestHeader("X-Domain") String domain) {
+    public PostResponse get(@PathVariable Long postId, @CurrentDomain DomainRef domain) {
         return postService.get(postId, domain);
     }
 
@@ -82,19 +83,19 @@ public class PostController {
     public Page<PostResponse> listByUser(@PathVariable Long userId,
                                           @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC)
                                           Pageable pageable,
-                                          @RequestHeader("X-Domain") String domain) {
+                                          @CurrentDomain DomainRef domain) {
         return postService.listByUser(userId, domain, pageable);
     }
 
     @PatchMapping("/posts/{postId}")
     public PostResponse update(@PathVariable Long postId, @Valid @RequestBody PostUpdateRequest request,
-                                @RequestHeader("X-Domain") String domain) {
+                                @CurrentDomain DomainRef domain) {
         return postService.updatePostText(postId, request, domain);
     }
 
     @DeleteMapping("/posts/{postId}")
     public ResponseEntity<Void> delete(@PathVariable Long postId, @RequestHeader("X-User-Id") Long actingUserId,
-                                        @RequestHeader("X-Domain") String domain) {
+                                        @CurrentDomain DomainRef domain) {
         postService.deletePost(postId, actingUserId, domain);
         return ResponseEntity.noContent().build();
     }

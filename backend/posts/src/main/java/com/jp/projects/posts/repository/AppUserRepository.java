@@ -9,8 +9,6 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
     Optional<AppUser> findByDomainIdAndUsername(Long domainId, String username);
 
-    Optional<AppUser> findByDomainIdAndEmail(Long domainId, String email);
-
     Optional<AppUser> findByIdAndDomainId(Long id, Long domainId);
 
     List<AppUser> findAllByDomainId(Long domainId);
