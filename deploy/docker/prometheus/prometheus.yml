@@ -1,0 +1,12 @@
+# Local/docker-compose scrape config. `posts:8081` resolves over the
+# compose network only — that port is never published to the host (see
+# docker-compose.yml and backend/posts/src/main/resources/application.yml).
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: posts
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["posts:8081"]
