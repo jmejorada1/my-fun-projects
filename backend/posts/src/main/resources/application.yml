@@ -31,6 +31,52 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+management:
+  server:
+    # Actuator gets its own port, never server.port — kept out of
+    # docker-compose.yml's published ports entirely (see root README's
+    # "Metrics & Monitoring"), reachable only from other containers on the
+    # compose network (the `prometheus` service). Spring Security's
+    # actuator auto-config only kicks in when this port is the SAME as
+    # server.port; on a different port it backs off completely, so this
+    # network boundary — not SecurityConfig's placeholder permitAll, which
+    # doesn't apply here either way — is the actual protection. Don't bind
+    # this to 127.0.0.1: in Docker each service is its own network
+    # namespace, so loopback would block the prometheus container too, not
+    # just the outside world.
+    port: 8081
+  endpoints:
+    web:
+      exposure:
+        # Explicit allow-list, not "*". Never add env/beans/heapdump/
+        # threaddump this way — they leak config values and heap contents,
+        # and this port has no auth in front of it (see above).
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        # Exposes /actuator/health/liveness and /readiness even outside
+        # Kubernetes (they're auto-created but hidden by default unless
+        # Boot detects a k8s environment) — deploy/kubernetes is a stated
+        # future goal, so these are already in place for it.
+        enabled: true
+  metrics:
+    tags:
+      # Tags every metric so Prometheus queries stay correct once a second
+      # service (or a second instance of this one) is scraped into the
+      # same Prometheus.
+      application: ${spring.application.name}
+    distribution:
+      # Server-side histogram buckets, not client-computed percentiles —
+      # only buckets aggregate correctly across instances in
+      # histogram_quantile() queries; percentiles computed in-process
+      # don't average/sum meaningfully across replicas.
+      percentiles-histogram:
+        http.server.requests: true
+      slo:
+        http.server.requests: 50ms,100ms,200ms,400ms,800ms,1s,2s,5s
+
 app:
   cors:
     # frontend/imdb-ui-angular/docs/design-spec.md §3.7. Comma-separated;

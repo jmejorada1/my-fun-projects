@@ -247,8 +247,12 @@ here since it's a separate component with its own local-run concerns.
 - **Port `8080` already in use** — another process (possibly the
   Dockerized `posts` container, if it's also running) is bound to it.
   Either stop it, or override this app's port:
-  `SERVER_PORT=8081 ./mvnw spring-boot:run` — remember to point any
-  frontend you're testing against at the new port.
+  `SERVER_PORT=8082 ./mvnw spring-boot:run` — remember to point any
+  frontend you're testing against at the new port. Don't use `8081` for
+  this — that's the Actuator/Micrometer management port
+  (`application.yml`'s `management.server.port`,
+  [`observability.md`](./observability.md)), already listening
+  separately; setting `SERVER_PORT=8081` would collide with it.
 - **CORS errors from a browser-based frontend** — confirm
   `app.cors.allowed-origins` (or `APP_CORS_ALLOWED_ORIGINS`) includes the
   exact origin the frontend is served from, including port ([§3](#3-connection-configuration)).

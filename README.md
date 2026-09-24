@@ -11,7 +11,9 @@
 start exploring in minutes.**
 
 See also: [OVERALL-ARCHITECTURE.md](OVERALL-ARCHITECTURE.md) — container
-topology, the pluggable domain model, and AWS deployment notes.
+topology, the pluggable domain model, and AWS deployment notes;
+[MONITORING-ARCHITECTURE.md](MONITORING-ARCHITECTURE.md) — how the
+Micrometer/Prometheus/Grafana metrics pipeline works end to end.
 
 A domain-partitioned discussion platform: users post about catalog items
 and reply in threaded comments, with each **domain** defining its own
@@ -102,7 +104,9 @@ services actually pick those values up varies:
   different ones instead. (Postgres is published on `5433`, not `5432` —
   also a `POSTGRES_PORT`-overridable default — specifically so it *doesn't*
   need to fight a local Postgres install; a pgAdmin session pointed at your
-  own local database is fine to leave running.)
+  own local database is fine to leave running.) Prometheus and Grafana
+  (below) publish on `9090`/`3000` — also `.env`-overridable
+  (`PROMETHEUS_PORT`/`GRAFANA_PORT`).
 - **Nothing else to download** — `imdb-loader`/`bigotry-loader`/
   `standard-loader` (below) run against a 5000-row sample of IMDB's
   `title.basics.tsv` checked into the
@@ -122,7 +126,8 @@ services actually pick those values up varies:
    collided port with a specific fix instead of a raw Docker error — then,
    if that passes, `docker compose build` followed by `docker compose up`,
    which builds and starts `postgres`, `posts` (runs its Flyway migrations
-   automatically on boot), and `frontend`. Any arguments you pass are
+   automatically on boot), `frontend`, and the `prometheus`/`grafana`
+   monitoring pair (see "Metrics & Monitoring" below). Any arguments you pass are
    forwarded to that `up` command, e.g. `./scripts/docker-run.sh -d` to run
    detached, or `./scripts/docker-run.sh posts` to start just one service.
 
@@ -155,6 +160,9 @@ services actually pick those values up varies:
 
    - Frontend: <http://localhost:4200>
    - API / Swagger UI: <http://localhost:8080/swagger-ui.html>
+   - Grafana: <http://localhost:3000> (`admin` / `admin` by default — see
+     "Metrics & Monitoring" below)
+   - Prometheus: <http://localhost:9090>
 
 3. Stop the app:
 
@@ -322,3 +330,44 @@ batch on top of what's already there.
 # or, without the precheck:
 docker compose build <service-name> && docker compose up <service-name>
 ```
+
+## Metrics & Monitoring
+
+`posts` is instrumented with [Micrometer](https://micrometer.io) via Spring
+Boot Actuator, exporting in Prometheus format. The `prometheus` and
+`grafana` services in `docker-compose.yml` start alongside the rest of the
+stack (no separate command needed) and come pre-wired end to end:
+
+- **Grafana** — <http://localhost:3000>, `admin` / `admin` by default
+  (change via `GRAFANA_ADMIN_PASSWORD` in `.env` before running this
+  anywhere reachable outside your own machine). A "posts — JVM & HTTP
+  overview" dashboard is auto-provisioned
+  ([`deploy/docker/grafana/provisioning/`](deploy/docker/grafana/provisioning/))
+  with HTTP request rate/latency/error-rate, JVM heap, GC pause time, and
+  HikariCP pool panels — nothing to click through manually.
+- **Prometheus** — <http://localhost:9090>, scraping `posts` every 15s
+  ([`deploy/docker/prometheus/prometheus.yml`](deploy/docker/prometheus/prometheus.yml)).
+  Useful for ad hoc PromQL without going through a dashboard.
+- **`posts` itself** exposes `/actuator/health`, `/actuator/info`, and
+  `/actuator/prometheus` on its own port (`application.yml`'s
+  `management.server.port`, `8081`) — deliberately **not** published to
+  the host in `docker-compose.yml`. It's reachable from `prometheus` over
+  the internal compose network, and nowhere else; that network boundary,
+  not application-level auth (`posts`' `SecurityConfig` doesn't cover this
+  port either way), is what keeps it from being just another open
+  endpoint. See
+  [`backend/posts/docs/architecture.md` §9.5](backend/posts/docs/architecture.md#95-observability)
+  for the full rationale, including why it isn't bound to `127.0.0.1`
+  either.
+
+For how to actually use any of this day to day (querying, adding your own
+metrics, editing the dashboard), see
+[`backend/posts/docs/observability.md`](backend/posts/docs/observability.md).
+For how the whole pipeline is wired together mechanically — what talks to
+what, and why — see [`MONITORING-ARCHITECTURE.md`](MONITORING-ARCHITECTURE.md).
+
+Running `posts` outside Docker (`./mvnw spring-boot:run`,
+[`running-locally.md`](backend/posts/docs/running-locally.md))? The
+management port is still `8081`, just on `localhost` this time:
+<http://localhost:8081/actuator/health>. Point a locally-run Prometheus at
+`localhost:8081` instead of `posts:8081` if you want to scrape it that way.

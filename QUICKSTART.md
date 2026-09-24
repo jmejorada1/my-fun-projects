@@ -12,8 +12,9 @@ system design behind all this, see
   uses Compose v2 syntax (`docker compose`, no hyphen).
 - **A Unix-like shell** — the setup scripts are bash. Native on
   macOS/Linux; use WSL2 on Windows.
-- Ports **4200**, **8080**, and **5433** free on the host (overridable
-  via `.env` — see [`.env.example`](.env.example)).
+- Ports **4200**, **8080**, **5433**, **9090** (Prometheus), and **3000**
+  (Grafana) free on the host (overridable via `.env` — see
+  [`.env.example`](.env.example)).
 - About **1 GB** of free disk for the built images.
 
 **Tested on:** MacBook Pro 16" 2019 (Intel i9-9880H, 8-core/16-thread,
@@ -52,8 +53,17 @@ Once it finishes, open **http://localhost:4200**.
 - For a full, screenshot-driven walkthrough of what to do next, see the
   [Angular UI User Guide](frontend/imdb-ui-angular/docs/user-guide.md).
 
+## Monitoring
+
+- **Grafana** — http://localhost:3000, pre-provisioned with a Prometheus
+  datasource and a starter JVM/HTTP dashboard for `posts` (nothing to
+  click through manually). Log in with `admin` / `admin` (username /
+  password) — overridable via `GRAFANA_ADMIN_PASSWORD` in `.env`.
+- **Prometheus** — http://localhost:9090, no login required.
+
 ## Shut It Down
 
 ```bash
-./scripts/docker-shutdown.sh
+./scripts/docker-shutdown.sh          # stop containers, keep the db volume
+./scripts/docker-shutdown.sh --all    # stop containers, wipe the db volume too
 ```
