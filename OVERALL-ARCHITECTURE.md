@@ -77,10 +77,14 @@ Solid lines run today; dashed lines are planned ([§6](#6-planned-extensions)).
 
 One `docker-compose.yml` at the repo root:
 
-- **Services**: `postgres`, `posts`, `frontend` are long-running, started
-  via `docker compose up`. `imdb-loader`, `bigotry-loader`, and
-  `standard-loader` are one-off jobs under a `tools` compose profile —
-  excluded from `up`, run via `docker compose run --rm <job>`.
+- **Services**: `postgres`, `posts`, `frontend`, `prometheus`, and
+  `grafana` are long-running, started via `docker compose up`.
+  `imdb-loader`, `bigotry-loader`, and `standard-loader` are one-off jobs
+  under a `tools` compose profile — excluded from `up`, run via
+  `docker compose run --rm <job>`. `prometheus` scrapes metrics `posts`
+  exports via Micrometer; `grafana` visualizes what `prometheus` collects
+  — neither is part of the application's request path, both are purely
+  observability. Full pipeline: [`MONITORING-ARCHITECTURE.md`](MONITORING-ARCHITECTURE.md).
 - **Networking**: services reach each other over Compose's internal DNS
   (`posts` connects to `postgres:5432`, never a published port). Only
   human/browser-facing ports (`4200`, `8080`, `postgres` at `5433` for
@@ -122,6 +126,7 @@ Full mechanism and trade-offs: [`backend/posts/docs/architecture.md`](backend/po
 | `frontend/imdb-ui-angular` | SPA for the `imdb/bigotry` and `imdb/standard` domains | [`architecture.md`](frontend/imdb-ui-angular/docs/architecture.md), [`design-spec.md`](frontend/imdb-ui-angular/docs/design-spec.md), [`user-guide.md`](frontend/imdb-ui-angular/docs/user-guide.md) |
 | `backend/imdb-data-python` | One-off IMDB import + mock-data seeding jobs | [`README.md`](backend/imdb-data-python/README.md), [`CLAUDE.md`](backend/imdb-data-python/CLAUDE.md) |
 | Full stack / local dev | Docker Compose usage, ports, env config | [`README.md`](README.md), [`CLAUDE.md`](CLAUDE.md) |
+| Metrics/monitoring (`prometheus`, `grafana`) | Micrometer → Prometheus → Grafana pipeline | [`MONITORING-ARCHITECTURE.md`](MONITORING-ARCHITECTURE.md), [`backend/posts/docs/observability.md`](backend/posts/docs/observability.md) |
 
 ## 5. AWS Deployment Feasibility
 
@@ -138,7 +143,7 @@ flowchart TB
 
     subgraph ECS["ECS Fargate (or EC2/EKS, per step 3 below)"]
         FE["frontend service\nimdb-ui-angular image"]
-        API["posts service\nposts image"]
+        API["posts service\nposts image\n:8080 app + :8081 metrics\n(8081 never ALB-registered)"]
     end
 
     Edge --> FE
@@ -149,6 +154,13 @@ flowchart TB
         Jobs["imdb-loader, bigotry-loader,\nstandard-loader"]
     end
     Jobs -->|JDBC| RDS
+
+    subgraph Obs["Observability (step 7 below)"]
+        AMP["Amazon Managed Prometheus"]
+        AMG["Amazon Managed Grafana"]
+    end
+    API -.->|"scraped, VPC-internal only\n(same as today's posts:8081)"| AMP
+    AMG -.->|PromQL| AMP
 
     ECR["ECR"] -.->|image pull| FE
     ECR -.->|image pull| API
@@ -179,6 +191,20 @@ Migration steps, in the order they'd naturally happen:
      [§6](#6-planned-extensions) is pursued instead of ECS; adds its own
      $0.10/hr control-plane fee on top of whichever of the above runs
      the worker nodes.
+
+   `posts`' task definition declares both container ports (`8080` app,
+   `8081` Micrometer/Actuator — see
+   [`MONITORING-ARCHITECTURE.md` §3](MONITORING-ARCHITECTURE.md#3-the-management-port-split)),
+   but only `8080` is ever registered with the ALB target group —
+   the ECS/Fargate equivalent of `docker-compose.yml` today simply never
+   publishing `8081`. The task definition's own **container health check**
+   (not the ALB's) hits `http://localhost:8081/actuator/health/readiness`
+   directly inside the task's network namespace, reusing the same
+   liveness/readiness probes already enabled for the stated Kubernetes
+   goal in [§6](#6-planned-extensions) — the ALB's target group health
+   check stays on the app port/path as before, so the management port is
+   never involved in traffic routing, only in ECS's own task-health
+   decisions.
 4. **Batch jobs** — run the three loaders as scheduled/on-demand ECS
    tasks (EventBridge Scheduler or manual `RunTask`), mirroring how
    Compose's `tools` profile already keeps them out of the long-running
@@ -192,7 +218,22 @@ Migration steps, in the order they'd naturally happen:
    `SPRING_DATASOURCE_*`, `APP_CORS_ALLOWED_ORIGINS`, `API_BASE_URL`)
    into Secrets Manager / Parameter Store, injected as task-definition
    env vars — same relaxed-binding mechanism, just a different source.
-7. **Deploys** — `cdk deploy` from your own machine already covers
+7. **Observability** — the self-hosted `prometheus`/`grafana` containers
+   ([`MONITORING-ARCHITECTURE.md`](MONITORING-ARCHITECTURE.md)) map onto
+   **Amazon Managed Prometheus (AMP)** and **Amazon Managed Grafana
+   (AMG)**: an AMP scraper (or an ADOT Collector sidecar) pulls from each
+   task's `8081/actuator/prometheus` over the VPC — same pull model, same
+   "never publish the management port" boundary as today, just AWS-managed
+   service discovery instead of Compose DNS. AMG imports
+   [`posts-overview.json`](deploy/docker/grafana/provisioning/dashboards/posts-overview.json)
+   unchanged (it's plain Grafana dashboard JSON) and swaps
+   `GRAFANA_ADMIN_PASSWORD` for IAM/SSO-based login. Simply running
+   `prometheus`/`grafana` as two more ECS tasks (step 3's pattern, unchanged
+   images) is also a legitimate option and cheaper at this app's current
+   scale — it just leaves you managing the TSDB's storage/HA/backups
+   yourself instead of AWS doing it, the same Fargate-vs-EC2-style
+   tradeoff step 3 already makes for compute.
+8. **Deploys** — `cdk deploy` from your own machine already covers
    build, push, and stack/service update in one command, enough for a
    solo deploy. A GitHub Actions workflow (none exists yet, only a PR
    template is checked in) running `cdk deploy` on merge is the natural

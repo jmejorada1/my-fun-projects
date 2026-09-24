@@ -21,6 +21,8 @@ public class SecurityConfig {
 
     // TODO(design-spec.md §6): replace with OAuth2/OIDC resource-server
     // config once an auth mechanism is chosen. Everything is open for now.
+    // Note: this filter chain does not cover actuator endpoints — those run
+    // on a separate management port (docs/architecture.md §9.5).
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http

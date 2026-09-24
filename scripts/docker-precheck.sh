@@ -25,7 +25,7 @@ cd "$ROOT_DIR"
 # the host-side `ports:` entries in docker-compose.yml without hand-editing
 # both places.
 [ -f .env ] && set -o allexport && source .env && set +o allexport
-REQUIRED_PORTS=("${FRONTEND_PORT:-4200}" "${API_PORT:-8080}" "${POSTGRES_PORT:-5433}")
+REQUIRED_PORTS=("${FRONTEND_PORT:-4200}" "${API_PORT:-8080}" "${POSTGRES_PORT:-5433}" "${PROMETHEUS_PORT:-9090}" "${GRAFANA_PORT:-3000}")
 
 FAIL_COUNT=0
 

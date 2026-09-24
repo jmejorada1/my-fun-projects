@@ -42,6 +42,22 @@
 			<artifactId>spring-boot-starter-cache</artifactId>
 		</dependency>
 
+		<!-- Health/info/metrics endpoints + Micrometer's instrumentation
+		     hooks (HTTP, JVM, HikariCP, ...). See application.yml's
+		     `management` block and docs/architecture.md §9.5 for what's
+		     exposed and why it runs on its own port. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+		<!-- Renders Micrometer's metrics in Prometheus's exposition format
+		     at /actuator/prometheus — scraped by the `prometheus` service
+		     in docker-compose.yml. -->
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-registry-prometheus</artifactId>
+		</dependency>
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-flyway</artifactId>
@@ -138,6 +154,17 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+				<executions>
+					<!-- Generates META-INF/build-info.properties (name,
+					     version, build time) so /actuator/info can report
+					     which build is actually running in a given
+					     environment, instead of just "it's up". -->
+					<execution>
+						<goals>
+							<goal>build-info</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>

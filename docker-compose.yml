@@ -43,6 +43,12 @@ services:
       APP_CORS_ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-4200}
     ports:
       - "${API_PORT:-8080}:8080"
+      # Actuator/Micrometer's management port (application.yml) is
+      # deliberately NOT published here — same reasoning as postgres not
+      # exposing every internal detail, taken further: it isn't reachable
+      # from the host at all, only from other containers on this compose
+      # network (prometheus, below). See root README's "Metrics &
+      # Monitoring".
     depends_on:
       postgres:
         condition: service_healthy
@@ -65,6 +71,44 @@ services:
       - "${FRONTEND_PORT:-4200}:80"
     depends_on:
       - posts
+
+  # Scrapes `posts`' /actuator/prometheus every 15s (see
+  # deploy/docker/prometheus/prometheus.yml) over the internal compose
+  # network — `posts:8081` resolves here even though that port is never
+  # published to the host. Pinned to a specific tag, not `latest`, so a
+  # rebuild doesn't silently change what's running.
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    volumes:
+      - ./deploy/docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=15d"
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    depends_on:
+      - posts
+
+  # Pre-provisioned (deploy/docker/grafana/provisioning) with a Prometheus
+  # datasource and a starter JVM/HTTP dashboard for `posts` — nothing to
+  # click through manually on first run. GF_SECURITY_ADMIN_PASSWORD's
+  # `admin` default is fine for local/dev use, same as POSTGRES_PASSWORD
+  # above; set GRAFANA_ADMIN_PASSWORD in .env before this ever runs
+  # anywhere reachable outside your own machine.
+  grafana:
+    image: grafana/grafana:13.2.2
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./deploy/docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    depends_on:
+      - prometheus
 
   # One-off data-load job, not a long-running service — excluded from
   # `docker compose up` via the "tools" profile. Self-contained by default:
@@ -123,3 +167,5 @@ services:
 
 volumes:
   postgres-data:
+  prometheus-data:
+  grafana-data:

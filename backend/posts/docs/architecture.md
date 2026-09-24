@@ -32,6 +32,7 @@ your machine, see [`running-locally.md`](./running-locally.md).
   - [9.2 Security & CORS](#92-security--cors)
   - [9.3 API documentation](#93-api-documentation)
   - [9.4 Auditing](#94-auditing)
+  - [9.5 Observability](#95-observability)
 - [10. Testing Architecture](#10-testing-architecture)
 - [11. Related Documents](#11-related-documents)
 
@@ -483,6 +484,55 @@ JPA auditing (`@CreatedDate`/`@LastModifiedDate`,
 `@EnableJpaAuditing` in `JpaAuditingConfig`) rather than DB defaults alone,
 so the same mechanism applies uniformly regardless of domain.
 
+### 9.5 Observability
+
+[↑ Back to Table of Contents](#table-of-contents)
+
+`spring-boot-starter-actuator` + `micrometer-registry-prometheus`
+(`pom.xml`) instrument HTTP requests, JVM (heap/GC/threads), and the
+HikariCP connection pool out of the box — no custom `MeterBinder`s needed
+for any of that. Root [README.md](../../../README.md)'s "Metrics &
+Monitoring" covers running it via Docker; [`observability.md`](./observability.md)
+covers day-to-day usage (querying, adding metrics, editing the dashboard);
+[`MONITORING-ARCHITECTURE.md`](../../../MONITORING-ARCHITECTURE.md) walks
+the entire pipeline mechanically, end to end. The design decisions worth
+recording here:
+
+- **Actuator runs on its own port** (`management.server.port: 8081` in
+  `application.yml`), never `server.port`. This is what lets it skip
+  `SecurityConfig` entirely — Spring Boot's actuator auto-security only
+  attaches when the management port is the *same* as the app's; on a
+  different port, it backs off, and nothing else in this app secures that
+  port either. That's deliberate, not an oversight: the port is never
+  published in `docker-compose.yml`, reachable only from the `prometheus`
+  container over the compose network, so network isolation is the actual
+  control, not application-level auth. If this ever needs to be reachable
+  from outside the compose network (a real deployment without a sidecar
+  Prometheus, `deploy/kubernetes`'s stated future goal), add either a
+  dedicated `SecurityFilterChain` scoped to the management context or a
+  network-level restriction (security group, NetworkPolicy) before
+  publishing it anywhere.
+- **Not bound to `127.0.0.1`.** Loopback-only binding is the textbook
+  hardening move for a management port, but it doesn't fit this compose
+  topology: each service is its own network namespace, so `posts`
+  binding to its own loopback would block the `prometheus` *container*
+  from reaching it too, not just the outside world. It would fit a
+  Kubernetes pod, where a scraper sidecar shares the pod's network
+  namespace — worth revisiting once `deploy/kubernetes` is real.
+- **Endpoint exposure is an explicit allow-list** (`health,info,prometheus`
+  — not `*`) so a future contributor adding an actuator dependency for
+  something else doesn't accidentally expose `env`, `beans`, or
+  `heapdump`.
+- **`http.server.requests` uses server-side histogram buckets**
+  (`management.metrics.distribution.percentiles-histogram`), not
+  client-computed percentiles — the former aggregate correctly across
+  instances via Prometheus's `histogram_quantile()`, the latter don't.
+  The provisioned Grafana dashboard's latency panels rely on this.
+- **`/actuator/info` reports the actual running build** (name, version,
+  build time) via the `spring-boot-maven-plugin`'s `build-info` goal
+  (`pom.xml`) — cheap to keep current since it's generated at build time,
+  not hand-maintained.
+
 ## 10. Testing Architecture
 
 [↑ Back to Table of Contents](#table-of-contents)
@@ -511,4 +561,6 @@ and the root [`CLAUDE.md`](../../../CLAUDE.md).
 | [`design-spec.md`](./design-spec.md) | Canonical data model: tables, constraints, decision log |
 | [`db-design-spec.md`](./db-design-spec.md) | Plain-language ERD walkthrough |
 | [`running-locally.md`](./running-locally.md) | Running this service on your machine without Docker |
+| [`observability.md`](./observability.md) | Using the metrics stack: dashboards, PromQL, adding your own metrics |
+| [`../../../MONITORING-ARCHITECTURE.md`](../../../MONITORING-ARCHITECTURE.md) | How the Micrometer → Prometheus → Grafana pipeline works and connects, end to end |
 | [`frontend/imdb-ui-angular/docs/architecture.md`](../../../frontend/imdb-ui-angular/docs/architecture.md) | How a domain's *frontend* behavior (rating mode, skin, business rules) is configured |
