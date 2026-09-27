@@ -16,6 +16,7 @@ understand the schema without parsing the diagram syntax directly.
 - [Walking Through Each Relationship](#walking-through-each-relationship)
 - [Domain Scoping](#domain-scoping)
 - [Putting It Together: One Example](#putting-it-together-one-example)
+- [Open Questions](#open-questions)
 
 ## The Diagram
 
@@ -171,10 +172,16 @@ rather than recomputing "is any ancestor deleted" on every read.
 
 **`POST ||--o{ POST_FLAG : carries`**
 A single post can carry multiple flags — for example, one post could be
-flagged as both racist and sexist in the same submission. Each of those
-flags is its own row in `post_flag`, linked back to the post via
-`post_flag.post_id`. This is why type/score isn't stored directly on `post`
-itself: a post needs to support zero, one, or several flags simultaneously.
+flagged as both racist and sexist. Each of those flags is its own row in
+`post_flag`, linked back to the post via `post_flag.post_id`. This is why
+type/score isn't stored directly on `post` itself: a post needs to support
+zero, one, or several flags simultaneously. A post can have at most one
+*active* flag per type (a partial unique index on `(post_id, post_type_id)
+WHERE deleted_at IS NULL`); flagging the same type again updates that
+flag's score. Today the API attaches only one flag per request: `POST
+/posts` takes a single `postTypeId`/`score` pair, and any further flags go
+through `POST /posts/{postId}/flags`. See
+[Open Questions](#open-questions) about creating several flags with the post.
 
 **`POST_TYPE ||--o{ POST_FLAG : classifies`**
 `post_type` is the second small lookup table, holding the fixed set of flag
@@ -225,3 +232,30 @@ Post #2 shows up nested underneath post #1 in the thread, and carries two
 independent severity flags — exactly the shape the diagram describes. Every
 row here — the resource, both posts, and both flags — carries the same
 `domain_id` as "The Room", inherited transitively down the chain.
+
+## Open Questions
+
+[↑ Back to Table of Contents](#table-of-contents)
+
+**Should a post be created with several flags at once?** (deferred)
+The schema already supports several active flags per post (one per type),
+but `POST /posts` accepts only one `postTypeId`/`score` pair. Additional
+flags need separate `POST /posts/{postId}/flags` calls, each in its own
+transaction, so a failure partway leaves the post with only some of its
+flags. If the UI adds a multi-category picker to the create form, the
+options are:
+
+1. **UI only:** call `POST /posts` with the first flag, then
+   `POST /posts/{postId}/flags` for each other one. No backend change, but
+   not atomic, and the UI must handle partial failure.
+2. **UI and API (preferred):** change `PostCreateRequest` to take
+   `flags: [{postTypeId, score}, ...]` and have `createPost` call
+   `addOrUpdateFlag` for each one inside its existing transaction, so the
+   post and all its flags commit or roll back together. Reject duplicate
+   `postTypeId`s in the list, since the upsert would silently merge them.
+
+Product decisions to settle first:
+- Multi-flag applies to `imdb/bigotry` only; `imdb/standard` is a single
+  rating by design.
+- Can `no-bigotry` be combined with `racism`/`sexism`/`lgbtq-phobic` on the
+  same post, or should it be exclusive?

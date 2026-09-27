@@ -34,5 +34,6 @@
 ## Checklist
 
 - [ ] Ran the relevant test suite locally and it passes
+- [ ] `./scripts/quality-gate.sh` passes (≥85% of changed lines covered)
 - [ ] No secrets, credentials, or large data files included
 - [ ] Docs updated if this changes documented behavior

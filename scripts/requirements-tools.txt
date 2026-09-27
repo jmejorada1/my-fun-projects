@@ -1,0 +1,4 @@
+# Python tooling for scripts/quality-gate.sh,
+# installed into the gitignored .venv-tools/ at the repo root on first run.
+-r ../backend/imdb-data-python/requirements-dev.txt
+diff-cover>=10.6,<11

@@ -1,124 +1,68 @@
-# CLAUDE.md
+# CLAUDE.md — posts API
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Spring Boot 4.1 / Java 25, base package `com.jp.projects.posts`,
+PostgreSQL schema `posts`. Fully implemented. Check the code and
+`src/main/resources/db/migration` for current state, not the plan docs.
 
-## Project status
+## Commands (run from `backend/posts`)
 
-Fully implemented, not a scaffold — entities, repositories, services,
-controllers, DTOs/mappers, and Flyway migrations through `V17` all exist
-under `src/main/java` and `src/main/resources/db/migration`. Two domains
-are seeded: `imdb/bigotry` (severity-scored flags) and `imdb/standard` (a
-plain rating, no severity — `V17__seed_imdb_standard_domain.sql`). The
-docs in `docs/` (below) were the original implementation plan and remain
-the canonical data-model reference, but check the actual code/migrations
-for current state rather than assuming the docs are still describing
-something not yet built.
+```bash
+./mvnw clean install
+./mvnw spring-boot:run
+./mvnw test [-Dtest=ClassName[#method]]   # also writes target/site/jacoco/
+```
 
-## Commands
+- **`UnsupportedClassVersionError`** means `JAVA_HOME` is an older JDK.
+  Override it for one command only: `JAVA_HOME=/path/to/jdk-25 ./mvnw test`
+  (`/usr/libexec/java_home -V` lists installed JDKs).
+- **Testcontainers tests** (`PostsApplicationTests`,
+  `PostsFlowIntegrationTest`, `PostFlagRepositoryTest`) can fail with
+  `Previous attempts to find a Docker environment failed` even when
+  `docker info` works. Try `DOCKER_HOST=<socket from docker context ls>`.
+  If that doesn't help, verify against the real stack instead:
+  `docker compose up -d postgres posts`, then
+  `scripts/docker-wait-for-posts.sh`, then `curl` the API or query the DB.
 
-Build/run/test are driven through the Maven wrapper (`./mvnw`), run from
-`posts/`.
+## Code style
 
-- Build: `./mvnw clean install`
-- Run the app: `./mvnw spring-boot:run`
-- Run all tests: `./mvnw test`
-- Run a single test class: `./mvnw test -Dtest=ClassName`
-- Run a single test method: `./mvnw test -Dtest=ClassName#methodName`
+Standard Spring Boot idioms, Lombok for boilerplate, MapStruct for DTO
+mapping. Match the existing package structure.
 
-**Local `JAVA_HOME` may not match this project's Java 25.** If `./mvnw`
-fails with `UnsupportedClassVersionError`, override for the one command
-rather than changing `JAVA_HOME` globally:
-`JAVA_HOME=/path/to/jdk-25 ./mvnw test` (`/usr/libexec/java_home -V` on
-macOS lists installed JDKs).
+## Data model: the docs are the source of truth
 
-**Testcontainers-backed tests (`PostsApplicationTests`,
-`PostsFlowIntegrationTest`, `PostFlagRepositoryTest`) may fail with
-`Previous attempts to find a Docker environment failed` even when the
-`docker` CLI itself works fine** (`docker info` succeeds). Worth trying
-`DOCKER_HOST=<active context's socket>` (`docker context ls`), but not
-guaranteed to fix it. If it doesn't, verify against the real
-`docker compose` stack instead — build and start `postgres`+`posts`,
-wait for Flyway via `../../scripts/docker-wait-for-posts.sh`, then query
-the DB directly or hit the API with `curl`. That path doesn't depend on
-Testcontainers' Docker auto-detection.
+Read these before changing the model, and keep them consistent with the
+code:
+- [`docs/design-spec.md`](docs/design-spec.md): tables, constraints, and
+  the decision log. Check the decision log and
+  [Open Questions](docs/design-spec.md#6-open-questions-not-yet-answered--do-not-build-against-these)
+  first, and record new gaps there in the same format instead of
+  deciding them in code.
+- [`docs/db-design-spec.md`](docs/db-design-spec.md): the ERD, walked
+  through one relationship at a time.
+- [`docs/architecture.md`](docs/architecture.md): request lifecycle, REST
+  surface, and package layout.
+- [`docs/running-locally.md`](docs/running-locally.md): running without
+  Docker.
 
-## Architecture
+Core entities: `domain` partitions everything else. Then `app_user`,
+`resource`, `resource_category` (per domain), `post` (threaded through
+`parent_post_id`), `post_type` (per domain), and `post_flag` (a post can
+carry several flags, each with its own score). `imdb/standard` flags
+always send the same fixed score, so `post_flag.score` stays non-null
+(see the frontend's
+[decision log](../../frontend/imdb-ui-angular/docs/design-spec.md#2-decision-log),
+decision #7).
 
-### Domain model
+Auth is a deliberate placeholder: username-only, no password or token
+([design-spec](docs/design-spec.md#6-open-questions-not-yet-answered--do-not-build-against-these)).
+`APP_CORS_ALLOWED_ORIGINS` and `SPRING_DATASOURCE_URL` override config
+through relaxed binding.
 
-The service lets users post about IMDB titles (movie/TV/short/video game/
-etc.) and reply underneath other posts. Posts can carry flags — what a
-flag *means* is domain-specific: `imdb/bigotry` flags a post with a
-content-type category (`racism`/`sexism`/`lgbtq-phobic`/`no-bigotry`) plus
-a 0–5 severity score; `imdb/standard` flags a post with a plain rating
-category (`skip-it`/`it-was-okay`/`i-enjoyed-it`/`i-loved-it`) and a fixed,
-meaningless score (the frontend always sends the same constant — see
-[`frontend/imdb-ui-angular/docs/design-spec.md`](../../frontend/imdb-ui-angular/docs/design-spec.md)
-§2 decision #7 for why that's the deliberate, no-schema-change approach
-rather than making `post_flag.score` nullable). Core entities: `domain`
-(partitions everything else), `app_user`, `resource`, `resource_category`
-(lookup, seeded per domain from IMDB's `titleType` values), `post`
-(self-referencing via `parent_post_id` for unlimited-depth threaded
-replies), `post_type` (lookup, seeded per domain), `post_flag` (join
-table — a single post can carry multiple type flags, each with its own
-score). Full ERD and relationship-by-relationship rationale:
-[`docs/db-design-spec.md`](docs/db-design-spec.md).
+## Adding a new domain
 
-### Adding a new domain
-
-Follow the pattern in `V14__seed_imdb_bigotry_domain.sql` /
-`V16__seed_no_bigotry_post_type.sql` /
-`V17__seed_imdb_standard_domain.sql`: one migration inserting the
-`domain` row, its `resource_category` rows (the same ten IMDB
-`titleType` values, since `resource_category` is domain-scoped —
-copy, don't share, across domains), and its `post_type` rows. Import
-resources for it via the already-generic `imdb-loader`
-(`docker compose run --rm imdb-loader --domain <name>`) — no code change
-needed there. The frontend side of "add a domain" is a single config file;
-see [`frontend/imdb-ui-angular/docs/architecture.md`](../../frontend/imdb-ui-angular/docs/architecture.md) §4.
-
-### Docs are the source of truth for the data model — read before changing it
-
-`docs/` contains a chain of living specs that must stay consistent with
-each other and with the code:
-
-- [`docs/design-spec.md`](docs/design-spec.md) — the canonical data model:
-  table definitions, constraints, and a running decision log. Every
-  non-obvious modeling choice (soft-delete strategy, threading depth,
-  category taxonomy, cascade behavior, domain scoping) is recorded here
-  with its rationale.
-- [`docs/db-design-spec.md`](docs/db-design-spec.md) — plain-language,
-  relationship-by-relationship narrative walkthrough of the ER diagram,
-  for faster onboarding.
-- [`docs/architecture.md`](docs/architecture.md) — components, request
-  lifecycle, REST API surface, package layout, and how the domain-scoping
-  design is meant to support more than the current IMDB domains.
-- [`docs/running-locally.md`](docs/running-locally.md) — running this
-  service without Docker.
-
-Before changing the data model, check [`design-spec.md`](docs/design-spec.md)'s decision log /
-"Open Questions" section. If you find a gap it doesn't already cover, add
-it using the same decision-log / open-questions format rather than
-deciding silently in code.
-
-### Tech stack specifics
-
-Spring Boot 4.1.1, Java 25, base package `com.jp.projects.posts`,
-PostgreSQL (schema `posts`). `spring-boot-starter-security` is a
-dependency, but auth is intentionally a placeholder ([`design-spec.md`](docs/design-spec.md) §6)
-— username-only login/register, no password/token yet.
-`app.cors.allowed-origins` and `spring.datasource.url` are both
-overridable via env var (`APP_CORS_ALLOWED_ORIGINS`,
-`SPRING_DATASOURCE_URL`) through Spring's relaxed binding, no code change
-needed — see `docker-compose.yml`'s `posts` service and the root
-`CLAUDE.md`/README for how the whole stack's ports are centralized in
-`.env`.
-
-## Working with this repo
-
-Do not guess when requirements, data model details, or design intent are
-unclear or underspecified. Ask a question, or add it as an explicit open
-item in the relevant spec doc under `docs/`, rather than silently picking a
-default. When you notice something worth flagging — a design inconsistency,
-a better approach, a gap between the docs and the code — say so rather than
-staying quiet about it.
+Add one new migration, following `V14`/`V16`/`V17`. It inserts the
+`domain` row, that domain's own copies of the ten IMDB `titleType`
+`resource_category` rows (copied, not shared across domains), and its
+`post_type` rows. Import resources with the generic
+`imdb-loader --domain <name>`. On the frontend, a domain is one config
+file ([architecture](../../frontend/imdb-ui-angular/docs/architecture.md#4-domain-configuration-system)).
