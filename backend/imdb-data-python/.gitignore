@@ -8,3 +8,9 @@ __pycache__/
 # IMDB source data — large downloaded dataset, not project source
 title.basics.tsv
 title.basics.tsv.gz
+
+# Test/coverage output
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
