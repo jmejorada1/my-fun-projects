@@ -35,10 +35,13 @@ effort there beyond noting anything glaring.
    for coverage? Look for missing edge cases from the spec's Test Plan,
    assertion-free tests, over-mocking that tests the mock, and tests
    coupled to implementation details.
-4. **Design:** single responsibility, sensible seams, no speculative
-   abstraction, no clever code where plain code would do, consistency
-   with the surrounding code and the component `CLAUDE.md`. Suggest a
-   concrete simpler alternative whenever you flag something.
+4. **Design**, against the root
+   [Design principles](../../CLAUDE.md#design-principles): single
+   responsibility, sensible seams, no speculative abstraction, no clever
+   code where plain code would do, new code that duplicates an existing
+   helper (name it), and consistency with the surrounding code and the
+   component `CLAUDE.md`. Suggest a concrete simpler alternative whenever
+   you flag something.
 
 Report only findings you can defend with a concrete scenario. No style
 nits that a formatter would handle, and no rewrites motivated by taste.

@@ -65,3 +65,16 @@ does, tell the user and wait. Don't relaunch it yourself.
 - When requirements or design intent are unclear, ask, or record an open
   question in the relevant spec doc. Don't silently pick a default. Point
   out any doc/code inconsistency or better approach you notice.
+
+## Design principles
+
+- **KISS:** the simplest code that fully meets the requirement. Boring
+  over clever: no speculative abstractions, no generic frameworks for one
+  use case, no new libraries without a clear reason.
+- **SOLID, where it pays off:** one responsibility per class, constructor
+  injection, interfaces only at real seams (repositories, external clients).
+- **DRY, by the rule of three:** look for an existing helper, mapper or
+  validator before writing one. Extract shared code once the same logic
+  appears a third time, not before.
+- When these conflict, KISS wins: a little duplication beats the wrong
+  abstraction.

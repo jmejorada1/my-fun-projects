@@ -81,9 +81,9 @@ used on its own (see [section 5](#5-triggering-options)).
 | Agent | Model | Tools | Job |
 |---|---|---|---|
 | [`spec-planner`](.claude/agents/spec-planner.md) | opus | read + write the spec | Reads the requirements, the component `CLAUDE.md`s and the closest existing feature. Writes `spec.md`: requirements traceability, design, security notes, tasks (each with its tests), test plan, **alternatives and recommendations**, and open questions |
-| [`spec-implementer`](.claude/agents/spec-implementer.md) | sonnet | read + edit | Implements one task at a time, **code and tests together**: SOLID applied with judgment, "boring over clever", existing patterns. Works until the quality gate passes. In fix rounds it marks each finding Fixed, Disputed or Deferred |
+| [`spec-implementer`](.claude/agents/spec-implementer.md) | sonnet | read + edit | Implements one task at a time, **code and tests together**, following the root [Design principles](CLAUDE.md#design-principles) (KISS, SOLID, DRY by the rule of three) and existing patterns. Works until the quality gate passes. In fix rounds it marks each finding Fixed, Disputed or Deferred |
 | [`security-auditor`](.claude/agents/security-auditor.md) | opus | **read-only** | Runs the security scan and triages every hit (real, false positive, or pre-existing). Then reviews what scanners can't see: IDOR, cross-domain `X-Domain` leaks, mass assignment, validation gaps, data exposure, security config |
-| [`code-reviewer`](.claude/agents/code-reviewer.md) | opus | **read-only** | Reviews correctness bugs, conformance to the spec's requirements, **test quality** (do tests assert behavior or just add coverage?), and design (simplicity, SOLID, consistency) |
+| [`code-reviewer`](.claude/agents/code-reviewer.md) | opus | **read-only** | Reviews correctness bugs, conformance to the spec's requirements, **test quality** (do tests assert behavior or just add coverage?), and design (simplicity, SOLID, duplication of existing code, consistency) |
 
 Sonnet does the implementing because that stage uses the most tokens and
 is following a detailed, approved spec. Opus handles the judgment-heavy
