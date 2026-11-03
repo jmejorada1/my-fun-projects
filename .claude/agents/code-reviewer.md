@@ -41,7 +41,9 @@ effort there beyond noting anything glaring.
    code where plain code would do, new code that duplicates an existing
    helper (name it), and consistency with the surrounding code and the
    component `CLAUDE.md`. Suggest a concrete simpler alternative whenever
-   you flag something.
+   you flag something. Red flags:
+   - An interface with a single implementation that isn't a repository,
+     mapper or external client.
 
 Report only findings you can defend with a concrete scenario. No style
 nits that a formatter would handle, and no rewrites motivated by taste.
