@@ -25,6 +25,9 @@ describe('RankingsPanelComponent', () => {
   let httpMock: HttpTestingController;
 
   beforeEach(async () => {
+    // Spec files share localStorage (Vitest runs non-isolated), so a domain
+    // or user persisted by another file would otherwise leak in here.
+    localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [RankingsPanelComponent],
       providers: [
