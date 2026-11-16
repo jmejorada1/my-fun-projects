@@ -21,3 +21,6 @@ backend/posts/docs/edit-delete-race-explained.md
 
 # Local k8s overlay patches generated from .env (scripts/lib-k8s.sh)
 deploy/kubernetes/overlays/local/.generated/
+
+# Quiz output from /diff-quiz (.claude/skills/diff-quiz)
+.quizzes/
