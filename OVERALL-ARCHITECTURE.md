@@ -1,5 +1,15 @@
 # Overall Architecture
 
+This app hosts more than one community, each with its own way of rating
+movies, TV shows, and other IMDB titles. Users post about a title and
+reply in threads, and a picker in the UI switches communities. In the
+code, each community is a **domain**. Today there are two:
+
+| Community | Domain | What it's about |
+|---|---|---|
+| **Big-O-Meter** | `imdb/bigotry` | Flags titles for potentially biased content (racism, sexism and LGBTQ+-phobia) and rates how severe each flag is, 0–5. |
+| **Movie-Meter** | `imdb/standard` | A general-purpose rating: skip it, it was okay, I enjoyed it, or I loved it. No severity. |
+
 Container-orchestration-level view of this system: what runs, how the
 pieces talk, and how the design stays pluggable for new frontends,
 domains, and backend capabilities. For code-level detail, see the linked
@@ -27,7 +37,7 @@ single host.
 Every table, service call, and endpoint is partitioned by a **domain**
 concept resolved from a request header, so unrelated frontends can share
 the same backend and database with no schema change. Two domains are
-live today: `imdb/bigotry` and `imdb/standard`.
+implemented: `imdb/bigotry` and `imdb/standard`.
 
 - [§3](#3-pluggable-domain-model) — how the domain mechanism works
 - [§5](#5-aws-deployment-feasibility) — moving today's Compose setup to AWS

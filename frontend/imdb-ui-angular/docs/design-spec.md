@@ -1,7 +1,7 @@
 # imdb-ui-angular — Design Spec
 
-Status: Implemented. Screens, flows, and business rules currently live for
-both domains this app serves.
+Status: Implemented. Screens, flows, and business rules currently implemented
+for both domains this app serves.
 Source: [`requirements-notes.txt`](./requirements-notes.txt) (original raw
 draft).
 
@@ -26,7 +26,7 @@ developers, see [`user-guide.md`](./user-guide.md).
 
 A single-page UI for the `posts` backend's threaded-post/flag domains,
 switchable at runtime via a domain picker ([`architecture.md`](./architecture.md) §4) rather
-than being built for one domain. Two domains are live today:
+than being built for one domain. Two domains are implemented:
 `imdb/bigotry` ("Big-O-Meter" — flags titles for racism/sexism/lgbtq-phobia
 with a 0–5 severity score) and `imdb/standard` ("Movie-Meter" — a plain
 skip-it/it-was-okay/i-enjoyed-it/i-loved-it rating, no severity).
