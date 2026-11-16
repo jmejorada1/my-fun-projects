@@ -1,0 +1,8 @@
+# The only routing object that differs per environment: locally Envoy
+# Gateway implements it. overlays/eks would use gateway.k8s.aws/alb.
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: imdb
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller

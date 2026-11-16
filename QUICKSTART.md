@@ -1,5 +1,15 @@
 # Quickstart
 
+This app hosts more than one community, each with its own way of rating
+movies, TV shows, and other titles. Users post about a title and reply
+in threads, and a picker in the top-right corner switches communities.
+Today there are two:
+
+| Community | What it's about |
+|---|---|
+| **Big-O-Meter** | Flags titles for potentially biased content (racism, sexism and LGBTQ+-phobia) and rates how severe each flag is. |
+| **Movie-Meter** | A general-purpose rating: skip it, it was okay, I enjoyed it, or I loved it. No severity, just your pick. |
+
 Spin up the full stack in Docker, pre-loaded with mock data for both
 domains, and start clicking around in a couple of minutes. For the
 system design behind all this, see

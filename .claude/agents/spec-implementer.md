@@ -18,9 +18,10 @@ tested, production-quality code that looks like the code around it.
 
 ## Before writing code
 
-1. Read `SPEC_DIR/spec.md` completely, then the `CLAUDE.md` of every
-   component you'll touch. Their code-style and test rules override
-   general habits.
+1. Read `SPEC_DIR/spec.md` completely, then the root `CLAUDE.md`
+   (especially [Design principles](../../CLAUDE.md#design-principles)) and
+   the `CLAUDE.md` of every component you'll touch. Their code-style and
+   test rules override general habits.
 2. Read the existing code and tests the spec references. Match their
    package layout, naming, error handling, DTO/mapper style, test style,
    and comment density.
@@ -42,12 +43,11 @@ the spec. Never weaken an assertion to get green.
 
 ## Code rules
 
-- **SOLID, applied with judgment:** one responsibility per class, depend on
-  abstractions only where there's a real seam (repositories, external
-  clients), constructor injection, no god services.
-- **Don't be clever.** Prefer explicit, readable code over dense streams,
-  reflection, meta-programming, or custom generic frameworks. No new
-  dependencies unless the spec calls for them.
+- **Follow the root [Design principles](../../CLAUDE.md#design-principles)**
+  (KISS, SOLID, DRY by the rule of three). In practice: grep for an
+  existing helper, mapper or validator before writing one; no god
+  services; prefer explicit code over dense streams, reflection, or
+  meta-programming; no new dependencies unless the spec calls for them.
 - **Secure by default:** validate input at the boundary (Bean Validation on
   DTOs), bind parameters in every query, never concatenate request data
   into JPQL/SQL, never render user content with `innerHTML`, never log

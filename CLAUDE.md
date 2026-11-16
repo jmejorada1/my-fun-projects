@@ -20,9 +20,11 @@ Users post about IMDB titles and reply in threaded comments, scoped by a
 | Frontend | [`frontend/imdb-ui-angular`](frontend/imdb-ui-angular) | Angular 22, standalone + Signals, Vitest |
 | Data loaders | [`backend/imdb-data-python`](backend/imdb-data-python) | One-off Python scripts, run via Docker |
 
-`deploy/kubernetes/` is an empty placeholder. `deploy/docker/requirements.txt`
-holds the original docker-compose planning notes, not Python deps.
-Neither is live tooling.
+`deploy/docker/` holds the Prometheus and Grafana config that both stacks
+mount. `deploy/kubernetes/` holds the local Kubernetes manifests (a
+Kustomize base plus a `local` overlay); read
+[`deploy/kubernetes/README.md`](deploy/kubernetes/README.md) before
+working there.
 
 ## Running the stack (Docker)
 
@@ -45,6 +47,27 @@ defaults are in `docker-compose.yml`). `FRONTEND_PORT`, `API_PORT` and
 the frontend's runtime API URL, and the port checks in the scripts. Change
 a port in `.env`, never in individual files.
 
+### Running on local Kubernetes instead
+
+Docker Desktop's built-in cluster (context `docker-desktop`), with one
+origin: the UI at `http://localhost:${FRONTEND_PORT}` and the API at
+`/api`. Run only one stack at a time: `k8s-precheck.sh` refuses to start
+while compose is up. Details are in
+[`deploy/kubernetes/README.md`](deploy/kubernetes/README.md).
+
+```bash
+./scripts/k8s-run.sh [bigotry-data] [standard-data] [--all] [--render]
+./scripts/k8s-reload.sh [frontend|backend]
+./scripts/k8s-load.sh <imdb|bigotry|standard> [loader args...]   # loader as a Job
+./scripts/k8s-port-forward.sh [postgres|prometheus|grafana|gateway|all]
+./scripts/k8s-shutdown.sh [--all]                 # --all deletes namespace imdb (data)
+./scripts/k8s-smoke-test.sh [base-url]
+./scripts/k8s-verify-static.sh                    # no-cluster checks: script syntax, rendered manifests
+```
+
+All `kubectl` calls in these scripts are pinned to the `docker-desktop`
+context, whatever the current context is.
+
 **Docker Desktop can quit mid-session** (`docker info` fails). If it
 does, tell the user and wait. Don't relaunch it yourself.
 
@@ -65,3 +88,16 @@ does, tell the user and wait. Don't relaunch it yourself.
 - When requirements or design intent are unclear, ask, or record an open
   question in the relevant spec doc. Don't silently pick a default. Point
   out any doc/code inconsistency or better approach you notice.
+
+## Design principles
+
+- **KISS:** the simplest code that fully meets the requirement. Boring
+  over clever: no speculative abstractions, no generic frameworks for one
+  use case, no new libraries without a clear reason.
+- **SOLID, where it pays off:** one responsibility per class, constructor
+  injection, interfaces only at real seams (repositories, external clients).
+- **DRY, by the rule of three:** look for an existing helper, mapper or
+  validator before writing one. Extract shared code once the same logic
+  appears a third time, not before.
+- When these conflict, KISS wins: a little duplication beats the wrong
+  abstraction.

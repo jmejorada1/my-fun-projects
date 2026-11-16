@@ -1,0 +1,25 @@
+# /api -> posts, everything else -> frontend: one origin, no CORS.
+# PathPrefix matches whole segments, so /api matches /api/... but not /apix.
+# posts' management port (8081) is deliberately never a backend here.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: imdb
+spec:
+  parentRefs:
+    - name: imdb
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api
+      backendRefs:
+        - name: posts
+          port: 8080
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: frontend
+          port: 80

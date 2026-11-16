@@ -34,7 +34,7 @@ An Angular 22 single-page app (standalone components, Signals,
 threaded-post/flag domains. One build serves **every configured domain**
 from a runtime picker in the toolbar — today `imdb/bigotry` ("Big-O-Meter",
 severity-scored bigotry flags) and `imdb/standard` ("Movie-Meter", a plain
-rating), both live.
+rating), both implemented.
 
 Domain-specific behavior — rating mode, badge coloring, conflict-detection
 rules, skin — is isolated behind one `DomainConfig` object per domain

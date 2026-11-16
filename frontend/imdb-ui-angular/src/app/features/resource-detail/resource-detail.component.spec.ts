@@ -13,11 +13,9 @@ import { PostActivityService } from '../../core/post-activity.service';
 import { DOMAIN_OPTIONS_TOKEN } from '../../core/domain-options';
 import { ResourceFlagSummaryEntry } from '../../api/resource.service';
 
-// imdb-standard.config.ts ships with enabled: false (flips true once
-// backend seed data exists — plan §11 Phase 2b) — component-level tests of
-// its category-only behavior don't need that, so this override makes it
-// selectable purely for the test, same pattern
-// domain-selection.service.spec.ts already uses.
+// imdb/standard is enabled now (Phase 2b seeded its backend data), but this
+// override keeps its category-only tests selectable regardless of the real
+// config's enabled flag, same pattern domain-selection.service.spec.ts uses.
 const BOTH_DOMAINS_ENABLED = [
   { value: 'imdb/bigotry', label: 'Big-O-Meter', enabled: true, description: 'Bigotry flagging.' },
   { value: 'imdb/standard', label: 'Movie-Meter', enabled: true, description: 'Standard ratings.' },

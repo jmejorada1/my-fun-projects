@@ -28,11 +28,72 @@ All three default to [`sample-data/title.basics.sample.tsv`](./sample-data/title
 — a 5000-row subset (500 rows per `resource_category` title type,
 `tt0000001`–`tt0260178`) checked into this repo, so each script runs with
 no IMDB download required. Point `tsv_path`/`--tsv-path` at the real, full
-`title.basics.tsv` instead for larger-scale imports (see "Loading IMDB
-data" in the [root README](../../README.md)). All three scripts also skip
+`title.basics.tsv` instead for larger-scale imports (see
+[Importing the full IMDB dataset](#importing-the-full-imdb-dataset)). All
+three scripts also skip
 rows whose `primaryTitle` is one of IMDB's generic placeholder episode
 titles (e.g. `Episode #1.1`) — tens of thousands of `tvEpisode` rows have
 no real title and aren't useful as mock post/reply subjects.
+
+## Running with Docker
+
+You don't need local Python for this. Each script runs as a one-off
+compose job. The jobs are in the `tools` profile, so `docker compose up`
+doesn't start them. Any arguments after the job name are passed to the
+script as CLI flags.
+
+| Job | Script | What it loads by default |
+|---|---|---|
+| `imdb-loader` | `import_resources.py` | Resources only, into the domain you pass with `--domain` |
+| `bigotry-loader` | `import_bigotry_data.py` | `imdb/bigotry`: all 5000 sample rows, plus mock `user1`/`user2`/`user3` posts, replies and flags (`user1` posts least, `user3` most) |
+| `standard-loader` | `import_standard_data.py` | `imdb/standard`: a 500-row slice, plus a few mock posts and replies |
+
+**Easiest:** the wrapper scripts start `postgres` and `posts` (or reuse
+them if they're already running), wait for the Flyway migrations, then
+run the loader. They don't start the frontend, and they leave the
+containers running when they finish.
+
+```bash
+./scripts/docker-load-bigotry-data.sh --total-posts 1000 --seed 42
+./scripts/docker-load-standard-data.sh --total-posts 200 --seed 42
+```
+
+To seed while bringing up the whole stack, use
+`./scripts/docker-run.sh bigotry-data`, `standard-data` or `--all`.
+
+**When `postgres` and `posts` are already running**, run a job directly:
+
+```bash
+docker compose run --rm imdb-loader --domain imdb/bigotry
+docker compose run --rm imdb-loader --start-row 1 --end-row 1000 --domain imdb/standard
+docker compose run --rm bigotry-loader
+docker compose run --rm standard-loader
+```
+
+- Use `imdb/bigotry` or `imdb/standard`, not `imdb`. Those are the
+  domains the frontend sends. `resource_category` is scoped per domain,
+  so each domain needs its own import.
+- `imdb-loader` fails on tconsts that were already imported (see
+  [Failure behavior](#failure-behavior)). To import more, use a later
+  `--start-row`.
+- `bigotry-loader` and `standard-loader` skip resources that already
+  exist. Posts, replies and flags are not deduplicated, so every re-run
+  adds another batch.
+
+### Importing the full IMDB dataset
+
+The bundled sample has 5000 rows. For more, download `title.basics.tsv`
+from [IMDB's non-commercial datasets](https://datasets.imdbws.com/) into
+this directory (it's git-ignored), then bind-mount it and point
+`--tsv-path` at it. Run this from the repo root:
+
+```bash
+docker compose run --rm -v "$(pwd)/backend/imdb-data-python/title.basics.tsv:/app/full-title.basics.tsv:ro" \
+  imdb-loader --tsv-path /app/full-title.basics.tsv --start-row 1 --end-row 50000 --domain imdb/bigotry
+```
+
+The same `-v` and `--tsv-path` work with `bigotry-loader` and
+`standard-loader`. The wrapper scripts don't support them.
 
 ## Prerequisites
 

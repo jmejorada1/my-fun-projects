@@ -1,0 +1,28 @@
+# Shared by every environment. Environment-specific bits (image tags, pull
+# policy, GatewayClass controller, .env-derived ports, monitoring config
+# files) live in overlays/. See deploy/kubernetes/README.md.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: imdb
+
+# On every object, for the scripts' label-based deletes. includeSelectors:
+# false leaves Service/Deployment selectors untouched.
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: imdb
+    includeSelectors: false
+    includeTemplates: true
+
+resources:
+  - namespace.yaml
+  - postgres/statefulset.yaml
+  - postgres/service.yaml
+  - posts/deployment.yaml
+  - posts/service.yaml
+  - frontend/deployment.yaml
+  - frontend/service.yaml
+  - gateway/gateway.yaml
+  - gateway/httproute.yaml
+  - monitoring/prometheus.yaml
+  - monitoring/grafana.yaml

@@ -12,8 +12,15 @@ TODO.txt
 backend/posts/docs/upsert-active-flag-explained.md
 backend/posts/docs/page-queries-explained.md
 backend/posts/docs/rankings-query-explained.md
+backend/posts/docs/edit-delete-race-explained.md
 .claude/skills/spring-boot-quiz/
 
 # Quality/security gate tooling and reports (scripts/quality-gate.sh, scripts/security-scan.sh)
 .venv-tools/
 .quality/
+
+# Local k8s overlay patches generated from .env (scripts/lib-k8s.sh)
+deploy/kubernetes/overlays/local/.generated/
+
+# Quiz output from /diff-quiz (.claude/skills/diff-quiz)
+.quizzes/

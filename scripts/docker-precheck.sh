@@ -114,7 +114,7 @@ for port in "${REQUIRED_PORTS[@]}"; do
   port_in_use "$port"
   case $? in
     0) fail "port $port is already in use" \
-         "Find what's using it: lsof -nP -iTCP:$port -sTCP:LISTEN" ;;
+         "Find what's using it: lsof -nP -iTCP:$port -sTCP:LISTEN (if the k8s stack is up: ./scripts/k8s-shutdown.sh)" ;;
     1) pass "port $port is free" ;;
     *) warn "couldn't check port $port — no lsof or nc on this machine" ;;
   esac

@@ -1,5 +1,15 @@
 # Monitoring Architecture
 
+This app hosts more than one community, each with its own way of rating
+movies, TV shows, and other IMDB titles. Users post about a title and
+reply in threads, and a picker in the UI switches communities. In the
+code, each community is a **domain**. Today there are two:
+
+| Community | Domain | What it's about |
+|---|---|---|
+| **Big-O-Meter** | `imdb/bigotry` | Flags titles for potentially biased content (racism, sexism and LGBTQ+-phobia) and rates how severe each flag is, 0–5. |
+| **Movie-Meter** | `imdb/standard` | A general-purpose rating: skip it, it was okay, I enjoyed it, or I loved it. No severity. |
+
 How metrics actually get from a line of Java code inside `posts` to a
 graph in a browser — the mechanism, not the day-to-day usage. For "how do
 I view/query/extend this," see

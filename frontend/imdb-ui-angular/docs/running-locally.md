@@ -127,5 +127,6 @@ this file for that path.
   yet (each domain's data is separate). Import resources with
   `backend/imdb-data-python/import_resources.py --domain "imdb/bigotry"`
   (or `"imdb/standard"`) and create posts/flags against them, or run the
-  Docker mock-data loaders described in the root
-  [`README.md`](../../../README.md) to see the panels populate.
+  Docker mock-data loaders described in
+  [`backend/imdb-data-python/README.md`](../../../backend/imdb-data-python/README.md#running-with-docker)
+  to see the panels populate.

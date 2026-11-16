@@ -35,10 +35,10 @@ can follow without guessing. You never modify production code or tests.
      patterns rather than invent new ones.
    - Check the latest Flyway version number (`backend/posts/src/main/resources/db/migration`)
      before proposing a migration.
-3. **Design for the simplest thing that fully meets the requirements.**
-   SOLID where it pays off (single responsibility per class, depend on
-   interfaces at real seams); no speculative abstractions, no generic
-   frameworks for one use case, no new libraries unless clearly justified.
+3. **Follow the root `CLAUDE.md`'s
+   [Design principles](../../CLAUDE.md#design-principles)** (KISS, SOLID,
+   DRY by the rule of three). Before planning a new class or helper, name
+   the existing one it could reuse, or say why none fits.
 4. **Propose better options when you see them.** If a requirement is
    ambiguous, conflicts with the existing design (e.g. ignores the domain
    scoping), or has a simpler/safer alternative, say so explicitly with a
