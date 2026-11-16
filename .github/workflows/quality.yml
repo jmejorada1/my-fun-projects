@@ -1,0 +1,72 @@
+# Same gates as the feature pipeline, for every PR (including hand-written
+# code): changed-line coverage and a security scan. See AGENT-PIPELINE.md.
+name: quality
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1" # Mondays: full-repo security scan for newly published CVEs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coverage-gate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # diff-cover needs the base branch history
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/imdb-ui-angular/package-lock.json
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend/imdb-ui-angular
+      - name: Coverage gate (≥85% of changed lines)
+        run: ./scripts/quality-gate.sh --base "origin/${{ github.base_ref }}"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: coverage-reports
+          path: .quality/
+          if-no-files-found: ignore
+
+  security-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Security scan (changed files on PRs, whole repo otherwise)
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            ./scripts/security-scan.sh --base "origin/${{ github.base_ref }}"
+          else
+            ./scripts/security-scan.sh --all
+          fi
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: security-reports
+          path: .quality/
+          if-no-files-found: ignore
