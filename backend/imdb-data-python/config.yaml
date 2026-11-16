@@ -6,7 +6,7 @@
 # sample bundled in this repo (sample-data/title.basics.sample.tsv, 5000
 # rows: 500 of each resource_category title type) so this loader works out
 # of the box with no IMDB download. For larger-scale imports, download the
-# real title.basics.tsv (see ../README.md's "Loading IMDB data" section)
+# real title.basics.tsv (see README.md's "Importing the full IMDB dataset")
 # and point tsv_path at it instead — either directly in this file or via
 # `--tsv-path`.
 tsv_path: sample-data/title.basics.sample.tsv
