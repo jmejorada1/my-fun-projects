@@ -1,0 +1,60 @@
+# Docker Desktop overlay. Render it through the scripts, not
+# `kubectl apply -k`: they write .generated/ from .env first, and pass
+# --load-restrictor LoadRestrictionsNone so the configMapGenerators below can
+# read compose's files under deploy/docker/ (spec §4.4, §8.4).
+#   ./scripts/k8s-run.sh            # deploy
+#   ./scripts/k8s-run.sh --render   # just print the YAML
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# No overlay-wide `namespace:`: it would also stamp the cluster-scoped
+# GatewayClass. Base resources are already in imdb, and each generator
+# below sets its own namespace.
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: imdb
+    includeSelectors: false
+
+resources:
+  - ../../base
+  - gatewayclass.yaml
+
+# :local tags, never :latest (which would default imagePullPolicy to Always).
+images:
+  - name: imdb/posts
+    newTag: local
+  - name: imdb/frontend
+    newTag: local
+
+patches:
+  # Use the image docker build just put in the node's image store.
+  - target:
+      kind: Deployment
+      name: posts|frontend
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent
+  # Written from .env by scripts/lib-k8s.sh (write_env_patch). Gitignored.
+  - path: .generated/gateway-port.yaml
+    target:
+      kind: Gateway
+      name: imdb
+  - path: .generated/posts-cors.yaml
+
+# Reuse compose's monitoring config files as-is, so the two stacks can't
+# drift. The content hash in each generated name rolls the pod on change.
+configMapGenerator:
+  - name: prometheus-config
+    namespace: imdb
+    files:
+      - ../../../docker/prometheus/prometheus.yml
+  - name: grafana-datasources
+    namespace: imdb
+    files:
+      - ../../../docker/grafana/provisioning/datasources/datasource.yml
+  - name: grafana-dashboards
+    namespace: imdb
+    files:
+      - ../../../docker/grafana/provisioning/dashboards/dashboards.yml
+      - ../../../docker/grafana/provisioning/dashboards/posts-overview.json

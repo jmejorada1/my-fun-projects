@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    app.kubernetes.io/name: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: frontend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: frontend
+    spec:
+      # No runAsNonRoot: nginx:1.27-alpine's master process starts as root
+      # (spec §4.2, §10 step 8).
+      containers:
+        - name: frontend
+          image: imdb/frontend
+          ports:
+            - name: http
+              containerPort: 80
+          env:
+            # docker-entrypoint.sh writes this to /config.json. Relative, so
+            # the browser calls the same origin and the Gateway routes /api.
+            - name: API_BASE_URL
+              value: /api
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              memory: 128Mi

@@ -18,3 +18,6 @@ backend/posts/docs/edit-delete-race-explained.md
 # Quality/security gate tooling and reports (scripts/quality-gate.sh, scripts/security-scan.sh)
 .venv-tools/
 .quality/
+
+# Local k8s overlay patches generated from .env (scripts/lib-k8s.sh)
+deploy/kubernetes/overlays/local/.generated/

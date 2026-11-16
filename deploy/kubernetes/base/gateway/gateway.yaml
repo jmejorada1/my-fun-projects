@@ -1,0 +1,12 @@
+# The single browser entry point. Envoy Gateway turns this into a
+# LoadBalancer Service, which Docker Desktop publishes on localhost.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: imdb
+spec:
+  gatewayClassName: imdb            # each overlay defines GatewayClass "imdb"
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 4200                    # replaced from .env FRONTEND_PORT (generated patch)
