@@ -42,7 +42,9 @@ jobs:
         run: npm ci
         working-directory: frontend/imdb-ui-angular
       - name: Coverage gate (≥85% of changed lines)
-        run: ./scripts/quality-gate.sh --base "origin/${{ github.base_ref }}"
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: ./scripts/quality-gate.sh --base "origin/$BASE_REF"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -58,9 +60,12 @@ jobs:
         with:
           fetch-depth: 0
       - name: Security scan (changed files on PRs, whole repo otherwise)
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            ./scripts/security-scan.sh --base "origin/${{ github.base_ref }}"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            ./scripts/security-scan.sh --base "origin/$BASE_REF"
           else
             ./scripts/security-scan.sh --all
           fi
