@@ -1,13 +1,11 @@
 # Posts Service — Database Design Narrative
 
-Status: Implemented. Narrative companion to the canonical spec — kept up
-to date alongside it.
-Companion to: [`design-spec.md`](./design-spec.md) (full spec, assumptions, table
-definitions, business rules)
+**Status:** Implemented, kept in step with the canonical spec,
+[`design-spec.md`](./design-spec.md), which has the full column
+definitions, constraints and decision log.
 
-This document walks through the entity-relationship diagram in plain
-language — what each box and line actually means — for anyone who wants to
-understand the schema without parsing the diagram syntax directly.
+A plain-language walk through the entity-relationship diagram: what each
+box and line means.
 
 ## Table of Contents
 
@@ -20,7 +18,8 @@ understand the schema without parsing the diagram syntax directly.
 
 ## The Diagram
 
-[↑ Back to Table of Contents](#table-of-contents)
+Relationships only; every column is in
+[`design-spec.md` §4.1](./design-spec.md#41-mermaid-er-diagram).
 
 ```mermaid
 erDiagram
@@ -33,229 +32,128 @@ erDiagram
     DOMAIN ||--o{ RESOURCE_CATEGORY : scopes
     DOMAIN ||--o{ POST_TYPE : scopes
     DOMAIN ||--o{ APP_USER : scopes
-
-    DOMAIN {
-        bigint id PK
-        varchar name
-        varchar display_name
-        jsonb data
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
-    APP_USER {
-        bigint id PK
-        bigint domain_id FK
-        varchar username
-        varchar email
-        varchar first_name
-        varchar last_name
-        jsonb data
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
-    RESOURCE_CATEGORY {
-        bigint id PK
-        bigint domain_id FK
-        varchar name
-        varchar display_name
-        jsonb data
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
-    RESOURCE {
-        bigint id PK
-        varchar name
-        varchar display_name
-        bigint category_id FK
-        bigint domain_id FK "derived from category_id"
-        jsonb data
-        timestamptz created_at
-        timestamptz updated_at
-        timestamptz deleted_at
-    }
-
-    POST_TYPE {
-        bigint id PK
-        bigint domain_id FK
-        varchar name
-        jsonb data
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
-    POST {
-        bigint id PK
-        bigint resource_id FK
-        bigint user_id FK
-        bigint parent_post_id FK
-        bigint domain_id FK "derived from resource_id"
-        text body_text
-        jsonb data
-        timestamptz created_at
-        timestamptz updated_at
-        timestamptz deleted_at
-    }
-
-    POST_FLAG {
-        bigint id PK
-        bigint post_id FK
-        bigint post_type_id FK
-        bigint domain_id FK "derived from post_id"
-        smallint score
-        jsonb data
-        timestamptz created_at
-        timestamptz updated_at
-        timestamptz deleted_at
-    }
 ```
 
 ## Reading the Notation
 
-[↑ Back to Table of Contents](#table-of-contents)
-
-Each `||--o{` line is a one-to-many relationship. The `||` end sits on the
-"one" side, the `o{` end sits on the "many" side. For example
-`APP_USER ||--o{ POST : authors` reads as: **one `app_user` authors zero or
-more `post` rows.** The label after the colon (`authors`, `categorizes`,
-`classifies`, etc.) is just a human-readable name for the relationship — it
-has no effect on the schema itself, it just makes the diagram self-explanatory.
+Each `||--o{` line is one-to-many: `||` marks the "one" side, `o{` the
+"zero or more" side. `APP_USER ||--o{ POST : authors` reads: **one
+`app_user` authors zero or more `post` rows.** The label after the colon
+is just a name for readers; it doesn't affect the schema.
 
 ## Walking Through Each Relationship
 
-[↑ Back to Table of Contents](#table-of-contents)
-
 **`APP_USER ||--o{ POST : authors`**
-A user can write many posts (top-level posts and replies alike), but every
-post has exactly one author. This is the standard "author owns content"
-relationship, implemented as `post.user_id` pointing back at `app_user.id`.
+A user writes many posts (top-level and replies); every post has exactly
+one author, via `post.user_id`.
 
 **`RESOURCE_CATEGORY ||--o{ RESOURCE : categorizes`**
-`resource_category` is a small, fixed lookup table seeded from IMDB's own
-`titleType` values (`movie`, `short`, `tvSeries`, `tvEpisode`,
-`tvMiniSeries`, `tvMovie`, `tvSpecial`, `tvShort`, `video`, `videoGame` — see
-[`design-spec.md`](./design-spec.md) §4.3 for the full list with descriptions). Each row pairs a
-machine-readable `name` with a human-readable `display_name`. Every
-`resource` points at exactly one category row via `resource.category_id`.
-This is why a title can't belong to two categories at once in this model —
-it's a single classification, not a tag list.
+`resource_category` is a small lookup table. For the `imdb/*` domains it
+holds IMDB's `titleType` values (`movie`, `short`, `tvSeries`,
+`tvEpisode`, `tvMiniSeries`, `tvMovie`, `tvSpecial`, `tvShort`, `video`,
+`videoGame`), each domain with its own copy. Each row pairs a machine
+`name` with a readable `display_name`. A resource points at exactly one
+category via `resource.category_id`, so it's a single classification, not
+a tag list.
 
 **`RESOURCE ||--o{ POST : "is subject of"`**
-A resource (an IMDB title) can have many posts made about it, but each post
-belongs to exactly one resource via `post.resource_id`. This is the anchor
-that ties an entire comment thread — the top-level post and every reply
-beneath it — back to the movie or show it's about.
+A resource (an IMDB title) has many posts; each post belongs to one
+resource via `post.resource_id`. This ties a whole thread, the top-level
+post and every reply, to the title it's about.
 
 **`POST ||--o{ POST : "replies (parent_post_id)"`**
-This is the self-referencing relationship that makes threaded replies
-possible. Every post has a `parent_post_id` column that points at another
-row in the *same* table. A post with `parent_post_id = NULL` is a top-level
-post directly on a resource. A post with `parent_post_id` set is a reply
-sitting underneath that parent post. Because a post can itself be pointed at
-by other posts' `parent_post_id`, replies can nest to unlimited depth — a
-reply to a reply to a reply, and so on — which is how the "one user posts,
-others reply underneath" requirement is satisfied. A recommended composite
-foreign key (`post(id, resource_id)` → `post(parent_post_id, resource_id)`,
-detailed in [`design-spec.md`](./design-spec.md) §4.3) additionally guarantees that a reply
-always shares its `resource_id` with its parent, so a thread can never
-accidentally jump to a different movie or show.
+The self-reference that makes threads. `parent_post_id = NULL` is a
+top-level post; otherwise the post is a reply to the post it points at.
+Since replies can themselves be parents, nesting is unlimited. A composite
+FK (`post (parent_post_id, resource_id) → post (id, resource_id)`,
+[`design-spec.md` §4.3](./design-spec.md#43-table-definitions))
+guarantees a reply has the same `resource_id` as its parent, so a thread
+can't jump to another title.
 
-`post` (along with `resource` and `post_flag`) also carries a nullable
-`deleted_at` column for soft delete — rows are never hard-deleted, only
-marked. Because the self-reference forms a tree, deleting a post has a
-cascading effect on that tree: removing a post hides its *entire* reply
-subtree, not just the one row. The recommended approach is to set
-`deleted_at` on the post and every descendant beneath it at delete time,
-rather than recomputing "is any ancestor deleted" on every read.
+`post`, like `resource` and `post_flag`, has a nullable `deleted_at` for
+soft delete; rows are marked, never removed. Because posts form a tree,
+deleting a post hides its whole reply subtree: `deleted_at` is set on the
+post and every descendant at delete time, rather than checking ancestors
+on every read.
 
 **`POST ||--o{ POST_FLAG : carries`**
-A single post can carry multiple flags — for example, one post could be
-flagged as both racist and sexist. Each of those flags is its own row in
-`post_flag`, linked back to the post via `post_flag.post_id`. This is why
-type/score isn't stored directly on `post` itself: a post needs to support
-zero, one, or several flags simultaneously. A post can have at most one
-*active* flag per type (a partial unique index on `(post_id, post_type_id)
-WHERE deleted_at IS NULL`); flagging the same type again updates that
-flag's score. Today the API attaches only one flag per request: `POST
-/posts` takes a single `postTypeId`/`score` pair, and any further flags go
-through `POST /posts/{postId}/flags`. See
-[Open Questions](#open-questions) about creating several flags with the post.
+A post can carry several flags (say, both racism and sexism), each its own
+`post_flag` row linked by `post_flag.post_id`. That's why type and score
+aren't columns on `post`. A post has at most one *active* flag per type (a
+partial unique index on `(post_id, post_type_id) WHERE deleted_at IS
+NULL`); flagging the same type again updates that flag's score.
+
+Today the API attaches one flag per request: `POST /posts` takes a single
+`postTypeId`/`score`, and further flags go through
+`POST /posts/{postId}/flags` (see [Open Questions](#open-questions)).
 
 **`POST_TYPE ||--o{ POST_FLAG : classifies`**
-`post_type` is the second small lookup table, holding the fixed set of flag
-categories (`racism`, `sexism`, `lgbtq-phobic`). Each `post_flag` row points
-at exactly one `post_type` via `post_flag.post_type_id`, and additionally
-carries its own `score` (0–5, where 0 is neutral and 5 is most severe). So
-a single post having both a racism flag scored 4 and a sexism flag scored 2
-would be two separate `post_flag` rows, both pointing at the same
-`post.id`, each pointing at a different `post_type.id`.
+`post_type` is the second lookup table, holding each domain's flag
+categories: `racism`, `sexism`, `lgbtq-phobic` and `no-bigotry` for
+`imdb/bigotry`; `skip-it`, `it-was-okay`, `i-enjoyed-it`, `i-loved-it`
+for `imdb/standard`. Each `post_flag` points at one `post_type` and has
+its own `score` (0–5, 0 = neutral, 5 = most severe). A post with a racism
+flag scored 4 and a sexism flag scored 2 is two `post_flag` rows with the
+same `post_id` and different `post_type_id`s.
 
 ## Domain Scoping
 
-[↑ Back to Table of Contents](#table-of-contents)
+**`DOMAIN ||--o{ RESOURCE_CATEGORY : scopes`** (and likewise `POST_TYPE`,
+`APP_USER`)
+`domain` partitions the schema so unrelated taxonomies can share one
+database. Today it has two rows, `imdb/bigotry` and `imdb/standard`.
 
-**`DOMAIN ||--o{ RESOURCE_CATEGORY : scopes`** (and the same relationship to
-`POST_TYPE` and `APP_USER`)
-`domain` is a new lookup table — today it holds a single row, `imdb` — that
-partitions the rest of the schema so unrelated resource taxonomies could
-eventually share this same database. `resource_category`, `post_type`, and
-`app_user` each point at exactly one `domain` row directly. `resource`,
-`post`, and `post_flag` don't get to pick their own `domain_id` — it's
-*derived*: a `resource`'s domain must match its `category`'s domain, a
-`post`'s domain must match both its `resource`'s domain and its author's
-domain, and a `post_flag`'s domain must match both its `post`'s domain and
-its `post_type`'s domain. Each of these is enforced with a composite
-foreign key against an `(id, domain_id)` pair on the parent table — the
-same technique the `parent_post_id`/`resource_id` same-thread constraint
-above already uses, just one column wider. The practical effect: it's
-impossible at the database level for a post to reference a resource from a
-different domain, or to be flagged with a type that belongs to some other
-domain. See [`design-spec.md`](./design-spec.md) decision #11 and §4.3 for the column-level
-detail.
+- `resource_category`, `post_type` and `app_user` each point at one
+  `domain` directly.
+- `resource`, `post` and `post_flag` **derive** their `domain_id`; they
+  can't choose it:
+  - a resource's domain = its category's
+  - a post's domain = its resource's = its author's
+  - a flag's domain = its post's = its post type's
+
+Each rule is a composite FK against an `(id, domain_id)` pair on the
+parent, the same technique as the reply/resource constraint above, one
+column wider. So the database itself rejects a post on another domain's
+resource, or a flag using another domain's type. Column detail:
+[`design-spec.md`](./design-spec.md) decision #11 and
+[§4.3](./design-spec.md#43-table-definitions).
 
 ## Putting It Together: One Example
 
-[↑ Back to Table of Contents](#table-of-contents)
+In `imdb/bigotry`, a top-level post on "The Room" gets a reply, and the
+reply is flagged twice:
 
-Imagine a top-level post on the resource "The Room" that gets a reply, and
-the reply is flagged twice:
+| Row | Values |
+|---|---|
+| `resource` | `The Room`, category → `movie`, domain → `imdb/bigotry` |
+| `post` #1 | `resource_id` → The Room, `parent_post_id` → NULL (top-level) |
+| `post` #2 | `resource_id` → The Room, `parent_post_id` → 1 (reply to #1) |
+| `post_flag` A | `post_id` → 2, `post_type_id` → `racism`, `score` → 4 |
+| `post_flag` B | `post_id` → 2, `post_type_id` → `sexism`, `score` → 2 |
 
-- `resource` row: `The Room` (category → `movie`, domain → `imdb`)
-- `post` row #1: `resource_id` → The Room, `parent_post_id` → NULL (top-level)
-- `post` row #2: `resource_id` → The Room, `parent_post_id` → 1 (a reply to post #1)
-- `post_flag` row A: `post_id` → 2, `post_type_id` → `racism`, `score` → 4
-- `post_flag` row B: `post_id` → 2, `post_type_id` → `sexism`, `score` → 2
-
-Post #2 shows up nested underneath post #1 in the thread, and carries two
-independent severity flags — exactly the shape the diagram describes. Every
-row here — the resource, both posts, and both flags — carries the same
-`domain_id` as "The Room", inherited transitively down the chain.
+Post #2 nests under post #1 and carries two independent flags. Every row
+has the same `domain_id` as "The Room", inherited down the chain.
 
 ## Open Questions
 
-[↑ Back to Table of Contents](#table-of-contents)
-
 **Should a post be created with several flags at once?** (deferred)
-The schema already supports several active flags per post (one per type),
-but `POST /posts` accepts only one `postTypeId`/`score` pair. Additional
-flags need separate `POST /posts/{postId}/flags` calls, each in its own
-transaction, so a failure partway leaves the post with only some of its
-flags. If the UI adds a multi-category picker to the create form, the
-options are:
+The schema allows several active flags per post (one per type), but
+`POST /posts` takes only one `postTypeId`/`score`. Extra flags need
+separate `POST /posts/{postId}/flags` calls, each its own transaction, so
+a failure partway leaves some flags missing. If the create form gets a
+multi-category picker, the options are:
 
-1. **UI only:** call `POST /posts` with the first flag, then
-   `POST /posts/{postId}/flags` for each other one. No backend change, but
-   not atomic, and the UI must handle partial failure.
+1. **UI only:** `POST /posts` with the first flag, then
+   `POST /posts/{postId}/flags` for the rest. No backend change, but not
+   atomic, and the UI must handle partial failure.
 2. **UI and API (preferred):** change `PostCreateRequest` to take
    `flags: [{postTypeId, score}, ...]` and have `createPost` call
-   `addOrUpdateFlag` for each one inside its existing transaction, so the
-   post and all its flags commit or roll back together. Reject duplicate
-   `postTypeId`s in the list, since the upsert would silently merge them.
+   `addOrUpdateFlag` for each inside its existing transaction, so the post
+   and its flags commit or roll back together. Reject duplicate
+   `postTypeId`s, since the upsert would silently merge them.
 
 Product decisions to settle first:
 - Multi-flag applies to `imdb/bigotry` only; `imdb/standard` is a single
   rating by design.
-- Can `no-bigotry` be combined with `racism`/`sexism`/`lgbtq-phobic` on the
-  same post, or should it be exclusive?
+- Can `no-bigotry` be combined with `racism`/`sexism`/`lgbtq-phobic` on
+  one post, or is it exclusive?

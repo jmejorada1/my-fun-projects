@@ -33,7 +33,7 @@ public class SecurityConfig {
     }
 
     /**
-     * frontend/imdb-ui-angular/docs/design-spec.md §3.7 — the Angular dev
+     * CORS (architecture.md §9.2) — the Angular dev
      * server (and later, a deployed UI) calls this API cross-origin.
      * Origins come from {@code app.cors.allowed-origins} rather than a
      * wildcard, since there's no {@code allowCredentials} reason to need

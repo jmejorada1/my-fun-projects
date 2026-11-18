@@ -1,16 +1,15 @@
 # Posts Service — Design Spec
 
-Status: Implemented. Canonical data model reference — kept up to date as
-the schema evolves, rather than a point-in-time plan.
-This document specifies the **domain-agnostic** schema: tables, columns,
-constraints, and the rules that hold regardless of which domain is using
-them. It deliberately avoids describing what a given domain's categories,
-flag types, or resources actually *are* — that's seed data, not schema, and
-lives in the Flyway migrations that seed each domain (see [§4.3](#43-table-definitions)'s pointers).
-For a narrative ERD walkthrough, see
-[`db-design-spec.md`](./db-design-spec.md). For how this generality is
-meant to serve more than the current IMDB domains, see
-[`architecture.md`](./architecture.md) §8.
+**Status:** Implemented. The canonical data model, kept current as the
+schema changes.
+
+This spec covers the **domain-agnostic** schema: tables, columns,
+constraints and rules that hold for every domain. What a given domain's
+categories, flag types or resources *are* is seed data, found in that
+domain's Flyway migration ([§4.3](#43-table-definitions) points to them).
+ERD walkthrough: [`db-design-spec.md`](./db-design-spec.md). How this
+generality serves more than IMDB:
+[`architecture.md` §8](./architecture.md#8-multi-domain-design).
 
 ## Table of Contents
 
@@ -27,85 +26,67 @@ meant to serve more than the current IMDB domains, see
 
 ## 1. Overview
 
-[↑ Back to Table of Contents](#table-of-contents)
+Users post about a **resource**, a catalog item scoped to a **domain** (a
+partition that lets unrelated taxonomies share the schema; decision #11).
+Others reply under any post, forming an unbounded thread per resource. A
+post can be flagged with one or more **post types** (a per-domain
+taxonomy, such as content-warning categories or a rating scale), each flag
+with its own 0–5 score (0 = neutral, 5 = highest; meaning defined per
+domain).
 
-Users can create posts against a **resource** — a catalog item scoped to a
-**domain** (a partition that lets unrelated resource taxonomies share this
-same schema; see [§2](#2-decision-log) decision #11). Other users can reply underneath any
-post, forming an unbounded comment thread per resource. A post can be
-flagged with one or more **post types** (a domain-defined taxonomy — e.g.
-content-warning categories, or a plain rating scale), each flag carrying
-its own 0–5 score (0 = neutral, 5 = most severe/highest, meaning defined
-per domain).
-
-Today's seeded domains are both IMDB-catalog variants
-(`imdb/bigotry`, `imdb/standard` — see the domain's own seed migration for
-its specific categories/types), but nothing in this schema assumes that.
+Both seeded domains, `imdb/bigotry` and `imdb/standard`, are IMDB-catalog
+variants, but the schema assumes nothing about that.
 
 ## 2. Decision Log
 
-[↑ Back to Table of Contents](#table-of-contents)
-
-Confirmed decisions resolving gaps/ambiguities in the original
-`requirements.txt`:
+Confirmed decisions resolving gaps in the original `requirements.txt`:
 
 | # | Decision | Rationale |
 |---|----------|-----------|
-| 1 | `post` and `users_posts` are **collapsed into a single `post` table**, self-referencing via `parent_post_id` for threading. | The original draft had two overlapping tables. |
-| 2 | `resource_category` is a **domain-scoped lookup/enum table**; `resource` holds a single `category_id` FK. | One category per resource, not a many-to-many tag. |
+| 1 | `post` and `users_posts` are **merged into one `post` table**, self-referencing via `parent_post_id`. | The original draft had two overlapping tables. |
+| 2 | `resource_category` is a **per-domain lookup table**; `resource` has one `category_id` FK. | One category per resource, not many-to-many tags. |
 | 3 | Reply nesting is **unlimited depth** via `parent_post_id`. | True threaded comments. |
-| 4 | A post can carry **multiple type flags**, each with its own score, via join table `post_flag(post_id, post_type_id, score)`. | A single post can be flagged under several types at once, each with a different severity. |
-| 5 | `post` and `post_flag` get **soft delete** (`deleted_at timestamptz`, nullable). | No hard deletes of user-generated content; users can edit/delete their own posts/flags. |
-| 6 | `post_flag`'s uniqueness is a **partial unique index**: `UNIQUE (post_id, post_type_id) WHERE deleted_at IS NULL`. | Soft-deleting a flag shouldn't permanently block re-adding the same type later. |
-| 7 | `resource` rows are populated primarily by an external batch/ingestion process, with `POST /resources` also available for direct creation. | Bulk catalog data needs a bulk path; direct creation stays available. |
-| 8 | `resource`'s API surface is **Create, Read, Delete — no Update**. | Scope decision for the current phase. |
-| 9 | `resource` also gets `deleted_at` (soft delete). | `post.resource_id` is a hard FK — hard-deleting a resource with posts against it would either violate the FK or cascade-destroy those posts. |
-| 10 | Soft-deleting a `post` **cascades to its entire reply subtree**. | All descendant replies are hidden along with the deleted post, not just the post itself. |
-| 11 | Every table is scoped to a **domain** lookup table, so the schema can serve unrelated resource taxonomies side by side. `resource_category`/`post_type`/`app_user` own a `domain_id`; `resource`/`post`/`post_flag` get a *derived* `domain_id`, DB-enforced via composite FKs rather than client-set. | Lets unrelated domains (e.g. a future non-IMDB app) share this schema without cross-contaminating each other's data; see migrations `V7`–`V13`. |
-| 12 | `post_flag.score` range is **0–5** (not 1–5). `0` is an explicit "neutral" data point, distinct from having no `post_flag` row at all for that type. | `V15__widen_post_flag_score_range.sql`. Aggregates (e.g. `/rankings`) naturally pull toward 0 when neutral flags are included — intended. |
+| 4 | A post can carry **several type flags**, each with its own score, via `post_flag(post_id, post_type_id, score)`. | One post can be flagged under several types at different severities. |
+| 5 | `post` and `post_flag` are **soft-deleted** (`deleted_at timestamptz`, nullable). | No hard deletes of user content; users edit/delete their own posts and flags. |
+| 6 | `post_flag` uniqueness is a **partial unique index**: `UNIQUE (post_id, post_type_id) WHERE deleted_at IS NULL`. | Soft-deleting a flag mustn't block re-adding that type. |
+| 7 | `resource` rows come mainly from an external ingestion process; `POST /resources` also allows direct creation. | Bulk catalogs need a bulk path. |
+| 8 | `resource` API is **Create, Read, Delete; no Update**. | Scope for the current phase. |
+| 9 | `resource` is also **soft-deleted**. | `post.resource_id` is a hard FK, so a hard delete would fail or cascade-destroy posts. |
+| 10 | Soft-deleting a `post` **cascades to its whole reply subtree**. | Replies are hidden along with the deleted post. |
+| 11 | Every table is scoped to a **domain** lookup table. `resource_category`/`post_type`/`app_user` own a `domain_id`; `resource`/`post`/`post_flag` get a *derived* `domain_id`, enforced by composite FKs, never client-set. | Unrelated domains share the schema without mixing data. Migrations `V7`–`V13`. |
+| 12 | `post_flag.score` range is **0–5**, not 1–5. `0` is an explicit "neutral" data point, distinct from having no flag of that type. | `V15__widen_post_flag_score_range.sql`. Aggregates like `/rankings` pull toward 0 when neutral flags are included, as intended. |
 
-Additional engineering defaults, applied for consistency rather than
-requested explicitly (revisit if unwanted):
+Engineering defaults added for consistency (revisit if unwanted):
 
-- **`user` → `app_user`**: `user` is a Postgres reserved word.
-- **Audit columns**: `created_at`/`updated_at` on every table.
-- **`data jsonb`** on every table, for domain-specific extra fields without
-  a schema change.
-- **Reply scoping**: a reply always inherits its parent post's
-  `resource_id` — it doesn't pick a new one. DB-enforced via composite FK
+- **`user` → `app_user`**, because `user` is reserved in Postgres.
+- **Audit columns** `created_at`/`updated_at` on every table.
+- **`data jsonb`** on every table, for per-domain extra fields without a
+  schema change.
+- **Replies inherit the parent's `resource_id`**, enforced by composite FK
   ([§4.3](#43-table-definitions)).
-- **`resource.name`**: treated as a natural/external key from whatever
-  system originates a domain's resources (e.g. IMDB's `tconst` for the
-  `imdb/*` domains today), with `display_name` as the human-readable label.
-  Validation against that external source is an open question ([§6](#6-open-questions-not-yet-answered--do-not-build-against-these)).
+- **`resource.name` is the external natural key** from the domain's source
+  system (IMDB `tconst` for `imdb/*`), with `display_name` as the label.
+  Validating it against that source is an open question
+  ([§6](#6-open-questions-not-yet-answered--do-not-build-against-these)).
 
 ## 3. Entity Overview
 
-[↑ Back to Table of Contents](#table-of-contents)
-
-- **domain** — lookup table partitioning all other data (decision #11).
-- **app_user** — a registered user; author of posts. Scoped to a domain.
-- **resource_category** — domain-scoped lookup table for a resource's
-  taxonomy (e.g. IMDB title types for the `imdb/*` domains). Seed values
-  live in each domain's own migration, not in this spec.
-- **resource** — the catalog item posts are made against. Domain derived
-  from its category.
-- **post_type** — domain-scoped lookup of flag/label categories a post can
-  carry. Seed values live in each domain's own migration.
-- **post** — a user's post against a resource, or a reply to another post
-  (self-referencing thread). Domain derived from its resource; author must
-  belong to the same domain.
-- **post_flag** — join table attaching one or more `post_type` + score
-  (0–5) to a `post`. Domain derived from its post; flag type must belong
-  to the same domain.
+- **domain**: partitions all other data (decision #11).
+- **app_user**: a registered user and post author. Per domain.
+- **resource_category**: per-domain resource taxonomy (IMDB title types
+  for `imdb/*`). Seeds live in each domain's migration.
+- **resource**: the catalog item posts are about. Domain derived from its
+  category.
+- **post_type**: per-domain flag/label categories. Seeds live in each
+  domain's migration.
+- **post**: a post about a resource, or a reply to a post. Domain derived
+  from its resource; the author must be in the same domain.
+- **post_flag**: attaches a `post_type` + score (0–5) to a `post`. Domain
+  derived from its post; the type must be in the same domain.
 
 ## 4. Data Model
 
-[↑ Back to Table of Contents](#table-of-contents)
-
 ### 4.1 Mermaid ER Diagram
-
-[↑ Back to Table of Contents](#table-of-contents)
 
 ```mermaid
 erDiagram
@@ -197,18 +178,14 @@ erDiagram
     }
 ```
 
-`resource`, `post`, and `post_flag`'s `domain_id` is never set
-independently by a client — it's derived and DB-enforced via composite FKs
-(e.g. `resource (category_id, domain_id) → resource_category (id,
-domain_id)`), so it can never disagree with the row it's derived from —
-the same composite-FK SQL is repeated inline with each table below ([§4.3](#43-table-definitions)).
+The derived `domain_id` on `resource`, `post` and `post_flag` is never
+client-set. Composite FKs (e.g. `resource (category_id, domain_id) →
+resource_category (id, domain_id)`) keep it equal to its source row's
+domain; the SQL is with each table in [§4.3](#43-table-definitions).
 
 ### 4.2 Example Thread Shape
 
-[↑ Back to Table of Contents](#table-of-contents)
-
-Illustrates how `parent_post_id` produces unlimited nesting for a single
-resource, independent of what that resource represents:
+How `parent_post_id` nests replies under one resource:
 
 ```mermaid
 flowchart TD
@@ -226,20 +203,24 @@ flowchart TD
 
 ### 4.3 Table Definitions
 
-[↑ Back to Table of Contents](#table-of-contents)
+Every table also has `data jsonb` and `created_at`/`updated_at
+timestamptz NOT NULL DEFAULT now()`; they're omitted below. `deleted_at`
+(where present) is a nullable soft-delete marker: `NULL` means active.
+
+Tables that other tables reference by `(id, domain_id)` carry an extra
+`UNIQUE (id, domain_id)` constraint so the composite FK has a target. The
+primary key stays `id` alone. These are `app_user`, `resource_category`,
+`resource`, `post_type` and `post`.
 
 **domain**
 
 | Column | Type | Constraints |
 |---|---|---|
 | id | bigint | PK |
-| name | varchar | NOT NULL, UNIQUE — machine key, e.g. `imdb/bigotry` |
+| name | varchar | NOT NULL, UNIQUE; machine key, e.g. `imdb/bigotry` |
 | display_name | varchar | NOT NULL |
-| data | jsonb | |
-| created_at | timestamptz | NOT NULL, default now() |
-| updated_at | timestamptz | NOT NULL, default now() |
 
-Current seed values: `V7`, `V14`, `V17` (`imdb/bigotry`, `imdb/standard`).
+Seeds: `V7`, `V14`, `V17` (`imdb/bigotry`, `imdb/standard`).
 
 **app_user**
 
@@ -247,47 +228,33 @@ Current seed values: `V7`, `V14`, `V17` (`imdb/bigotry`, `imdb/standard`).
 |---|---|---|
 | id | bigint | PK |
 | domain_id | bigint | NOT NULL, FK → domain.id |
-| username | varchar | NOT NULL, UNIQUE per domain (`UNIQUE (domain_id, username)`) |
-| email | varchar | NOT NULL, UNIQUE per domain (`UNIQUE (domain_id, email)`) |
+| username | varchar | NOT NULL, `UNIQUE (domain_id, username)` |
+| email | varchar | NOT NULL, `UNIQUE (domain_id, email)` |
 | first_name | varchar | |
 | last_name | varchar | |
-| data | jsonb | |
-| created_at | timestamptz | NOT NULL, default now() |
-| updated_at | timestamptz | NOT NULL, default now() |
-
-Also carries `UNIQUE (id, domain_id)` so `post` can FK against the pair
-(see **post** below) — not a change to the primary key, which stays `id`
-alone.
 
 **resource_category**
 
 | Column | Type | Constraints |
 |---|---|---|
 | id | bigint | PK |
-| domain_id | bigint | NOT NULL, FK → domain.id. Also carries `UNIQUE (id, domain_id)` so `resource` can FK against the pair. |
-| name | varchar | NOT NULL, UNIQUE per domain (`UNIQUE (domain_id, name)`) — machine key |
-| display_name | varchar | NOT NULL — human-readable label |
-| data | jsonb | |
-| created_at | timestamptz | NOT NULL, default now() |
-| updated_at | timestamptz | NOT NULL, default now() |
+| domain_id | bigint | NOT NULL, FK → domain.id |
+| name | varchar | NOT NULL, `UNIQUE (domain_id, name)`; machine key |
+| display_name | varchar | NOT NULL; human-readable label |
 
-Seed values are domain-specific and loaded by migration, not specified
-here — e.g. `V2__seed_lookup_tables.sql` for the original IMDB `titleType`
-taxonomy the `imdb/*` domains share.
+Seeds are per domain, e.g. `V2__seed_lookup_tables.sql` for the IMDB
+`titleType` taxonomy the `imdb/*` domains use.
 
 **resource**
 
 | Column | Type | Constraints |
 |---|---|---|
 | id | bigint | PK |
-| domain_id | bigint | NOT NULL. **Derived from `category_id`**, never set independently — see the composite FK below. Also carries `UNIQUE (id, domain_id)` so `post` can FK against the pair. |
-| name | varchar | NOT NULL, UNIQUE per domain (`UNIQUE (domain_id, name)`; external/natural key) |
+| domain_id | bigint | NOT NULL; **derived from `category_id`** (composite FK below) |
+| name | varchar | NOT NULL, `UNIQUE (domain_id, name)`; external natural key |
 | display_name | varchar | NOT NULL |
 | category_id | bigint | NOT NULL, FK → resource_category.id |
-| data | jsonb | |
-| created_at | timestamptz | NOT NULL, default now() |
-| updated_at | timestamptz | NOT NULL, default now() |
-| deleted_at | timestamptz | NULLABLE — soft delete marker; NULL = active. Required so deleting a resource can't orphan or cascade-destroy posts made against it. |
+| deleted_at | timestamptz | Soft delete, so deleting a resource can't orphan or destroy its posts |
 
 ```sql
 ALTER TABLE resource
@@ -300,33 +267,26 @@ ALTER TABLE resource
 | Column | Type | Constraints |
 |---|---|---|
 | id | bigint | PK |
-| domain_id | bigint | NOT NULL, FK → domain.id. Also carries `UNIQUE (id, domain_id)` so `post_flag` can FK against the pair. |
-| name | varchar | NOT NULL, UNIQUE per domain (`UNIQUE (domain_id, name)`) |
-| data | jsonb | |
-| created_at | timestamptz | NOT NULL, default now() |
-| updated_at | timestamptz | NOT NULL, default now() |
+| domain_id | bigint | NOT NULL, FK → domain.id |
+| name | varchar | NOT NULL, `UNIQUE (domain_id, name)` |
 
-Seed values are domain-specific — e.g. `V14`/`V16` seed `imdb/bigotry`'s
-severity-flag types, `V17` seeds `imdb/standard`'s plain rating types.
+Seeds are per domain: `V14`/`V16` for `imdb/bigotry`'s severity flags,
+`V17` for `imdb/standard`'s rating types.
 
 **post**
 
 | Column | Type | Constraints |
 |---|---|---|
 | id | bigint | PK |
-| domain_id | bigint | NOT NULL. **Derived from `resource_id`**, never set independently — see the composite FKs below. Also carries `UNIQUE (id, domain_id)` so `post_flag` can FK against the pair. |
+| domain_id | bigint | NOT NULL; **derived from `resource_id`** (composite FKs below) |
 | resource_id | bigint | NOT NULL, FK → resource.id |
 | user_id | bigint | NOT NULL, FK → app_user.id (author) |
-| parent_post_id | bigint | NULLABLE, FK → post.id (NULL = top-level post) |
+| parent_post_id | bigint | NULLABLE, FK → post.id (NULL = top-level) |
 | body_text | text | NOT NULL |
-| data | jsonb | |
-| created_at | timestamptz | NOT NULL, default now() |
-| updated_at | timestamptz | NOT NULL, default now() |
-| deleted_at | timestamptz | NULLABLE — soft delete marker; NULL = active. Set when the author deletes their own post. |
+| deleted_at | timestamptz | Set when the author deletes the post |
 
-A reply must belong to the same resource as its parent, and a post's
-domain must match both its resource's and its author's domain — all
-DB-enforced via composite FKs:
+A reply shares its parent's resource, and a post's domain matches both its
+resource's and its author's:
 
 ```sql
 ALTER TABLE post ADD CONSTRAINT uq_post_id_resource UNIQUE (id, resource_id);
@@ -346,18 +306,14 @@ ALTER TABLE post
 | Column | Type | Constraints |
 |---|---|---|
 | id | bigint | PK |
-| domain_id | bigint | NOT NULL. **Derived from `post_id`**, never set independently — see the composite FKs below. |
+| domain_id | bigint | NOT NULL; **derived from `post_id`** (composite FKs below) |
 | post_id | bigint | NOT NULL, FK → post.id |
 | post_type_id | bigint | NOT NULL, FK → post_type.id |
-| score | smallint | NOT NULL, CHECK (score BETWEEN 0 AND 5) — 0 = neutral (decision #12) |
-| data | jsonb | |
-| created_at | timestamptz | NOT NULL, default now() |
-| updated_at | timestamptz | NOT NULL, default now() |
-| deleted_at | timestamptz | NULLABLE — soft delete marker; NULL = active. Set when the author removes that flag from their post. |
+| score | smallint | NOT NULL, `CHECK (score BETWEEN 0 AND 5)`; 0 = neutral (decision #12) |
+| deleted_at | timestamptz | Set when the author removes the flag |
 
-A flag's domain must match both its post's domain and its flag type's
-domain, and only one active flag per `(post_id, post_type_id)` is allowed
-(a partial index so re-adding a soft-deleted type doesn't stay blocked):
+A flag's domain matches both its post's and its type's, and only one
+active flag per `(post_id, post_type_id)` is allowed:
 
 ```sql
 ALTER TABLE post_flag
@@ -372,53 +328,40 @@ CREATE UNIQUE INDEX uq_post_flag_active_post_type
     WHERE deleted_at IS NULL;
 ```
 
-Re-flagging the same type on an already-active flag updates the existing
-row's score rather than inserting a duplicate.
+Flagging a type that already has an active flag updates its score instead
+of inserting a duplicate.
 
 ## 5. Business Rules Summary
 
-[↑ Back to Table of Contents](#table-of-contents)
-
-1. A post always belongs to exactly one resource (directly, or via its
-   thread's root post).
-2. `parent_post_id = NULL` marks a top-level post; non-null marks a reply,
-   nested to unlimited depth.
-3. A post can carry zero or more `post_flag` entries, each pairing a
-   `post_type` with a 0–5 score (0 = neutral).
+1. A post belongs to exactly one resource (directly, or via its thread's
+   root).
+2. `parent_post_id = NULL` is a top-level post; non-null is a reply, at any
+   depth.
+3. A post has zero or more flags, each a `post_type` + 0–5 score
+   (0 = neutral).
 4. A resource has exactly one category.
-5. Users can edit their own `post` in place (silently overwriting
-   `body_text`, no edit history) and soft-delete their own `post` or
-   individual `post_flag` entries. Soft-deleted rows are never hard-deleted.
-6. Soft-deleting a `post` cascades to its entire reply subtree, not just
-   the post itself.
-7. Every request to a domain-scoped endpoint carries an `X-Domain` header;
-   a missing or unrecognized domain is rejected rather than defaulted. A
-   resource/post/flag can never cross a domain boundary from the
-   category/resource/post it's derived from (decision #11).
+5. Users can edit their own post in place (overwrites `body_text`, no
+   history) and soft-delete their own posts or flags. Nothing is ever
+   hard-deleted.
+6. Soft-deleting a post cascades to its whole reply subtree.
+7. Every domain-scoped request carries `X-Domain`; a missing or unknown
+   domain is rejected, never defaulted. No resource, post or flag can
+   cross the domain of the row it derives from (decision #11).
 
 ## 6. Open Questions (not yet answered — do not build against these)
 
-[↑ Back to Table of Contents](#table-of-contents)
-
-- **`POST /resources` validation**: should submitted resources be
-  validated against the domain's external source dataset (e.g. IMDB's
-  `title.basics.tsv` for the `imdb/*` domains), or can a resource be
-  created arbitrarily with any `name`/`category`? Currently unvalidated
-  ([§2](#2-decision-log) additional-defaults note on `resource.name`).
-- **Cascading soft delete**: currently implemented as a write-time
-  recursive cascade (decision #10) — is that the right trade-off long
-  term, or should "hidden because an ancestor is deleted" instead be
-  computed at read time (keeping each row's `deleted_at` meaning "the user
-  deleted *this* row specifically")?
-- **Auth/authz**: deferred. No schema impact assumed yet — if
-  roles/permissions are needed later (e.g. moderator vs. regular user),
-  that likely means an `app_user.role` column or a separate roles table,
-  to be designed when this is tackled.
-- **Moderation workflow**: deferred, TBD.
+- **`POST /resources` validation.** Should resources be validated against
+  the domain's source dataset (IMDB `title.basics.tsv` for `imdb/*`), or
+  accepted with any `name`/category? Currently unvalidated.
+- **Cascading soft delete.** Implemented as a write-time recursive cascade
+  (decision #10). Long term, should "hidden because an ancestor was
+  deleted" be computed at read time instead, so each row's `deleted_at`
+  means "this row was deleted"?
+- **Auth/authz.** Deferred. Roles (e.g. moderator) would likely need an
+  `app_user.role` column or a roles table, designed when this is tackled.
+- **Moderation workflow.** Deferred.
 
 ## 7. Tech Stack
 
-[↑ Back to Table of Contents](#table-of-contents)
-
-Spring Boot (Spring REST + Spring Data JPA), PostgreSQL. Implementation
-detail: [`architecture.md`](./architecture.md).
+Spring Boot (Spring REST + Spring Data JPA), PostgreSQL. Implementation:
+[`architecture.md`](./architecture.md).

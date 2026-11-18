@@ -70,7 +70,7 @@ public interface PostFlagRepository extends JpaRepository<PostFlag, Long> {
     }
 
     /**
-     * Backs {@code GET /rankings} (design-spec.md §3.5): for each
+     * Backs {@code GET /rankings} (architecture.md §5): for each
      * {@code post_type} in the domain, the 5 resources with the highest
      * average score among their active flags of that type. Flags on a
      * soft-deleted post, and soft-deleted resources, are excluded —

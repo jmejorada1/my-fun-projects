@@ -156,7 +156,7 @@ public class PostService {
                 .findByDomainIdAndParentPostIdAndDeletedAtIsNull(domainId, parentPostId, pageable), domainId);
     }
 
-    /** All posts (top-level + replies) authored by a user — design-spec.md §3.4. */
+    /** All posts (top-level + replies) authored by a user — architecture.md §5. */
     public Page<PostResponse> listByUser(Long userId, DomainRef domain, Pageable pageable) {
         Long domainId = domain.id();
         requireUserInDomain(userId, domainId);

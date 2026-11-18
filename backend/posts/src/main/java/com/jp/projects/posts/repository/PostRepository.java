@@ -20,7 +20,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
     Page<Post> findByDomainIdAndParentPostIdAndDeletedAtIsNull(Long domainId, Long parentPostId, Pageable pageable);
 
-    /** All posts (top-level + replies) authored by a user — design-spec.md §3.4. */
+    /** All posts (top-level + replies) authored by a user — architecture.md §5. */
     Page<Post> findByDomainIdAndUserIdAndDeletedAtIsNull(Long domainId, Long userId, Pageable pageable);
 
     /**

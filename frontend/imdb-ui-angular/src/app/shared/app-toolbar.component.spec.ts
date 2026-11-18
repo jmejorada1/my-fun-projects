@@ -75,6 +75,16 @@ describe('AppToolbarComponent', () => {
     expect(future?.textContent).toContain('coming soon');
   });
 
+  it('picker shows the domain restored from storage on first render, not the first option', () => {
+    localStorage.setItem('imdb-ui-angular.selectedDomain', 'imdb/standard');
+    TestBed.overrideProvider(DOMAIN_OPTIONS_TOKEN, { useValue: TWO_ENABLED_OPTIONS });
+    const fixture = TestBed.createComponent(AppToolbarComponent);
+    fixture.detectChanges();
+
+    const select: HTMLSelectElement = fixture.nativeElement.querySelector('select');
+    expect(select.value).toBe('imdb/standard');
+  });
+
   it('selecting a new domain calls DomainSelectionService.select with it', () => {
     TestBed.overrideProvider(DOMAIN_OPTIONS_TOKEN, { useValue: TWO_ENABLED_OPTIONS });
     const fixture = TestBed.createComponent(AppToolbarComponent);

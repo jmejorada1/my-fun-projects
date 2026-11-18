@@ -16,9 +16,16 @@
   <div class="right-group">
     <label class="domain-picker">
       Domain:
-      <select name="domain" [value]="selectedDomain()" (change)="onDomainChange($event)">
+      <!-- Selection is bound per <option>, not via [value] on the <select>:
+           [value] is applied before the @for renders the options, so the
+           browser drops it and falls back to the first option. -->
+      <select name="domain" (change)="onDomainChange($event)">
         @for (option of domainOptions; track option.value) {
-          <option [value]="option.value" [disabled]="!option.enabled">
+          <option
+            [value]="option.value"
+            [disabled]="!option.enabled"
+            [selected]="option.value === selectedDomain()"
+          >
             {{ option.label }}{{ option.enabled ? '' : ' (coming soon)' }}
           </option>
         }

@@ -3,7 +3,7 @@ package com.jp.projects.posts.repository;
 /**
  * Interface projection for {@link PostFlagRepository#findTopRankedResourcesByPostType},
  * one row per (post_type, resource) pair already limited to the top 5 per
- * post_type — see design-spec.md §3.5.
+ * post_type — see architecture.md §5.
  */
 public interface PostTypeRankingRow {
 

@@ -1,15 +1,11 @@
 # imdb-ui-angular — Design Spec
 
-Status: Implemented. Screens, flows, and business rules currently implemented
-for both domains this app serves.
-Source: [`requirements-notes.txt`](./requirements-notes.txt) (original raw
-draft).
+**Status:** Implemented for both domains. **Source:**
+[`requirements-notes.txt`](./archived/requirements-notes.txt) (original draft).
 
-For how the code is structured, see [`architecture.md`](./architecture.md).
-For the backend data model these screens render, see
-[`backend/posts/docs/design-spec.md`](../../../backend/posts/docs/design-spec.md).
-For a screenshot-driven walkthrough written for end users rather than
-developers, see [`user-guide.md`](./user-guide.md).
+Code structure: [`architecture.md`](./architecture.md). Backend data
+model: [`backend/posts/docs/design-spec.md`](../../../backend/posts/docs/design-spec.md).
+End-user walkthrough: [`user-guide.md`](./user-guide.md).
 
 ## Table of Contents
 
@@ -22,105 +18,88 @@ developers, see [`user-guide.md`](./user-guide.md).
 
 ## 1. Overview
 
-[↑ Back to Table of Contents](#table-of-contents)
+A single-page UI for the `posts` backend, switchable at runtime between
+domains ([`architecture.md` §4](./architecture.md#4-domain-configuration-system)):
 
-A single-page UI for the `posts` backend's threaded-post/flag domains,
-switchable at runtime via a domain picker ([`architecture.md`](./architecture.md) §4) rather
-than being built for one domain. Two domains are implemented:
-`imdb/bigotry` ("Big-O-Meter" — flags titles for racism/sexism/lgbtq-phobia
-with a 0–5 severity score) and `imdb/standard` ("Movie-Meter" — a plain
-skip-it/it-was-okay/i-enjoyed-it/i-loved-it rating, no severity).
+- `imdb/bigotry` ("Big-O-Meter"): flag titles for racism, sexism or
+  LGBTQ+-phobia with a 0–5 severity.
+- `imdb/standard` ("Movie-Meter"): a plain skip-it / it-was-okay /
+  i-enjoyed-it / i-loved-it rating, no severity.
 
-Three screens: **Login**, **Register**, and a guarded **Dashboard**
-(3-panel layout — a user's own posts, search + a resource's detail view,
-and top-5 rankings per post type), plus a **Resource Detail** view reached
-from search results.
+Screens: **Login**, **Register**, and a guarded 3-panel **Dashboard** (my
+posts, search or resource detail, top-5 rankings per post type). **Resource
+Detail** opens from a search result.
 
 ## 2. Decision Log
 
-[↑ Back to Table of Contents](#table-of-contents)
-
 | # | Decision | Rationale |
 |---|----------|-----------|
-| 1 | Login and registration are **separate actions, both by username**. Login is a lookup (`404` if unknown); registration is a create (`409` on a duplicate username/email). | Sets up a clean seam for a future real identity provider: register ≈ "create an account," login ≈ "look up an account" — neither changes shape when a real IdP is added later. |
-| 2 | **No password/session/token.** The logged-in user's id/username/email lives in a signal, mirrored to `localStorage` so a refresh doesn't log the user out, and is sent as plain `userId`/`username` fields exactly where the backend's DTOs already expect them. | Matches the backend's explicit "not security-enforced" stance ([`backend/posts/docs/architecture.md`](../../../backend/posts/docs/architecture.md) §5) — a fake token would imply more security than actually exists. |
-| 3 | Search is **submit-driven, not type-ahead**; matches a resource's `displayName`, case-insensitive, partial. | Explicitly out of scope per the original requirements. |
-| 4 | Soft-deleted resources/posts/flags need **no client-side filtering** — the backend already excludes `deletedAt`-set rows from every endpoint this app calls. | Consistent with existing backend behavior, not a new assumption. |
-| 5 | The left dashboard panel lists **every post the current user authored** — top-level and replies, across all resources, newest first. | Matches `GET /users/{userId}/posts`. |
-| 6 | Rankings (`GET /rankings`, [`architecture.md`](./architecture.md) §6) are **domain-agnostic on the backend** — this app renders whatever post types come back for the active domain rather than hardcoding category names. | Lets a new domain's rankings render correctly with zero frontend code change, same as the backend's own domain-agnostic design. |
-| 7 | A `category-only` domain (today: `imdb/standard`) still submits a **fixed constant score** with every flag, since the backend's `post_flag.score` is `NOT NULL`. Ranking order still comes out correct: with every score equal, the backend's `ORDER BY avg_score DESC, flag_count DESC` degrades to ordering by count alone — exactly "counts of the chosen categories." | Avoids a backend schema/query change for this domain; recorded as a deliberate choice per [`backend/posts/CLAUDE.md`](../../../backend/posts/CLAUDE.md)'s "record non-obvious modeling choices" guidance, not a silent assumption. |
-| 8 | **Deployment is a static build served by nginx in Docker**, with the backend URL resolved at container *startup* via `/config.json`, not baked in at `ng build` time. | One built image works against any backend without a rebuild — see [`architecture.md`](./architecture.md) §6/§9. |
+| 1 | Login and registration are **separate actions, both by username**. Login looks up (`404` if unknown); register creates (`409` on a duplicate username/email). | A clean seam for a real IdP later: register = create an account, login = look one up. Neither changes shape. |
+| 2 | **No password, session or token.** The user's id/username/email sits in a signal mirrored to `localStorage` (survives refresh) and is sent as plain `userId`/`username` fields where backend DTOs expect them. | Matches the backend's "not security-enforced" stance ([backend §5](../../../backend/posts/docs/architecture.md#5-rest-api-surface)). A fake token would imply security that doesn't exist. |
+| 3 | Search is **submit-driven, not type-ahead**: case-insensitive partial match on `displayName`. | Type-ahead was out of scope in the original requirements. |
+| 4 | **No client-side filtering of soft-deleted rows.** | The backend already excludes rows with `deletedAt` set from every endpoint this app calls. |
+| 5 | The left panel lists **every post the user authored**: top-level and replies, all resources, newest first. | Matches `GET /users/{userId}/posts`. |
+| 6 | Rankings (`GET /rankings`) are **domain-agnostic**: the app renders whatever post types the backend returns for the active domain. | A new domain's rankings render with no frontend change. |
+| 7 | A `category-only` domain (today `imdb/standard`) sends a **fixed constant score** with every flag, since `post_flag.score` is `NOT NULL`. With equal scores, the backend's `ORDER BY avg_score DESC, flag_count DESC` reduces to ordering by count, which is what this domain wants. | No backend schema or query change. Recorded per [`backend/posts/CLAUDE.md`](../../../backend/posts/CLAUDE.md)'s "record non-obvious modeling choices." |
+| 8 | **Static build served by nginx in Docker**, with the backend URL read from `/config.json` at container startup, not baked in at `ng build`. | One image works against any backend ([`architecture.md` §6](./architecture.md#6-api-layer--runtime-configuration), [§9](./architecture.md#9-deployment)). |
 
 ## 3. Screens & Flows
 
-[↑ Back to Table of Contents](#table-of-contents)
+**Login** (`/login`): username + submit, and a link to `/register`. Looks
+up the account (decision #1); `404` shows "no account found."
 
-**Login** (`/login`): a username field + submit, plus a link to
-`/register`. On submit, looks up the account ([§2](#2-decision-log) decision #1); a `404`
-surfaces as "no account found."
-
-**Register** (`/register`): username + email fields + submit, plus a link
-back to `/login`. On submit, creates the account and logs it straight in
-(no separate "now go log in" step); a `409` surfaces as a field error.
+**Register** (`/register`): username + email + submit, and a link back to
+`/login`. Creates the account and logs straight in; `409` shows as a field
+error.
 
 **Dashboard** (`/`, guarded): a toolbar (domain picker, search box, "Hi
-`{{username}}`" + Logout) plus a resizable 3-column layout below it.
+`{{username}}`", Logout) over a resizable 3-column layout:
 
-- **Left — my-posts panel**: every post the current user authored, newest
-  first. Empty state: "You haven't posted yet."
-- **Center**: a routed child — search results by default
-  (`SearchPanelComponent`), or a resource's detail view
-  (`ResourceDetailComponent`) after clicking a result.
-- **Right — rankings panel**: one ranked list per post type in the active
-  domain, each entry showing a resource and its score (average, for a
-  `severity-score` domain) or count (for a `category-only` domain).
+- **Left, my posts:** everything the user authored, newest first. Empty
+  state: "You haven't posted yet."
+- **Center:** a routed child: search results (`SearchPanelComponent`) by
+  default, or a resource's detail (`ResourceDetailComponent`) after a
+  click.
+- **Right, rankings:** one ranked list per post type in the active domain,
+  each entry showing a resource with its average score (`severity-score`)
+  or count (`category-only`).
 
 **Resource Detail** (`/resources/:id`): the resource, its top-level posts
-in a sortable/resizable table, and a form to add a new post — optionally
-flagged with the active domain's rating in the same submit
-(`POST /posts`). Replying, sorting, and column-width preferences are
-scoped to this screen; posting or replying notifies the dashboard's
-left/right panels to refresh ([`architecture.md`](./architecture.md) §5) without navigating
-away.
+in a sortable, resizable table, and a form to add a post, optionally
+flagged with the domain's rating in the same submit (`POST /posts`).
+Replying, sorting and column widths are local to this screen. Posting or
+replying tells the side panels to refresh
+([`architecture.md` §5](./architecture.md#5-state-management)) without
+navigating away.
 
 ## 4. Domain-Specific Business Rules
 
-[↑ Back to Table of Contents](#table-of-contents)
-
-Behavior that differs by domain, all driven through `DomainConfig`
-([`architecture.md`](./architecture.md) §4) rather than hardcoded — the table below is the
-*current* two domains, not an exhaustive list of every field a future
-domain could set:
+All driven by `DomainConfig`
+([`architecture.md` §4](./architecture.md#4-domain-configuration-system)).
+This covers the current two domains, not every field a future one could
+set.
 
 | | `imdb/bigotry` | `imdb/standard` |
 |---|---|---|
-| Rating input | 0–5 severity score + category | Category only, no score field shown |
-| Ranking metric shown | Average severity score | Effectively a count ([§2](#2-decision-log) decision #7) |
-| Badge coloring | By severity (green = no-bigotry, yellow → red by score) | By category tier (red → green, worst → best) |
-| Conflict-detection dialog | Yes — flagging "no bigotry" against a post that also carries a severe (≥3) flag of another type prompts the user to resolve the contradiction | No — no neutral/contradiction concept for a plain rating |
-| Theme | The app's default `:root` colors | Overridden accent + a neutral grey for the "it was okay" tier |
+| Rating input | 0–5 severity score + category | Category only, no score field |
+| Ranking metric | Average severity | Effectively a count (decision #7) |
+| Badge coloring | By severity: green = no-bigotry, yellow → red by score | By tier: red → green, worst → best |
+| Conflict dialog | Yes: flagging "no bigotry" on a post that also has a severe (≥3) flag of another type asks the user to resolve it | No: a plain rating has no neutral/contradiction concept |
+| Theme | The app's default `:root` colors | Overridden accent, plus neutral grey for "it was okay" |
 
 ## 5. Non-Goals
 
-[↑ Back to Table of Contents](#table-of-contents)
-
-- **Real authentication** (password, OAuth2/OIDC, tokens) — explicitly
-  deferred on the backend already; this app matches that, not ahead of it.
-- **Type-ahead search** — explicitly deferred per the original
-  requirements.
-- **The standalone `login-ui` project** (`frontend/login-ui/`) — still an
-  empty, reserved placeholder. This app's login/register screens are a
-  stand-in, not a stopgap waiting on that project specifically.
-- **A backend schema change for `category-only` domains** — `imdb/standard`
-  reuses the existing scored-flag schema via a fixed constant ([§2](#2-decision-log) decision
-  #7) rather than the backend growing a nullable-score or "unscored post
-  type" concept. Revisit only if a future domain's needs actually require it.
+- **Real authentication** (passwords, OAuth2/OIDC, tokens): deferred on the
+  backend, and this app doesn't get ahead of it.
+- **Type-ahead search:** deferred by the original requirements.
+- **A standalone login app:** not started. These login/register screens
+  are a stand-in, not a stopgap waiting on it.
+- **A backend schema change for `category-only` domains:** `imdb/standard`
+  reuses the scored-flag schema with a fixed score (decision #7). Revisit
+  only if a future domain needs a nullable score or unscored post types.
 
 ## 6. Open Questions
 
-[↑ Back to Table of Contents](#table-of-contents)
-
-- **Minimum flag-count threshold for rankings** — a resource with a single
-  5-scored flag currently outranks one with twenty flags averaging 4.8 in
-  a `severity-score` domain's rankings. No threshold is applied unless
-  wanted.
+- **Minimum flag count for rankings.** In a `severity-score` domain, a
+  resource with one flag scored 5 outranks one with twenty flags averaging
+  4.8. No threshold is applied unless one is wanted.

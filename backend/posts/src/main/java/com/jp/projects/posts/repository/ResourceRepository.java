@@ -23,7 +23,7 @@ public interface ResourceRepository extends JpaRepository<Resource, Long> {
 
     /**
      * Backs {@code GET /resources}: both filters are optional and
-     * combinable (frontend/imdb-ui-angular/docs/design-spec.md §3.3).
+     * combinable (architecture.md §5).
      *
      * <p>Escapes LIKE metacharacters in {@code search} before delegating,
      * so a literal {@code %} or {@code _} in someone's search text is
