@@ -25,9 +25,10 @@ public class RankingService {
     private final PostTypeMapper postTypeMapper;
 
     /**
-     * design-spec.md §3.5 — one entry per {@code post_type} in the domain
-     * (even ones with no flags yet, which get an empty {@code resources}
-     * list), each with its top-5 ranked resources.
+     * {@code GET /rankings} (architecture.md §5) — one entry per
+     * {@code post_type} in the domain (even ones with no flags yet, which
+     * get an empty {@code resources} list), each with its top-5 ranked
+     * resources.
      */
     public List<PostTypeRankingResponse> getRankings(DomainRef domain) {
         Long domainId = domain.id();

@@ -78,7 +78,7 @@ public class PostController {
         return postService.get(postId, domain);
     }
 
-    /** All posts (top-level + replies) authored by a user — design-spec.md §3.4. */
+    /** All posts (top-level + replies) authored by a user — architecture.md §5. */
     @GetMapping("/users/{userId}/posts")
     public Page<PostResponse> listByUser(@PathVariable Long userId,
                                           @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC)
