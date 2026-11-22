@@ -109,5 +109,19 @@ describe('DomainSelectionService', () => {
 
       expect(navigateSpy).not.toHaveBeenCalled();
     });
+
+    it("applies the active domain's theme tokens and removes them on a switch back", () => {
+      localStorage.setItem(STORAGE_KEY, 'imdb/bigotry');
+      const service = TestBed.inject(DomainSelectionService);
+      const rootStyle = document.documentElement.style;
+
+      service.select('imdb/standard');
+      TestBed.tick();
+      expect(rootStyle.getPropertyValue('--color-primary')).toBe('#0ea5e9');
+
+      service.select('imdb/bigotry');
+      TestBed.tick();
+      expect(rootStyle.getPropertyValue('--color-primary')).toBe('');
+    });
   });
 });
