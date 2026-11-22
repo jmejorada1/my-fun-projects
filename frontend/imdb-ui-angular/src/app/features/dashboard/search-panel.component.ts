@@ -5,16 +5,7 @@ import { SearchStateService } from '../../core/search-state.service';
 import { DomainSelectionService } from '../../core/domain-selection.service';
 import { Resource, ResourceFlagSummaryEntry } from '../../api/resource.service';
 
-/**
- * Center panel — renders whatever the last search produced. The search
- * box itself lives in the global toolbar (AppToolbarComponent), not here,
- * so results show up on the dashboard regardless of which page the search
- * was submitted from; SearchStateService is the shared state in between.
- *
- * Flag-summary columns are derived from whatever categories actually show
- * up in the current results (not a hardcoded list) — new post types just
- * appear as new columns automatically.
- */
+/** Columns come from the categories present in the results, so new post types need no change. */
 @Component({
   selector: 'app-search-panel',
   imports: [RouterLink, DecimalPipe],
@@ -45,8 +36,7 @@ export class SearchPanelComponent {
     return resource.flagSummary.find((entry) => entry.postTypeName === postTypeName);
   }
 
-  /** True when this category's cell should show a bare count instead of "avg X (count)" —
-   *  either a neutral flag (bigotry's "no-bigotry") or the whole domain has no severity to average. */
+  /** Neutral flags and category-only domains show a bare count instead of an average. */
   isCountOnly(postTypeName: string): boolean {
     const config = this.domainSelection.activeDomainConfig();
     return config.rating.mode === 'category-only' || postTypeName === config.neutralPostTypeName;

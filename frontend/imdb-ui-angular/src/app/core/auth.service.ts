@@ -13,14 +13,7 @@ export interface AuthUser {
 
 const STORAGE_KEY = 'imdb-ui-angular.currentUser';
 
-/**
- * Placeholder auth (design-spec.md §2 decision #2) — no password/token. `login` looks
- * up an existing account by username; `register` creates a new one from a
- * username + email. Both just store whatever `AppUserResponse` the
- * backend returns; neither knows or cares how that response was obtained,
- * which is deliberate — a future Google identity provider replaces what's
- * inside these two methods without changing this service's public shape.
- */
+/** Placeholder auth with no password or token (design-spec.md decision #2). */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
@@ -29,14 +22,14 @@ export class AuthService {
   private readonly currentUserSignal = signal<AuthUser | null>(readFromStorage());
   readonly currentUser = this.currentUserSignal.asReadonly();
 
-  /** Login: looks up an existing account. Errors (404) if none exists. */
+  /** 404 if the user doesn't exist. */
   login(username: string): Observable<AuthUser> {
     return this.http
       .get<AuthUser>(`${this.apiConfig.baseUrl()}/dev/users/by-username/${encodeURIComponent(username)}`)
       .pipe(tap((user) => this.setCurrentUser(user)));
   }
 
-  /** Register: always creates a new account. Errors (409) on a duplicate username/email. */
+  /** 409 on a duplicate username or email. */
   register(username: string, email: string): Observable<AuthUser> {
     return this.http
       .post<AuthUser>(`${this.apiConfig.baseUrl()}/dev/users`, { username, email })
@@ -58,7 +51,7 @@ function readFromStorage(): AuthUser | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? (JSON.parse(raw) as AuthUser) : null;
   } catch {
-    // Private browsing / disabled storage — fall back to "logged out".
+    // Storage unavailable: start logged out.
     return null;
   }
 }
@@ -71,6 +64,6 @@ function writeToStorage(user: AuthUser | null): void {
       localStorage.removeItem(STORAGE_KEY);
     }
   } catch {
-    // Signal is still the source of truth for this session either way.
+    // Storage is optional; the signal holds the user.
   }
 }

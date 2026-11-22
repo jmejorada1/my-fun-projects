@@ -51,9 +51,7 @@ class PostsFlowIntegrationTest {
     @Autowired
     private TestRestTemplate restTemplate;
 
-    // Every business endpoint requires an X-Domain header
-    // (architecture.md §8.1); adding it once here keeps the calls
-    // below unchanged rather than threading it through every request.
+    // Adds the X-Domain header every endpoint needs.
     @BeforeEach
     void addDomainHeader() {
         restTemplate.getRestTemplate().setInterceptors(List.of((request, body, execution) -> {
@@ -101,11 +99,7 @@ class PostsFlowIntegrationTest {
         restTemplate.postForObject("/posts/" + topLevel.id() + "/flags",
                 new PostFlagCreateRequest(user.id(), 1L, 5), PostFlagResponse.class);
 
-        // flag the REPLY too, with a type the top-level post doesn't have —
-        // this is the scenario that used to slip past the resource-detail
-        // page's summary (computed only from top-level posts) while still
-        // correctly showing up in /rankings (which aggregates any post
-        // depth); the resource-level assertions below check it's included.
+        // flag the reply with a type the top-level post doesn't have
         restTemplate.postForObject("/posts/" + reply.id() + "/flags",
                 new PostFlagCreateRequest(user.id(), 101L, 3), PostFlagResponse.class);
 
@@ -117,9 +111,7 @@ class PostsFlowIntegrationTest {
                 .extracting(PostFlagResponse::score)
                 .containsExactly((short) 5);
 
-        // the resource's post list (what the UI's expandable table renders)
-        // includes each post's flags inline, batch-loaded rather than
-        // requiring a separate /posts/{id}/flags call per row
+        // the post list includes each post's flags
         String topLevelPostsJson = restTemplate.getForObject(
                 "/resources/" + resource.id() + "/posts?size=50", String.class);
         JsonNode topLevelFromList = StreamSupport
@@ -132,12 +124,8 @@ class PostsFlowIntegrationTest {
                 .filter(f -> f.get("postType").get("id").asLong() == 1L)
                 .map(f -> f.get("score").asInt()))
                 .containsExactly(5);
-        // the one reply created above, batch-counted rather than requiring
-        // a separate /posts/{id}/replies call to know it exists
         assertThat(topLevelFromList.get("replyCount").asLong()).isEqualTo(1L);
 
-        // the movie title, batch-loaded alongside the page — most useful on
-        // the by-user endpoint (checked next), whose posts span many resources
         assertThat(topLevelFromList.get("resourceDisplayName").asText()).isEqualTo("Flow Movie");
 
         String userPostsJson = restTemplate.getForObject("/users/" + user.id() + "/posts?size=50", String.class);
@@ -149,9 +137,7 @@ class PostsFlowIntegrationTest {
                 .get("resourceDisplayName").asText())
                 .isEqualTo("Flow Movie");
 
-        // the resource search/list endpoint (search results page) includes
-        // a total post count and a per-category flag summary, batch-loaded
-        // rather than requiring a separate call per search result
+        // search results include a post count and flag summary
         String searchJson = restTemplate.getForObject(
                 "/resources?search=" + resource.displayName().replace(" ", "+"), String.class);
         JsonNode searchResult = StreamSupport
@@ -170,17 +156,13 @@ class PostsFlowIntegrationTest {
                 .filter(f -> f.get("postTypeName").asText().equals("sexism"))
                 .map(f -> f.get("flagCount").asLong()))
                 .containsExactly(1L);
-        // the reply-only flag, aggregated in alongside the top-level post's
+        // the reply's flag counts too
         assertThat(StreamSupport.stream(flagSummary.spliterator(), false)
                 .filter(f -> f.get("postTypeName").asText().equals("lgbtq-phobic"))
                 .map(f -> f.get("averageScore").asDouble()))
                 .containsExactly(3.0);
 
-        // the single-resource read (what the resource-detail page's route
-        // loads) reports the same aggregated postCount/flagSummary as the
-        // list/search endpoint above, including the reply's flag — it used
-        // to hardcode postCount=0 and flagSummary=[] instead of actually
-        // computing them
+        // the single-resource read reports the same totals
         ResourceResponse singleResource = restTemplate.getForObject(
                 "/resources/" + resource.id(), ResourceResponse.class);
         assertThat(singleResource.postCount()).isEqualTo(2L); // top-level post + its reply

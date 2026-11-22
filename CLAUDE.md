@@ -104,6 +104,16 @@ does, tell the user and wait. Don't relaunch it yourself.
   methods. A long `if`/`switch` chain on a type or mode may read better
   as a lookup map. Don't extract one-line wrappers just to make a method
   shorter.
+- **Comments, few and short:** names and small methods should explain
+  the code, so most changes need no comments. Comment only a *why* the
+  code can't show (a non-obvious constraint, a workaround with its issue
+  link, a security reason, a spec requirement that looks odd, with its
+  R#), in a line or two. Don't restate the code or narrate the change,
+  and don't leave commented-out code, section banners, or
+  Arrange/Act/Assert markers. Write doc comments only for public API
+  whose contract the signature doesn't make clear, or where a component
+  `CLAUDE.md` asks for them, in a sentence or two. Change history goes in
+  commit messages and spec notes.
 - **SOLID, where it pays off:** one responsibility per class, constructor
   injection, interfaces only at real seams (repositories, external clients).
 - **DRY, by the rule of three:** look for an existing helper, mapper or

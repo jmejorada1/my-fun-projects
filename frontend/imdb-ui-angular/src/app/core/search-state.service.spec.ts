@@ -76,12 +76,7 @@ describe('SearchStateService', () => {
   });
 
   it('clears stale results when the current user changes, e.g. a domain switch forcing a logout', () => {
-    // Regression test: resources are domain-scoped, but this service is a
-    // root singleton — without this, a domain switch (which logs the
-    // current user out first — see DomainSelectionService.select()) left
-    // the *previous* domain's results on screen. Clicking one navigated to
-    // a resourceId that doesn't exist in the newly-selected domain
-    // ("Resource <id> not found").
+    // Otherwise a domain switch leaves the old domain's results on screen.
     service.search('shawshank');
     httpMock.expectOne((r) => r.url === `${API_BASE_URL}/resources`).flush({
       content: [{ id: 1, name: 'tt1', displayName: 'The Shawshank Redemption', category: { id: 1, name: 'movie', displayName: 'Movie' } }],

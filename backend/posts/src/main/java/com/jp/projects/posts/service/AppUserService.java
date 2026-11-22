@@ -10,12 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Temporary, dev-only (architecture.md §5). Delete
- * this service (and its controller) once real registration/auth exists —
- * flagged as the seam where a Google identity provider would eventually
- * plug in instead.
- */
+/** Placeholder until real auth replaces it (architecture.md §5). */
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
@@ -23,12 +18,7 @@ public class AppUserService {
 
     private final AppUserRepository appUserRepository;
 
-    /**
-     * Registration (§19): always creates a new account. No pre-check on
-     * username/email uniqueness — that would be a race-prone
-     * check-then-insert, same reasoning as ResourceService.create. A
-     * violation surfaces as a 409 via GlobalExceptionHandler.
-     */
+    /** No uniqueness pre-check, which would race; the constraint violation becomes a 409. */
     @Transactional
     public AppUserResponse create(AppUserCreateRequest request, DomainRef domain) {
         AppUser user = AppUser.builder()
@@ -42,7 +32,6 @@ public class AppUserService {
         return toResponse(appUserRepository.save(user));
     }
 
-    /** Login (§19): looks up an existing account by username; does not create one. */
     public AppUserResponse findByUsername(String username, DomainRef domain) {
         return toResponse(appUserRepository.findByDomainIdAndUsername(domain.id(), username)
                 .orElseThrow(() -> new NotFoundException(
@@ -61,12 +50,8 @@ public class AppUserService {
     }
 
     /**
-     * Hard delete, unlike every other deletable entity here — {@code app_user}
-     * has no {@code deleted_at} column. Because {@code post.user_id} is a
-     * real FK, this only succeeds for a user who has never posted; anyone
-     * else's delete fails the constraint and surfaces as a 409. That
-     * asymmetry is tracked in docs/code-review-findings.md §1.4 and should
-     * be resolved when this dev-only surface is replaced by real auth.
+     * Hard delete ({@code app_user} has no {@code deleted_at}), so it 409s for anyone who has
+     * posted. Tracked in docs/code-review-findings.md §1.4.
      */
     @Transactional
     public void delete(Long id, DomainRef domain) {

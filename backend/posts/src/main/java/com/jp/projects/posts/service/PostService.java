@@ -43,13 +43,8 @@ public class PostService {
     private final PostFlagMapper postFlagMapper;
 
     /**
-     * Unified creation entry point: a top-level post when
-     * {@code parentPostId} is omitted, a reply when it's present (the
-     * effective resourceId is then derived from the parent, same rule as
-     * {@link #createReply} — any client-supplied resourceId is ignored in
-     * that case). Identifies the author by username rather than userId.
-     * When {@code postTypeId} is given (score is required alongside it),
-     * a flag is applied to the new post in the same transaction.
+     * Creates a reply when {@code parentPostId} is set, taking the parent's resource and ignoring
+     * {@code resourceId}. A {@code postTypeId} and score add a flag in the same transaction.
      */
     @Transactional
     public PostCreateResponse createPost(PostCreateRequest request, DomainRef domain) {
@@ -83,9 +78,7 @@ public class PostService {
                 .build();
         post = postRepository.save(post);
 
-        // Map before flagging, not after: addOrUpdateFlag's upsert is a
-        // @Modifying query with clearAutomatically = true, which detaches
-        // `post` from the persistence context.
+        // Map before flagging: the flag upsert clears the persistence context, detaching `post`.
         PostResponse postResponse = postMapper.toResponse(post);
 
         PostFlagResponse flag = null;
@@ -122,8 +115,7 @@ public class PostService {
         Post parent = getActive(parentPostId, domainId);
         AppUser author = requireUserInDomain(request.userId(), domainId);
 
-        // A reply inherits its thread's resource — derived server-side, not
-        // accepted from the client (design-spec.md §2).
+        // Replies take the parent's resource (design-spec.md §2).
         Post reply = Post.builder()
                 .domainId(domainId)
                 .resourceId(parent.getResourceId())
@@ -156,7 +148,6 @@ public class PostService {
                 .findByDomainIdAndParentPostIdAndDeletedAtIsNull(domainId, parentPostId, pageable), domainId);
     }
 
-    /** All posts (top-level + replies) authored by a user — architecture.md §5. */
     public Page<PostResponse> listByUser(Long userId, DomainRef domain, Pageable pageable) {
         Long domainId = domain.id();
         requireUserInDomain(userId, domainId);
@@ -165,14 +156,8 @@ public class PostService {
     }
 
     /**
-     * Turns a page of posts into a page of responses, batch-loading the
-     * three things the list endpoints add on top of a plain post — its
-     * flags, its active reply count, and its resource's title — in three
-     * queries total rather than per row.
-     *
-     * <p>Single-post reads/writes deliberately leave all three unset: the
-     * caller is already on that resource's page. (By-user is the case that
-     * most needs the title, since those posts span many resources.)
+     * Adds flags, reply count and resource title with one query each, not one per row. Single-post
+     * responses leave them unset.
      */
     private Page<PostResponse> toResponsePage(Page<Post> posts, Long domainId) {
         List<Long> postIds = posts.getContent().stream().map(Post::getId).toList();
@@ -187,10 +172,7 @@ public class PostService {
                         .collect(Collectors.toMap(PostRepository.ReplyCount::getParentPostId,
                                 PostRepository.ReplyCount::getReplyCount));
         List<Long> resourceIds = posts.getContent().stream().map(Post::getResourceId).distinct().toList();
-        // Domain-scoped and soft-delete-filtered like every other resource
-        // lookup in this service. The IDs come from already-domain-scoped
-        // posts so this can't currently narrow the result — it keeps the
-        // invariant local instead of relying on the caller to hold it.
+        // Domain-scoped even though the posts already are, so the check doesn't depend on callers.
         Map<Long, String> resourceDisplayNameById = resourceIds.isEmpty()
                 ? Map.of()
                 : resourceRepository.findByIdInAndDomainIdAndDeletedAtIsNull(resourceIds, domainId).stream()
@@ -205,8 +187,7 @@ public class PostService {
     public PostResponse updatePostText(Long postId, PostUpdateRequest request, DomainRef domain) {
         Post post = getActive(postId, domain.id());
         requireOwner(post, request.userId());
-        // Silently overwrites body_text in place — no edit history, per the
-        // confirmed decision (design-spec.md §6).
+        // No edit history is kept (design-spec.md §5).
         post.setBodyText(request.bodyText());
         return postMapper.toResponse(post);
     }
@@ -215,9 +196,7 @@ public class PostService {
     public void deletePost(Long postId, Long actingUserId, DomainRef domain) {
         Post post = getActive(postId, domain.id());
         requireOwner(post, actingUserId);
-        // Ownership check and cascade run in the same transaction as the
-        // @Modifying query requires an existing one, and a failed cascade
-        // shouldn't leave the root post's delete standing on its own.
+        // One transaction, so a failed cascade also undoes the root post's delete.
         postRepository.softDeleteSubtree(postId);
     }
 
@@ -227,15 +206,8 @@ public class PostService {
     }
 
     /**
-     * Explicit cross-domain author check for the endpoints that take a raw
-     * {@code userId} rather than resolving one by username within this
-     * domain already (design-spec.md §4.3) — the unified
-     * {@code createPost} entry point gets this for free from its
-     * domain-scoped username lookup instead. Returns the resolved
-     * {@link AppUser} so callers building a new {@code Post} can set its
-     * {@code user} association (needed for {@code PostMapper} to include
-     * {@code username} in the response — a freshly built entity has no
-     * lazy proxy to fall back on).
+     * For endpoints that take a raw userId (design-spec.md §3). Returns the user so a new Post can
+     * set {@code user}, which the mapper reads for {@code username}.
      */
     private AppUser requireUserInDomain(Long userId, Long domainId) {
         return appUserRepository.findByIdAndDomainId(userId, domainId)

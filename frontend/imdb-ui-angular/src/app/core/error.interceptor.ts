@@ -9,11 +9,7 @@ interface ProblemDetail {
   errors?: Record<string, string>;
 }
 
-/**
- * Wraps every failed request in an {@link AppHttpError} carrying a
- * ready-to-display message, so components don't each need to know how to
- * unpack a ProblemDetail body (backend/posts/docs/architecture.md §9.1).
- */
+/** Turns every failed request into an {@link AppHttpError} with a displayable message. */
 export class AppHttpError extends Error {
   constructor(
     message: string,

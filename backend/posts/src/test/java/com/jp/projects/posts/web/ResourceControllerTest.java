@@ -28,12 +28,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-/**
- * {@code WebMvcConfig}/{@code CurrentDomainArgumentResolver} are imported
- * explicitly: a {@code @WebMvcTest} slice doesn't pick up
- * {@code @Component} argument resolvers, and without them every
- * {@code @CurrentDomain} parameter would fail to resolve.
- */
+/** A @WebMvcTest slice doesn't pick up @Component argument resolvers, hence the @Import. */
 @WebMvcTest(ResourceController.class)
 @Import({SecurityConfig.class, WebMvcConfig.class, CurrentDomainArgumentResolver.class})
 class ResourceControllerTest {

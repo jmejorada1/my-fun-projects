@@ -3,23 +3,13 @@ import { PostService } from '../../../api/post.service';
 import { PostTypeRanking } from '../../../api/ranking.service';
 import { DomainConfig } from '../domain-config.model';
 
-/**
- * "No Bigotry" is a frontend-only concept — the backend's post_type table
- * has no notion of it (design-spec.md keeps post types/rankings
- * domain-agnostic on the server); everything below that treats it
- * specially reads it from this domain's config instead of a magic string.
- */
+// The backend treats this like any other post type; only the frontend gives it special rules.
 const NO_BIGOTRY_TYPE_NAME = 'no-bigotry';
 
 /** "No Bigotry" is only meaningful for a movie with nothing flagged this severely or worse. */
 const SEVERE_SCORE_THRESHOLD = 3;
 
-/**
- * Color-codes a flag badge/cell by severity — shared by resource-detail's
- * post table and the search panel's flag-summary columns so both use one
- * consistent scheme. "no-bigotry" is always green regardless of score,
- * since its score is always 0 but that means "clean," not "low severity."
- */
+/** "no-bigotry" is always green: its score is 0, meaning clean rather than low severity. */
 function flagSeverityClass(postTypeName: string, score: number): string {
   if (postTypeName === NO_BIGOTRY_TYPE_NAME) {
     return 'flag-badge--green';
@@ -34,14 +24,9 @@ function flagSeverityClass(postTypeName: string, score: number): string {
 }
 
 /**
- * "No Bigotry" should only rank movies with nothing flagged severity >= 3
- * in ANY category — but `/rankings` only returns per-category averages,
- * not individual flag scores, so that can't be decided from its response
- * alone (an average below 3 can still hide an individual flag of 4 or
- * 5). Purely client-side, and without teaching the backend anything
- * about "no-bigotry": fetch each no-bigotry-ranked movie's posts via the
- * existing, generic, domain-agnostic `GET /resources/{id}/posts` and
- * check their flags directly.
+ * Drops movies with any flag at or above the severe threshold from the "No Bigotry" ranking.
+ * /rankings only returns averages, which can hide a single severe flag, so each movie's
+ * posts are checked here.
  */
 function withoutSeverelyFlaggedNoBigotryEntries(
   rankings: PostTypeRanking[],
@@ -60,8 +45,7 @@ function withoutSeverelyFlaggedNoBigotryEntries(
           post.flags.some((flag) => flag.score >= SEVERE_SCORE_THRESHOLD),
         ),
       })),
-      // A flaky check for one movie shouldn't take down the whole panel —
-      // fail open (keep it displayed) rather than block on it.
+      // Fail open: keep the movie if its check fails.
       catchError(() => of({ resourceId: item.resource.id, hasSevereFlag: false })),
     ),
   );
@@ -78,9 +62,7 @@ function withoutSeverelyFlaggedNoBigotryEntries(
         .map((ranking) =>
           ranking.postType.name === NO_BIGOTRY_TYPE_NAME ? { ...ranking, resources: filteredResources } : ranking,
         )
-        // Nothing left to show once every candidate is filtered out —
-        // hide the category entirely rather than show an empty "No
-        // Bigotry" section with a misleading "no flagged resources" note.
+        // Hide "No Bigotry" entirely once every movie is filtered out.
         .filter((ranking) => ranking.postType.name !== NO_BIGOTRY_TYPE_NAME || ranking.resources.length > 0);
     }),
   );
@@ -99,7 +81,6 @@ export const IMDB_BIGOTRY_CONFIG: DomainConfig = {
   badgeClassFor: flagSeverityClass,
   neutralPostTypeName: NO_BIGOTRY_TYPE_NAME,
   postProcessRankings: withoutSeverelyFlaggedNoBigotryEntries,
-  // Bigotry's colors ARE styles.css's base :root values — it's the
-  // default domain, so it has nothing to override.
+  // The base styles.css tokens are bigotry's.
   themeTokens: {},
 };

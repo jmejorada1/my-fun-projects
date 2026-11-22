@@ -7,23 +7,10 @@ import { AuthService } from '../core/auth.service';
 import { DomainSelectionService } from '../core/domain-selection.service';
 import { SearchStateService } from '../core/search-state.service';
 
-// A fraction of the viewport's own height, not a fixed pixel count — a flat
-// px threshold would trigger at wildly different "how much have I actually
-// scrolled" points depending on the screen (e.g. a tall 4K monitor vs. a
-// small laptop), since it says nothing about how tall the viewport itself
-// is. This way "Back to top" appears once you've scrolled about half a
-// screen's worth, consistently across devices.
+// A fraction of the viewport height, so it behaves the same on any screen size.
 const BACK_TO_TOP_VIEWPORT_FRACTION = 0.5;
 
-/**
- * Global — mounted on every route, including login/register, since which
- * domain (and thus which account, if any) applies matters everywhere, not
- * just on the dashboard (design-spec.md §2 decision #1's login/register
- * split). The domain picker is always shown; the search box and "Hi
- * <username>"/Logout only once logged in — search results land on the
- * dashboard's center panel (via SearchStateService), which sits behind
- * authGuard, so searching pre-login has nowhere to go.
- */
+/** Shown on every route. Search and logout only appear once logged in, since results render on the guarded dashboard. */
 @Component({
   selector: 'app-toolbar',
   imports: [ReactiveFormsModule],
@@ -40,37 +27,20 @@ export class AppToolbarComponent {
   readonly domainOptions = this.domainSelection.options;
   readonly selectedDomain = this.domainSelection.selectedDomain;
   readonly currentUser = this.auth.currentUser;
-  /** Drives the big brand name — its color comes from the same
-   *  `--color-primary` token DomainSelectionService.applyTheme() already
-   *  sets on :root per domain, so no domain-specific styling logic is
-   *  needed here beyond showing the active config's own label. */
   readonly activeDomainConfig = this.domainSelection.activeDomainConfig;
 
-  // toSignal unsubscribes automatically on destroy — no manual cleanup needed.
   readonly showBackToTop = toSignal(
     fromEvent(window, 'scroll').pipe(
       throttleTime(100, undefined, { leading: true, trailing: true }),
-      // window.innerHeight is read fresh on every scroll event (not cached
-      // once), so this also stays correct across a resize or orientation
-      // change, not just across different devices.
       map(() => window.scrollY > window.innerHeight * BACK_TO_TOP_VIEWPORT_FRACTION),
     ),
     { initialValue: false },
   );
 
-  // [formGroup] on the <form> is required for (ngSubmit) to fire at all —
-  // see the identical bug fixed in login.component.ts.
   readonly searchForm = new FormGroup({ term: new FormControl('', { nonNullable: true }) });
 
   constructor() {
-    // This component is mounted once for the whole app (it lives on every
-    // route), so the search box's own value would otherwise survive a
-    // domain switch (which logs the current user out — see
-    // DomainSelectionService.select()) and a fresh login into the new
-    // domain, showing a stale query alongside SearchStateService's own
-    // now-cleared results. Same currentUser()-transition trigger as
-    // SearchStateService's reset, kept separate since this is
-    // component-local form state, not shared search state.
+    // The toolbar never unmounts, so clear the search box whenever the user changes.
     effect(() => {
       this.auth.currentUser();
       this.searchForm.reset({ term: '' });
@@ -86,13 +56,10 @@ export class AppToolbarComponent {
     if (term) {
       this.searchState.search(term);
     } else {
-      // A blank submit isn't "search for nothing" — it's "I'm done
-      // searching," so clear back to the pre-search state instead of
-      // hitting the backend with an empty query.
+      // A blank submit clears the search.
       this.searchState.clear();
     }
-    // Results only render on the dashboard's center panel — get there if
-    // we aren't already, without disturbing an in-progress search.
+    // Results only render on the dashboard.
     if (this.router.url !== '/') {
       this.router.navigateByUrl('/');
     }

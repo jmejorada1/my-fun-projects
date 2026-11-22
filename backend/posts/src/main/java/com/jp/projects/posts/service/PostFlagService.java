@@ -33,14 +33,8 @@ public class PostFlagService {
         postTypeRepository.findByIdAndDomainId(request.postTypeId(), domainId)
                 .orElseThrow(() -> NotFoundException.of("PostType", request.postTypeId()));
 
-        // `request.userId()` is accepted per the unenforced-acting-user
-        // pattern (architecture.md §5) but post_flag has
-        // no user_id column to persist it against — flags aren't tied to a
-        // specific flagger in the schema.
-        //
-        // A single native upsert, not a check-then-insert/update: two
-        // concurrent calls could both observe "no active flag" and race on
-        // the partial unique index otherwise.
+        // request.userId() isn't stored: post_flag has no user_id column.
+        // One upsert, since check-then-insert would race on the partial unique index.
         postFlagRepository.upsertActiveFlag(postId, request.postTypeId(), request.score().shortValue(), domainId);
 
         PostFlag flag = postFlagRepository

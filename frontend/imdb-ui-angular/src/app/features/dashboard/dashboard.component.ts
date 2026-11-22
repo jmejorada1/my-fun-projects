@@ -27,16 +27,6 @@ function clamp(px: number): number {
   return Math.min(MAX_SIDE_PANEL_PX, Math.max(MIN_SIDE_PANEL_PX, px));
 }
 
-/**
- * The center panel is a child <router-outlet> (see app.routes.ts) rather
- * than a fixed component — it swaps between search results and a
- * resource's detail view depending on the URL, while this component (and
- * therefore the left/right panels) stays mounted the whole time.
- *
- * Left/right panel widths are user-resizable via drag handles and
- * persisted to localStorage as a per-viewer convenience — reasonable here
- * since it's just a layout preference, not state anyone else needs to see.
- */
 @Component({
   selector: 'app-dashboard',
   imports: [MyPostsPanelComponent, RankingsPanelComponent, RouterOutlet],
@@ -92,7 +82,6 @@ export class DashboardComponent {
     }
   }
 
-  /** Arrow-key resizing for the splitter, per the ARIA separator pattern. */
   onSplitterKeydown(side: 'left' | 'right', event: KeyboardEvent): void {
     let delta = 0;
     if (event.key === 'ArrowLeft') {
@@ -112,7 +101,7 @@ export class DashboardComponent {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ left: this.leftWidth(), right: this.rightWidth() }));
     } catch {
-      // Best-effort convenience only — fine if storage is unavailable.
+      // Storage is optional.
     }
   }
 }

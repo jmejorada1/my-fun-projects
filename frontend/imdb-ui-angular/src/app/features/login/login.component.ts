@@ -17,19 +17,11 @@ export class LoginComponent {
   private readonly router = inject(Router);
   private readonly domainSelection = inject(DomainSelectionService);
 
-  /** The currently-selected domain option, so login can explain what it is. */
   readonly currentDomain = computed(() =>
     this.domainSelection.options.find((option) => option.value === this.domainSelection.selectedDomain()),
   );
 
-  /**
-   * (ngSubmit) only works on a <form> backed by FormGroupDirective
-   * ([formGroup]) or FormsModule's NgForm — a bare <form> with only
-   * ReactiveFormsModule and no [formGroup] never fires it (Angular treats
-   * "ngSubmit" as a nonexistent native DOM event instead). Wrapping the
-   * single control in a FormGroup is what makes the template's
-   * [formGroup]/(ngSubmit) binding actually work.
-   */
+  // A FormGroup even for one control: (ngSubmit) only fires on a <form> with [formGroup].
   readonly form = new FormGroup({
     username: new FormControl('', {
       nonNullable: true,

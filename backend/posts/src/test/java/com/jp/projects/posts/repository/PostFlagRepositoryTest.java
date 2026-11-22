@@ -37,9 +37,7 @@ class PostFlagRepositoryTest {
 
     @DynamicPropertySource
     static void schemaProperties(DynamicPropertyRegistry registry) {
-        // @ServiceConnection generates its own JDBC URL without the app's
-        // usual schema settings; point Hikari at the same "posts" schema
-        // Flyway creates so unqualified native queries resolve correctly.
+        // @ServiceConnection's URL drops the schema, which unqualified native queries need.
         registry.add("spring.datasource.hikari.schema", () -> "posts");
     }
 
@@ -69,9 +67,7 @@ class PostFlagRepositoryTest {
         domainId = domain.getId();
         ResourceCategory category = resourceCategoryRepository.findByDomainIdAndName(domainId, "movie")
                 .orElseThrow();
-        // Native @Modifying queries bypass the Hibernate session and hit
-        // JDBC directly, so setup rows must be physically flushed first or
-        // the FK-constrained upsert below won't see them yet.
+        // The native upsert bypasses the session, so flush setup rows first.
         Resource resource = resourceRepository.saveAndFlush(Resource.builder()
                 .domainId(domainId)
                 .name("tt-" + System.nanoTime())
@@ -114,8 +110,7 @@ class PostFlagRepositoryTest {
         flag.get().setDeletedAt(Instant.now());
         postFlagRepository.saveAndFlush(flag.get());
 
-        // The partial unique index only covers deleted_at IS NULL rows, so a
-        // fresh upsert after a soft delete must succeed rather than conflict.
+        // The partial unique index ignores soft-deleted rows.
         postFlagRepository.upsertActiveFlag(postId, postTypeId, (short) 4, domainId);
 
         List<PostFlag> active = postFlagRepository.findByPostIdAndDeletedAtIsNull(postId);

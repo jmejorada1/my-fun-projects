@@ -12,8 +12,7 @@ describe('AutoOpenDialogDirective', () => {
   it('calls showModal() once the dialog renders', () => {
     const fixture = TestBed.createComponent(HostComponent);
     const dialog: HTMLDialogElement = fixture.nativeElement.querySelector('dialog');
-    // jsdom implements <dialog> but showModal() needs an explicit stub in
-    // some environments — safe to always provide one before spying.
+    // Some jsdom versions lack showModal().
     dialog.showModal = dialog.showModal ?? (() => {});
     const showModalSpy = vi.spyOn(dialog, 'showModal');
 

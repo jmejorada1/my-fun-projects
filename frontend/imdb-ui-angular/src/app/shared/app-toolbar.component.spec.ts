@@ -16,10 +16,7 @@ const TWO_ENABLED_OPTIONS = [
   { value: 'imdb/standard', label: 'Movie-Meter', enabled: true, description: 'Standard ratings.' },
 ];
 
-// A fake not-yet-enabled option, decoupled from imdb/standard's real (now
-// enabled — Phase 2b seeded its backend data) config state, so this
-// "disabled option" rendering stays covered regardless of which real
-// domains happen to be enabled.
+// A fake disabled option, so this stays covered whichever real domains are enabled.
 const ONE_DISABLED_OPTION = [
   { value: 'imdb/bigotry', label: 'Big-O-Meter', enabled: true, description: 'Bigotry flagging.' },
   { value: 'imdb/future', label: 'Future-Meter', enabled: false, description: 'Not yet.' },
@@ -149,7 +146,6 @@ describe('AppToolbarComponent', () => {
     let httpMock: HttpTestingController;
 
     beforeEach(() => {
-      // The search box only renders once logged in.
       localStorage.setItem('imdb-ui-angular.currentUser', JSON.stringify(STORED_USER));
       httpMock = TestBed.inject(HttpTestingController);
     });
@@ -157,8 +153,7 @@ describe('AppToolbarComponent', () => {
     afterEach(() => httpMock.verify());
 
     it('actually submits via the real DOM form', () => {
-      // Same class of bug already fixed elsewhere: (ngSubmit) does nothing
-      // without [formGroup] backing the <form>.
+      // (ngSubmit) only fires when the <form> has [formGroup].
       const fixture = TestBed.createComponent(AppToolbarComponent);
       fixture.detectChanges();
 
@@ -233,11 +228,6 @@ describe('AppToolbarComponent', () => {
     });
 
     it('resets the typed search term when the current user changes, e.g. a domain switch forcing a logout', () => {
-      // Regression test: this component is mounted once for the whole app,
-      // so its search box's own FormControl value would otherwise survive
-      // a domain switch (which logs the current user out — see
-      // DomainSelectionService.select()) and show a stale query after
-      // logging into the new domain.
       const fixture = TestBed.createComponent(AppToolbarComponent);
       fixture.detectChanges();
       fixture.componentInstance.searchForm.controls.term.setValue('beauty and');
@@ -276,9 +266,7 @@ describe('AppToolbarComponent', () => {
     });
 
     it('hides again once scrolled back up', () => {
-      // Two scroll events in immediate succession fall inside the same
-      // throttleTime window — the second only resolves on its trailing
-      // edge, once real time (fake, here) actually advances past it.
+      // The second scroll lands in the throttle window and fires on its trailing edge.
       vi.useFakeTimers();
       try {
         localStorage.setItem('imdb-ui-angular.currentUser', JSON.stringify(STORED_USER));

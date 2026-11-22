@@ -30,10 +30,6 @@ describe('LoginComponent', () => {
   afterEach(() => httpMock.verify());
 
   it('actually submits via the real DOM form, not just by calling submit() directly', () => {
-    // Regression test: (ngSubmit) previously did nothing at all, because
-    // the <form> had no [formGroup]/NgForm directive backing it — calling
-    // component.submit() directly (as the other tests below do) doesn't
-    // exercise that wiring and would have passed even with the bug.
     const fixture = TestBed.createComponent(LoginComponent);
     fixture.detectChanges();
 

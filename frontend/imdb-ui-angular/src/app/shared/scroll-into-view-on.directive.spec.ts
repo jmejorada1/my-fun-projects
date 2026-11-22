@@ -14,7 +14,7 @@ describe('ScrollIntoViewOnDirective', () => {
   it('does not scroll while the condition is false', () => {
     const fixture = TestBed.createComponent(HostComponent);
     const div: HTMLElement = fixture.nativeElement.querySelector('div');
-    // jsdom doesn't implement scrollIntoView at all — stub it before spying.
+    // jsdom has no scrollIntoView.
     const scrollSpy = (div.scrollIntoView = vi.fn());
 
     fixture.detectChanges();

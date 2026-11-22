@@ -17,14 +17,10 @@ export class RegisterComponent {
   private readonly router = inject(Router);
   private readonly domainSelection = inject(DomainSelectionService);
 
-  /** The currently-selected domain option, so register shows its friendly
-   * name instead of the raw backend domain value (e.g. "imdb/bigotry"). */
   readonly currentDomain = computed(() =>
     this.domainSelection.options.find((option) => option.value === this.domainSelection.selectedDomain()),
   );
 
-  // [formGroup] on the <form> is required for (ngSubmit) to fire at all —
-  // see the identical bug fixed in login.component.ts.
   readonly form = new FormGroup({
     username: new FormControl('', {
       nonNullable: true,
@@ -51,7 +47,6 @@ export class RegisterComponent {
     this.auth.register(this.username.value, this.email.value).subscribe({
       next: () => {
         this.submitting.set(false);
-        // Auto-login after registering — no separate "now go log in" step.
         this.router.navigateByUrl('/');
       },
       error: (err: unknown) => {

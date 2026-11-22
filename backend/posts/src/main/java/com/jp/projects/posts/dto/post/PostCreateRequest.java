@@ -6,14 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.util.Map;
 
-/**
- * Unified post-creation request: a top-level post when {@code parentPostId}
- * is omitted, a reply when it's present (the server derives the effective
- * resourceId from the parent in that case — see PostService.createPost).
- * {@code postTypeId}/{@code score} are optional and must be provided
- * together; when given, a flag is applied to the new post in the same
- * transaction.
- */
+/** A reply when {@code parentPostId} is set. {@code postTypeId} and {@code score} come together or not at all. */
 public record PostCreateRequest(
         @NotBlank String username,
         @NotNull Long resourceId,

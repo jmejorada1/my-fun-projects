@@ -22,16 +22,7 @@ public class OpenApiConfig {
                         .version("v0.1"));
     }
 
-    /**
-     * Re-advertises the {@code X-Domain} header on every operation that
-     * takes a {@link CurrentDomain} parameter.
-     *
-     * <p>springdoc discovered the header on its own while each handler
-     * declared {@code @RequestHeader("X-Domain")}. Now that a custom
-     * argument resolver supplies it, springdoc can't see it — without this
-     * the documented contract would silently lose a required header, and
-     * "Try it out" in Swagger UI would 400.
-     */
+    /** springdoc can't see headers read by an argument resolver, so document X-Domain here. */
     @Bean
     OperationCustomizer currentDomainHeaderCustomizer() {
         return (operation, handlerMethod) -> {

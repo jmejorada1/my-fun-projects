@@ -36,16 +36,12 @@ public class ResourceService {
     public ResourceResponse create(ResourceCreateRequest request, DomainRef domain) {
         Long domainId = domain.id();
 
-        // Must be a real lookup (not getReferenceById) because it also
-        // proves the category belongs to this domain — resource.domainId
-        // is derived from it, not client-supplied (design-spec.md §4.3).
+        // A real lookup, not getReferenceById, so it also checks the category's domain.
         ResourceCategory category = resourceCategoryRepository
                 .findByIdAndDomainId(request.categoryId(), domainId)
                 .orElseThrow(() -> NotFoundException.of("ResourceCategory", request.categoryId()));
 
-        // No pre-check on `name` uniqueness — that would be a race-prone
-        // check-then-insert. The DB's unique constraint is the source of
-        // truth; a violation surfaces as a 409 via GlobalExceptionHandler.
+        // No uniqueness pre-check, which would race; the constraint violation becomes a 409.
         Resource resource = Resource.builder()
                 .domainId(domainId)
                 .name(request.name())
@@ -61,11 +57,6 @@ public class ResourceService {
         Resource resource = getActive(id, domain);
         List<Long> resourceIds = List.of(id);
 
-        // Same aggregation list() uses below, scoped to one resource — post
-        // counts/flag summaries include replies, not just top-level posts
-        // (no parent_post_id filter in either underlying query), so this
-        // stays consistent with /rankings rather than the frontend's
-        // previous top-level-only client-side summary.
         Map<Long, Long> postCountByResourceId = postCountByResourceId(resourceIds);
         Map<Long, List<ResourceFlagSummaryEntry>> flagSummaryByResourceId = flagSummaryByResourceId(resourceIds);
 

@@ -25,9 +25,7 @@ const RESOURCE = {
   flagSummary: [],
 };
 
-// Mirrors the nesting in app.routes.ts (center panel as a child outlet)
-// closely enough to exercise it, without pulling in the real lazy-loaded
-// config or the login/register routes this suite doesn't need.
+// A trimmed copy of app.routes.ts's nesting.
 const routes: Routes = [
   {
     path: '',
@@ -42,9 +40,7 @@ const routes: Routes = [
 describe('DashboardComponent', () => {
   let httpMock: HttpTestingController;
 
-  // rankings-panel wants an array; my-posts-panel (only fires when a user
-  // is in localStorage) wants a Page<Post> — a blanket `[]` flush breaks
-  // whichever one isn't an array.
+  // rankings-panel expects an array, my-posts-panel a Page<Post>.
   function flushPendingPanelRequests(): void {
     httpMock.match(() => true).forEach((req) => {
       req.flush(req.request.url.includes('/users/') ? EMPTY_PAGE : []);
@@ -105,9 +101,7 @@ describe('DashboardComponent', () => {
     const dashboardEl = el.querySelector('.dashboard') as HTMLElement;
     const splitter = el.querySelector('.splitter') as HTMLElement;
 
-    // MouseEvent, not PointerEvent — jsdom doesn't implement pointer
-    // capture, and the component's (pointerdown) binding fires for any
-    // native "pointerdown"-named event regardless of its concrete type.
+    // jsdom has no PointerEvent; (pointerdown) fires for any event with that name.
     splitter.dispatchEvent(new MouseEvent('pointerdown', { clientX: 280, bubbles: true }));
     splitter.dispatchEvent(new MouseEvent('pointermove', { clientX: 340, bubbles: true }));
     splitter.dispatchEvent(new MouseEvent('pointerup', { clientX: 340, bubbles: true }));

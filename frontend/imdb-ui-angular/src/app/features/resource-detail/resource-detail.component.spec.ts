@@ -13,9 +13,7 @@ import { PostActivityService } from '../../core/post-activity.service';
 import { DOMAIN_OPTIONS_TOKEN } from '../../core/domain-options';
 import { ResourceFlagSummaryEntry } from '../../api/resource.service';
 
-// imdb/standard is enabled now (Phase 2b seeded its backend data), but this
-// override keeps its category-only tests selectable regardless of the real
-// config's enabled flag, same pattern domain-selection.service.spec.ts uses.
+// Keeps the category-only tests independent of the real configs' enabled flags.
 const BOTH_DOMAINS_ENABLED = [
   { value: 'imdb/bigotry', label: 'Big-O-Meter', enabled: true, description: 'Bigotry flagging.' },
   { value: 'imdb/standard', label: 'Movie-Meter', enabled: true, description: 'Standard ratings.' },
@@ -70,18 +68,10 @@ describe('ResourceDetailComponent', () => {
     }).compileComponents();
     httpMock = TestBed.inject(HttpTestingController);
     router = TestBed.inject(Router);
-    // provideRouter([]) has no matching routes — a highlight query param
-    // triggers a real navigate() call (to clear the query params
-    // afterward) that would otherwise reject with "cannot match routes".
+    // provideRouter([]) has no routes, so the highlight cleanup navigate() would reject.
     vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
-    // Seeded into storage rather than driven through DomainSelectionService
-    // .select() — select() logs out the current user when the domain
-    // changes underneath an active session (the real, intentional behavior
-    // — see domain-selection.service.ts), which would fire here since
-    // currentUser is about to be set below. Pre-seeding storage instead
-    // models "already had this domain selected, page loads" rather than
-    // "switched mid-session," which is what these tests actually want.
+    // Seeded in storage because select() would log out the user set below.
     if (domain !== 'imdb/bigotry') {
       localStorage.setItem('imdb-ui-angular.selectedDomain', domain);
     }
@@ -109,27 +99,14 @@ describe('ResourceDetailComponent', () => {
     return fixture;
   }
 
-  /**
-   * Posting any flag (not just "no-bigotry") now triggers a background
-   * conflict check (GET .../posts?size=200) — tests that create a flagged
-   * post but aren't exercising that feature just need to drain it so
-   * httpMock.verify() in afterEach doesn't see it as a leftover request.
-   */
+  /** Drains the conflict check every flagged post triggers, for httpMock.verify(). */
   function flushConflictCheck(content: unknown[] = []): void {
     httpMock
       .expectOne((r) => r.url === `${API_BASE_URL}/resources/1/posts` && r.params.get('size') === '200')
       .flush({ content, totalElements: content.length, totalPages: 1, number: 0, size: 200 });
   }
 
-  /**
-   * Creating/removing a post, reply, or flag notifies PostActivityService,
-   * which this component (like rankings-panel) also listens to itself now,
-   * to refetch its own resource summary — tests that trigger any of those
-   * actions need to drain this GET too, same reason as flushConflictCheck.
-   * TestBed.tick() flushes the effect toObservable() uses internally —
-   * without it the refresh's HTTP request hasn't been made yet at all (same
-   * as rankings-panel.component.spec.ts's identical use of this signal).
-   */
+  /** Drains the resource refetch after post activity. tick() runs the effect behind toObservable(). */
   function flushResourceRefresh(resourceOverrides: Partial<typeof RESOURCE> = {}): void {
     TestBed.tick();
     httpMock
@@ -185,10 +162,7 @@ describe('ResourceDetailComponent', () => {
   });
 
   it('summarizes flags per category, averaging severity except for "no-bigotry" (a count instead)', async () => {
-    // categorySummary is sourced from the resource's backend-aggregated
-    // flagSummary (any post depth), not computed from the top-level posts
-    // shown below — so this test's posts are just display filler; the
-    // flagSummary override is what categorySummary actually reflects.
+    // categorySummary comes from flagSummary, not from these posts.
     const fixture = await createComponent(
       [
         {
@@ -243,12 +217,7 @@ describe('ResourceDetailComponent', () => {
   });
 
   it('includes a flag that only exists on an unloaded reply, not just the visible top-level posts', async () => {
-    // Regression test: a reply's flag used to be invisible here entirely,
-    // because the summary was computed from `posts()` (top-level only —
-    // replies are fetched lazily, only once a thread is expanded), while
-    // /rankings aggregates flags at any post depth. The top-level post
-    // below carries no flags at all; the lgbtq-phobic entry can only have
-    // come from the resource's backend-aggregated flagSummary.
+    // The post below is unflagged, so the lgbtq-phobic entry can only come from flagSummary.
     const fixture = await createComponent(
       [
         { id: 1, resourceId: 1, userId: 1, username: 'a', parentPostId: null, bodyText: 'x', data: null, createdAt: '', updatedAt: '', flags: [], replyCount: 1, resourceDisplayName: 'Carmencita' },
@@ -327,9 +296,7 @@ describe('ResourceDetailComponent', () => {
   });
 
   it('always shows "No Bigotry" in the category dropdown, even when the movie has a severe flag', async () => {
-    // DEFAULT_TOP_LEVEL_POSTS carries a racism flag scored 4 — "No Bigotry"
-    // must still be selectable; only the rankings panel excludes a movie
-    // from its own "No Bigotry" ranking for having a severe flag elsewhere.
+    // DEFAULT_TOP_LEVEL_POSTS has a racism flag scored 4; "No Bigotry" stays selectable.
     const fixture = await createComponent(undefined, [{ id: 5, name: 'racism' }, { id: 6, name: 'no-bigotry' }]);
 
     const options = Array.from(
@@ -401,7 +368,6 @@ describe('ResourceDetailComponent', () => {
     fixture.detectChanges();
 
     expect(el.textContent).not.toContain('Write something before posting.');
-    // Category is still unset — that error should remain.
     expect(el.textContent).toContain('Choose a category.');
   });
 
@@ -438,9 +404,7 @@ describe('ResourceDetailComponent', () => {
   });
 
   it('treats score 0 (neutral) as provided, not as missing', async () => {
-    // Regression guard: Validators.required must not treat a valid, falsy
-    // `0` score as "missing" (design-spec.md decision #12 equivalent on the
-    // backend) the way a naive truthiness check would.
+    // A score of 0 is valid, not missing.
     const fixture = await createComponent();
     fixture.componentInstance.form.setValue({ bodyText: 'Neutral on this one.', postTypeId: 5, score: 0 });
 
@@ -509,7 +473,6 @@ describe('ResourceDetailComponent', () => {
     expect(navigateSpy).not.toHaveBeenCalled();
     expect(fixture.componentInstance.repliesFor(42).length).toBe(1);
     expect(fixture.componentInstance.repliesFor(42)[0].bodyText).toBe('I agree.');
-    // The reply form collapses back after a successful post.
     expect(fixture.componentInstance.openReplyPostId()).toBeNull();
   });
 
@@ -746,7 +709,6 @@ describe('ResourceDetailComponent', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Nested reply.');
 
-    // Collapsing and re-expanding must not re-fetch — already loaded.
     fixture.componentInstance.toggleExpand(42);
     fixture.componentInstance.toggleExpand(42);
     httpMock.expectNone((r) => r.url === `${API_BASE_URL}/posts/42/replies`);
@@ -901,9 +863,7 @@ describe('ResourceDetailComponent', () => {
       const fixture = await createComponent();
       const resizer = (fixture.nativeElement as HTMLElement).querySelector('.col-resizer') as HTMLElement;
 
-      // MouseEvent, not PointerEvent — jsdom doesn't implement pointer
-      // capture, and the component's (pointerdown) binding fires for any
-      // native "pointerdown"-named event regardless of its concrete type.
+      // jsdom has no PointerEvent; (pointerdown) fires for any event with that name.
       resizer.dispatchEvent(new MouseEvent('pointerdown', { clientX: 320, bubbles: true }));
       resizer.dispatchEvent(new MouseEvent('pointermove', { clientX: 420, bubbles: true }));
       resizer.dispatchEvent(new MouseEvent('pointerup', { clientX: 420, bubbles: true }));
@@ -1055,11 +1015,7 @@ describe('ResourceDetailComponent', () => {
     });
 
     it('re-highlights on a second drill-down without a resource id change (regression)', async () => {
-      // Clicking another post/reply for the movie you're already viewing
-      // only changes query params — the path's :id segment stays the same,
-      // and paramMap does not re-emit for that. queryParamMap must be its
-      // own subscription, not read once off paramMap's snapshot, or this
-      // second highlight silently does nothing.
+      // Same :id, new query params: paramMap doesn't re-emit.
       const queryParamMap$ = new Subject<ReturnType<typeof convertToParamMap>>();
       await TestBed.configureTestingModule({
         imports: [ResourceDetailComponent],
@@ -1097,7 +1053,6 @@ describe('ResourceDetailComponent', () => {
       TestBed.tick(); // flush the highlight-applying effect
       expect(fixture.componentInstance.highlightedPostId()).toBe(42);
 
-      // A second drill-down target on the same already-loaded resource.
       queryParamMap$.next(convertToParamMap({}));
       queryParamMap$.next(convertToParamMap({ highlight: '42' }));
       TestBed.tick();
@@ -1293,8 +1248,6 @@ describe('ResourceDetailComponent', () => {
       const el = fixture.nativeElement as HTMLElement;
       expect(el.textContent).not.toContain('Severity is automatically set');
       expect(el.querySelector('select[formControlName="score"]')).toBeNull();
-      // Still locked/disabled to the domain's fixed value under the hood,
-      // same mechanism as bigotry's "No Bigotry" — just never surfaced.
       expect(fixture.componentInstance.form.controls.score.disabled).toBe(true);
       expect(fixture.componentInstance.form.controls.score.value).toBe(0);
     });
@@ -1320,24 +1273,14 @@ describe('ResourceDetailComponent', () => {
         flag: { id: 1, postId: 99, postType: { id: 3, name: 'i-loved-it' }, score: 0 },
       });
       flushResourceRefresh();
-      // No flushConflictCheck() here — neutralPostTypeName is null for this
-      // domain, so checkForConflictingPosts bails out before making the
-      // GET .../posts?size=200 request that flushConflictCheck expects. A
-      // leftover, unexpected request would fail afterEach's httpMock.verify().
+      // No conflict check here: this domain has no neutral post type.
       fixture.detectChanges();
 
       expect(fixture.componentInstance.conflictingPosts()).toEqual([]);
     });
 
     it('still submits the fixedScoreValue on a second post, not a stale null from the first reset', async () => {
-      // Regression test: FormGroup.reset({..., score: null}) only preserves
-      // a control's disabled state when passed the boxed {value, disabled}
-      // form — a plain null leaves score's *value* stuck at null after the
-      // first successful post, since (unlike bigotry's severity-score
-      // domain) nothing here re-triggers the score-locking effect on a
-      // category-only domain's postTypeId reset. Left unfixed, every post
-      // after the first would submit score: null and get rejected by the
-      // backend's "postTypeId and score must be provided together" check.
+      // reset() nulls the disabled score and nothing re-runs the lock effect here.
       const fixture = await createComponent([], STANDARD_POST_TYPES, {}, {}, 'imdb/standard');
       const c = fixture.componentInstance;
 

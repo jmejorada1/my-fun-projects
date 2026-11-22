@@ -9,7 +9,6 @@ import { DomainSelectionService } from '../../core/domain-selection.service';
 import { PostTypeRanking, RankingService } from '../../api/ranking.service';
 import { PostService } from '../../api/post.service';
 
-/** Right panel — top 5 resources per post type (design-spec.md §3, §4). */
 @Component({
   selector: 'app-rankings-panel',
   imports: [DecimalPipe, RouterLink],
@@ -28,7 +27,6 @@ export class RankingsPanelComponent {
   readonly loading = signal(true);
   readonly errorMessage = signal<string | null>(null);
 
-  /** Whether the active domain has no severity to average — drives the template's avg-vs-count rendering. */
   isCategoryOnly(): boolean {
     return this.domainSelection.activeDomainConfig().rating.mode === 'category-only';
   }
@@ -36,12 +34,8 @@ export class RankingsPanelComponent {
   constructor() {
     this.load();
 
-    // Refetches whenever a post/reply is created anywhere in the app
-    // (resource-detail) — this panel is mounted for the dashboard's whole
-    // lifetime (dashboard.component.ts), so a new flagged post would never
-    // show up here without this. skip(1): toObservable() immediately
-    // replays the signal's current value on subscribe, which would
-    // otherwise double up with the initial load() call above.
+    // The panel stays mounted, so refetch after post activity. skip(1): toObservable()
+    // emits the current value at once, which the load() above already covers.
     toObservable(this.postActivity.changed)
       .pipe(skip(1), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.load());

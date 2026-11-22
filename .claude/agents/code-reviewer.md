@@ -67,6 +67,8 @@ then read the new fix-round section of the notes.
    you flag something. Red flags:
    - An interface with a single implementation that isn't a repository,
      mapper or external client.
+   - Comments that break the comment rule in the Design principles.
+     Report them as one Low finding listing the locations.
 
 Report only findings you can defend with a concrete scenario. No style
 nits that a formatter would handle, and no rewrites motivated by taste.
