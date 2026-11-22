@@ -13,23 +13,13 @@ public interface PostFlagRepository extends JpaRepository<PostFlag, Long> {
 
     List<PostFlag> findByPostIdAndDeletedAtIsNull(Long postId);
 
-    /**
-     * Batch variant for a page of posts (post-list endpoints) — join-fetches
-     * postType so mapping to PostFlagResponse doesn't trigger a lazy load
-     * per flag.
-     */
+    /** Join-fetches postType to avoid a lazy load per flag. */
     @Query("SELECT pf FROM PostFlag pf JOIN FETCH pf.postType WHERE pf.postId IN :postIds AND pf.deletedAt IS NULL")
     List<PostFlag> findByPostIdInAndDeletedAtIsNull(@Param("postIds") Collection<Long> postIds);
 
     Optional<PostFlag> findByPostIdAndPostTypeIdAndDeletedAtIsNull(Long postId, Long postTypeId);
 
-    /**
-     * Atomic upsert-by-type against the partial unique index on
-     * (post_id, post_type_id) WHERE deleted_at IS NULL — see
-     * PostFlagService.addOrUpdateFlag. domain_id is only ever written on
-     * insert; ON CONFLICT never changes it, since post_id doesn't change
-     * across the upsert.
-     */
+    /** Upserts against the partial unique index on active (post_id, post_type_id). */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
         INSERT INTO post_flag (post_id, post_type_id, score, domain_id)
@@ -43,13 +33,6 @@ public interface PostFlagRepository extends JpaRepository<PostFlag, Long> {
                            @Param("score") Short score,
                            @Param("domainId") Long domainId);
 
-    /**
-     * Batch variant for a page of search results: each resource's active
-     * flags grouped by category, with an average score and count per
-     * category — backs the search results' flag-summary columns. No
-     * ranking/window function needed here (unlike
-     * findTopRankedResourcesByPostType), so plain JPQL suffices.
-     */
     @Query("""
         SELECT pf.post.resourceId AS resourceId, pf.postType.name AS postTypeName,
                AVG(pf.score) AS avgScore, COUNT(pf) AS flagCount
@@ -70,17 +53,8 @@ public interface PostFlagRepository extends JpaRepository<PostFlag, Long> {
     }
 
     /**
-     * Backs {@code GET /rankings} (architecture.md §5): for each
-     * {@code post_type} in the domain, the 5 resources with the highest
-     * average score among their active flags of that type. Flags on a
-     * soft-deleted post, and soft-deleted resources, are excluded —
-     * consistent with the rest of the API's {@code deletedAt} filtering.
-     * Ranks with a window function (unavailable in JPQL), hence native SQL;
-     * results are grouped by post type in {@code RankingService}, which
-     * also fills in post types with zero flags (absent here entirely).
-     *
-     * <p>Backed by {@code idx_post_flag_rankings}
-     * ({@code V18__add_search_and_ranking_indexes.sql}).
+     * Top 5 resources per post type by average score. Native SQL for the window function. Post
+     * types with no flags are absent; RankingService adds them. Uses {@code idx_post_flag_rankings}.
      */
     @Query(value = """
         WITH scored AS (

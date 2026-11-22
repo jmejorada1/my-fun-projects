@@ -1,11 +1,6 @@
 import { AfterViewInit, Directive, ElementRef, inject } from '@angular/core';
 
-/**
- * Focuses the host element once it renders. Meant for a form that only
- * enters the DOM when the user asks for it (e.g. an inline reply box) —
- * `ngAfterViewInit` fires each time Angular (re)creates the host, so
- * re-opening after closing focuses it again too.
- */
+/** Focuses the host each time it's created, e.g. an inline reply box inside an @if. */
 @Directive({
   selector: '[appAutofocus]',
 })

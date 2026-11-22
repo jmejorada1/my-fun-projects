@@ -30,8 +30,7 @@ describe('RegisterComponent', () => {
   afterEach(() => httpMock.verify());
 
   it('actually submits via the real DOM form', () => {
-    // Same class of bug already fixed twice elsewhere: (ngSubmit) does
-    // nothing without [formGroup] backing the <form>.
+    // (ngSubmit) only fires when the <form> has [formGroup].
     const fixture = TestBed.createComponent(RegisterComponent);
     fixture.detectChanges();
 

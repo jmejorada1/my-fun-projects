@@ -11,8 +11,6 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
     provideHttpClient(withInterceptors([domainHeaderInterceptor, errorInterceptor])),
-    // Resolves ApiConfigService.baseUrl() from /config.json before the app
-    // finishes bootstrapping — see core/api-config.ts.
     provideAppInitializer(loadApiConfig),
   ],
 };

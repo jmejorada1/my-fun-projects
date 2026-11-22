@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Import a row range of title.basics.tsv into the posts-db `resource` table.
 
-Config precedence: CLI flags override config.yaml, which overrides the
-built-in defaults below (none — every value must come from one of the two).
+CLI flags override config.yaml.
 """
 
 import argparse
@@ -106,10 +105,7 @@ def na_to_none(value):
     return None if value == r"\N" else value
 
 
-# IMDB fills in a placeholder like "Episode #1.1" for tvEpisode rows whose
-# real title isn't known — there are tens of thousands of these, and they're
-# useless as mock post/reply subjects, so they're skipped on import rather
-# than imported as unnamed resources.
+# Placeholder titles like "Episode #1.1" are skipped; they're useless as post subjects.
 GENERIC_EPISODE_TITLE_RE = re.compile(r"^episode[\s#-]*\d+(\.\d+)?$", re.IGNORECASE)
 
 

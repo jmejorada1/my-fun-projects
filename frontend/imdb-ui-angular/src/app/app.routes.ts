@@ -11,11 +11,7 @@ export const routes: Routes = [
     loadComponent: () => import('./features/register/register.component').then((m) => m.RegisterComponent),
   },
   {
-    // The dashboard shell (toolbar via AppComponent, left/right panels via
-    // DashboardComponent itself) stays mounted across both child routes —
-    // only its center-panel <router-outlet> swaps content. This is what
-    // keeps my-posts/rankings visible and un-reloaded while viewing a
-    // resource, rather than replacing the whole page.
+    // Child routes swap only the center panel; the side panels stay mounted.
     path: '',
     loadComponent: () => import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
     canActivate: [authGuard],

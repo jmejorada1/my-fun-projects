@@ -8,7 +8,6 @@ import { AppHttpError } from '../../core/error.interceptor';
 import { PostActivityService } from '../../core/post-activity.service';
 import { Post, PostService } from '../../api/post.service';
 
-/** One movie's worth of the user's posts (or replies), for the tree view. */
 interface MovieGroup {
   resourceId: number;
   displayName: string;
@@ -38,20 +37,9 @@ function toggled(ids: Set<number>, id: number): Set<number> {
   return next;
 }
 
-// Gates the "… more" toggle — actual clamping is CSS `line-clamp` (3
-// lines), same approach as the resource-detail posts table.
+// Shows the "… more" toggle; the clamp itself is CSS `line-clamp`.
 const LONG_POST_CHAR_THRESHOLD = 160;
 
-/**
- * Left panel — every post the logged-in user authored (design-spec.md §3),
- * split into top-level posts and replies by `parentPostId` — the backend
- * returns both mixed from the one endpoint, so the split is purely a
- * client-side presentation choice, not a second request. The "My Posts" /
- * "My Replies" sections collapse independently and start expanded; the
- * movie groups nested inside each one are a separate expandable tree,
- * collapsed by default: an "expanded ids" set means every group starts
- * closed with no setup needed once the posts arrive.
- */
 @Component({
   selector: 'app-my-posts-panel',
   imports: [DatePipe],
@@ -79,8 +67,6 @@ export class MyPostsPanelComponent {
   // A post's and its own replies' ids never collide, so one Set covers both trees.
   private readonly expandedBodyIds = signal<Set<number>>(new Set());
 
-  // The "My Posts" / "My Replies" sections themselves — expanded by
-  // default, unlike the movie groups nested inside them.
   readonly postsSectionExpanded = signal(true);
   readonly repliesSectionExpanded = signal(true);
 
@@ -90,12 +76,8 @@ export class MyPostsPanelComponent {
       this.load(user.id);
     }
 
-    // Refetches whenever a post/reply is created anywhere in the app
-    // (resource-detail) — this panel is mounted for the dashboard's whole
-    // lifetime (dashboard.component.ts), so without this it would only ever
-    // show what existed at page load. skip(1): toObservable() immediately
-    // replays the signal's current value on subscribe, which would
-    // otherwise double up with the initial load() call above.
+    // The panel stays mounted, so refetch after post activity. skip(1): toObservable()
+    // emits the current value at once, which the load() above already covers.
     toObservable(this.postActivity.changed)
       .pipe(skip(1), takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
@@ -142,13 +124,7 @@ export class MyPostsPanelComponent {
     this.expandedBodyIds.update((ids) => toggled(ids, postId));
   }
 
-  /**
-   * Drill-down: jumps to the movie's resource-detail page and tells it
-   * which row to scroll to and briefly highlight. A reply isn't its own row
-   * in that page's table (it only shows up once its parent's thread is
-   * expanded), so `parent` carries the top-level post to expand — null for
-   * a plain top-level post, where the post's own row already exists.
-   */
+  /** `parent` tells resource-detail which thread to expand to reach a reply. */
   goToPost(post: Post): void {
     this.router.navigate(['/resources', post.resourceId], {
       queryParams: { highlight: post.id, parent: post.parentPostId },

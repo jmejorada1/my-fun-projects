@@ -2,31 +2,12 @@
 """Seed the imdb/standard domain with resources plus mock users, posts, and
 replies, for local/dev testing of the plain-rating UI.
 
-Reuses import_resources.py's TSV parsing for the resource-import step (same
-title.basics.tsv row range) and import_bigotry_data.py's generic DB helpers
-(users/posts/flags are the same shape across domains — only *what a flag
-means* differs), then layers on synthetic posts/replies authored by three
-mock users (user1/user2/user3 — see USER_WEIGHTS below for the post-count
-ratio between them) rated skip-it/it-was-okay/i-enjoyed-it/i-loved-it.
+Every post gets one of the four rating categories at a fixed score of 0
+(frontend design-spec.md decision #7). Its own script rather than a
+generalization of import_bigotry_data.py (see CLAUDE.md, "Adding a new domain").
 
-Deliberately its own script rather than a generalization of
-import_bigotry_data.py — see backend/imdb-data-python/CLAUDE.md's "Adding a
-new domain": imdb/standard has no severity score or neutral-flag concept, so
-every post gets exactly one of the four rating categories at a fixed score
-of 0 (matches the frontend — see imdb-standard.config.ts's
-rating.fixedScoreValue and frontend/imdb-ui-angular/docs/design-spec.md §2
-decision #7), rather than
-bigotry's flag_probability/no-bigotry split.
-
-Unlike import_resources.py, the resource-import step here is idempotent:
-tconsts already present in the domain are skipped rather than aborting the
-run, so this script can be re-run to layer on more mock posts without
-re-seeding resources. Posts/replies are NOT idempotent — each run adds
-another batch on top of whatever already exists.
-
-Config precedence: CLI flags override standard-config.yaml, which overrides
-the built-in defaults below (none — every value must come from one of the
-two).
+Re-runnable: existing resources are skipped, but each run adds another batch
+of posts and replies. CLI flags override standard-config.yaml.
 """
 
 import argparse

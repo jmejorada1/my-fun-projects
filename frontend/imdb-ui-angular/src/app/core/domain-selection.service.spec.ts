@@ -10,18 +10,13 @@ const STORAGE_KEY = 'imdb-ui-angular.selectedDomain';
 const USER_STORAGE_KEY = 'imdb-ui-angular.currentUser';
 const STORED_USER = { id: 1, username: 'jdoe', email: 'jdoe@example.com', firstName: null, lastName: null };
 
-// Two enabled options, unlike the real DOMAIN_OPTIONS (only one is enabled
-// today) — needed to actually exercise "switch to a different domain"
-// rather than just "re-select the only one available."
+// Fixed options, so switching is tested whatever the real configs' enabled flags say.
 const TWO_ENABLED_OPTIONS = [
   { value: 'imdb/bigotry', label: 'Big-O-Meter', enabled: true, description: 'Bigotry flagging.' },
   { value: 'imdb/standard', label: 'Movie-Meter', enabled: true, description: 'Standard ratings.' },
 ];
 
-// A fake not-yet-enabled option, decoupled from imdb/standard's real
-// (now enabled — Phase 2b seeded its backend data) config state, so this
-// "reject a disabled domain" behavior stays covered regardless of which
-// real domains happen to be enabled.
+// A fake disabled option, so this stays covered whichever real domains are enabled.
 const ONE_DISABLED_OPTION = [
   { value: 'imdb/bigotry', label: 'Big-O-Meter', enabled: true, description: 'Bigotry flagging.' },
   { value: 'imdb/future', label: 'Future-Meter', enabled: false, description: 'Not yet.' },

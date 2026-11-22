@@ -9,11 +9,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Unlike every other controller, these two endpoints do not require an
- * {@code X-Domain} header — a frontend needs to be able to discover the
- * available domains before it knows which one to send.
- */
+/** No {@code X-Domain} header: clients call this to discover the domains. */
 @RestController
 @RequestMapping("/domains")
 @RequiredArgsConstructor

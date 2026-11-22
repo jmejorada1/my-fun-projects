@@ -19,28 +19,17 @@ public class SecurityConfig {
     @Value("${app.cors.allowed-origins}")
     private String[] allowedOrigins;
 
-    // TODO(design-spec.md §6): replace with OAuth2/OIDC resource-server
-    // config once an auth mechanism is chosen. Everything is open for now.
-    // Note: this filter chain does not cover actuator endpoints — those run
-    // on a separate management port (docs/architecture.md §9.5).
+    // TODO(design-spec.md §6): real auth. Doesn't cover the actuator's separate port.
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
-                .csrf(CsrfConfigurer::disable) // stateless JSON API; revisit alongside the real auth mechanism
+                .csrf(CsrfConfigurer::disable) // no cookies or sessions; revisit with real auth
                 .build();
     }
 
-    /**
-     * CORS (architecture.md §9.2) — the Angular dev
-     * server (and later, a deployed UI) calls this API cross-origin.
-     * Origins come from {@code app.cors.allowed-origins} rather than a
-     * wildcard, since there's no {@code allowCredentials} reason to need
-     * one and an explicit list is easy to audit. {@code X-Domain}/
-     * {@code X-User-Id} are custom headers the frontend sends on every
-     * request, so allowed headers stay wildcarded rather than enumerated.
-     */
+    /** Explicit origins (architecture.md §9.2); headers are open for X-Domain and X-User-Id. */
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();

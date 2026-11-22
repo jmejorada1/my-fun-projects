@@ -23,10 +23,7 @@ h2 {
   cursor: pointer;
 }
 
-/* :not(:disabled) isn't semantically needed (this button is never disabled)
-   — it's there so this beats the global button:hover:not(:disabled) rule's
-   specificity and actually resets the background, matching the fix used in
-   resource-detail.component.css. */
+/* :not(:disabled) outranks the global button:hover rule. */
 .section-toggle:hover:not(:disabled),
 .section-toggle:focus-visible {
   background: none;
@@ -75,7 +72,6 @@ h2 {
   background: var(--color-surface-alt);
 }
 
-/* Rotates into an "expanded" caret purely with CSS, same trick as resource-detail's posts table. */
 .tree-caret {
   display: inline-block;
   color: var(--color-primary);
@@ -163,10 +159,7 @@ h2 {
   cursor: pointer;
 }
 
-/* :not(:disabled) isn't semantically needed (this button is never disabled)
-   — it's there so this beats the global button:hover:not(:disabled) rule's
-   specificity and actually resets the background, matching the fix used in
-   resource-detail.component.css. */
+/* :not(:disabled) outranks the global button:hover rule. */
 .link-button:hover:not(:disabled) {
   background: none;
   color: var(--color-primary-hover);

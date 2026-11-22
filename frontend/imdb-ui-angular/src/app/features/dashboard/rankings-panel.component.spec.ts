@@ -12,9 +12,7 @@ import { PostActivityService } from '../../core/post-activity.service';
 import { DomainSelectionService } from '../../core/domain-selection.service';
 import { DOMAIN_OPTIONS_TOKEN } from '../../core/domain-options';
 
-// imdb/standard is enabled now (Phase 2b seeded its backend data), but this
-// override keeps it selectable here regardless of the real config's
-// enabled flag, same pattern domain-selection.service.spec.ts uses.
+// Keeps both domains selectable whatever the real configs' enabled flags say.
 const BOTH_DOMAINS_ENABLED = [
   { value: 'imdb/bigotry', label: 'Big-O-Meter', enabled: true, description: 'Bigotry flagging.' },
   { value: 'imdb/standard', label: 'Movie-Meter', enabled: true, description: 'Standard ratings.' },
@@ -24,8 +22,7 @@ describe('RankingsPanelComponent', () => {
   let httpMock: HttpTestingController;
 
   beforeEach(async () => {
-    // Spec files share localStorage (Vitest runs non-isolated), so a domain
-    // or user persisted by another file would otherwise leak in here.
+    // Vitest runs non-isolated, so localStorage carries over between spec files.
     localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [RankingsPanelComponent],
@@ -138,17 +135,14 @@ describe('RankingsPanelComponent', () => {
 
   it('refetches when notified of a new post/reply elsewhere in the app', () => {
     const fixture = TestBed.createComponent(RankingsPanelComponent);
-    // Flushes toObservable()'s initial replay of the signal's current value
-    // — otherwise it and the real change below would coalesce into a single
-    // effect run by the time the first tick() happens, and skip(1) would
-    // swallow the wrong (only) emission.
+    // Flush the initial emission first, or skip(1) would swallow the real change.
     TestBed.tick();
 
     httpMock.expectOne(`${API_BASE_URL}/rankings`).flush([{ postType: { id: 1, name: 'racism' }, resources: [] }]);
     expect(fixture.componentInstance.rankings()[0].resources).toEqual([]);
 
     TestBed.inject(PostActivityService).notifyPostOrReplyCreated();
-    TestBed.tick(); // flush the effect toObservable() uses internally
+    TestBed.tick(); // runs the effect behind toObservable()
 
     httpMock.expectOne(`${API_BASE_URL}/rankings`).flush([
       {
@@ -161,10 +155,7 @@ describe('RankingsPanelComponent', () => {
   });
 
   describe('imdb/standard (category-only rating domain)', () => {
-    // The outer beforeEach above already injects HttpTestingController,
-    // which locks the module against further provider overrides — reset
-    // and reconfigure from scratch with imdb/standard enabled instead of
-    // overriding the already-instantiated module.
+    // The outer beforeEach already instantiated the module, so reconfigure from scratch.
     beforeEach(async () => {
       TestBed.resetTestingModule();
       await TestBed.configureTestingModule({
@@ -177,8 +168,7 @@ describe('RankingsPanelComponent', () => {
         ],
       }).compileComponents();
       httpMock = TestBed.inject(HttpTestingController);
-      // Safe here (unlike resource-detail's tests): nothing in this spec
-      // ever logs a user in, so select()'s domain-switch logout is a no-op.
+      // No user is logged in, so select() doesn't log anyone out.
       TestBed.inject(DomainSelectionService).select('imdb/standard');
     });
 
@@ -209,8 +199,7 @@ describe('RankingsPanelComponent', () => {
         },
       ]);
 
-      // No GET .../posts request follows, unlike bigotry's severity
-      // re-check — afterEach's httpMock.verify() would fail otherwise.
+      // No severity re-check request follows.
       expect(fixture.componentInstance.rankings().length).toBe(1);
     });
   });

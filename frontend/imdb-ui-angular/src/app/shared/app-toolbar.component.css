@@ -9,17 +9,11 @@
   box-shadow: var(--shadow-sm);
   font-size: 0.85rem;
   color: var(--color-text);
-  /* Stays in the document flow (so it doesn't overlap content on load) but
-     pins to the viewport top once the page scrolls past it. */
   position: sticky;
   top: 0;
   z-index: 10;
 }
 
-/* The one glance a user needs to tell which domain/app they're in — color
-   comes from --color-primary, which DomainSelectionService.applyTheme()
-   already sets per domain (imdb-bigotry.config.ts/imdb-standard.config.ts's
-   themeTokens), so this follows any domain's skin with no extra logic. */
 .brand-name {
   font-size: 1.35rem;
   font-weight: 800;

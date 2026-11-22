@@ -9,11 +9,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Deliberately domain-agnostic (architecture.md §1): no
- * {@code imdb}/{@code bigotry}-specific vocabulary here — {@code X-Domain}
- * alone determines which domain's {@code post_type} rows get ranked.
- */
 @RestController
 @RequestMapping("/rankings")
 @RequiredArgsConstructor

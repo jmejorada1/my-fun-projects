@@ -23,13 +23,12 @@ export interface Resource {
   category: ResourceCategory;
   createdAt: string;
   updatedAt: string;
-  /** Counts posts at any depth (top-level + replies), on both list/search and single-resource GET. */
+  /** Counts replies too. */
   postCount: number;
-  /** Same any-depth scope as `postCount` — includes reply-only flags, not just top-level posts'. */
+  /** Includes flags on replies. */
   flagSummary: ResourceFlagSummaryEntry[];
 }
 
-/** Backs GET /resources — design-spec.md §3 (search panel). */
 @Injectable({ providedIn: 'root' })
 export class ResourceService {
   private readonly http = inject(HttpClient);

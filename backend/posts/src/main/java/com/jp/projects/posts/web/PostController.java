@@ -32,12 +32,6 @@ public class PostController {
 
     private final PostService postService;
 
-    /**
-     * Unified creation endpoint: identifies the author by username, takes
-     * resourceId + an optional parentPostId (present = reply, the server
-     * derives the effective resourceId from the parent), and an optional
-     * postTypeId/score pair to flag the post in the same call.
-     */
     @PostMapping("/posts")
     @ResponseStatus(HttpStatus.CREATED)
     public PostCreateResponse createPost(@Valid @RequestBody PostCreateRequest request,
@@ -78,7 +72,6 @@ public class PostController {
         return postService.get(postId, domain);
     }
 
-    /** All posts (top-level + replies) authored by a user — architecture.md §5. */
     @GetMapping("/users/{userId}/posts")
     public Page<PostResponse> listByUser(@PathVariable Long userId,
                                           @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC)

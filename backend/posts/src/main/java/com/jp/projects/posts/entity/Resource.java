@@ -44,11 +44,7 @@ public class Resource {
     @EqualsAndHashCode.Include
     private Long id;
 
-    /**
-     * Derived from {@code category}'s domain, never set independently by a
-     * client — enforced via a composite FK to
-     * {@code resource_category (id, domain_id)} (design-spec.md §4.3).
-     */
+    /** Must match the category's domain; a composite FK enforces it (design-spec.md §4.3). */
     @Column(name = "domain_id", nullable = false)
     private Long domainId;
 

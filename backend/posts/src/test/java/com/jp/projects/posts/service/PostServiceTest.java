@@ -34,9 +34,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class PostServiceTest {
 
     private static final Long DOMAIN_ID = 1L;
-    // The resolved X-Domain header, supplied by CurrentDomainArgumentResolver
-    // in production. Services no longer look it up themselves, so there is
-    // nothing left to stub per test.
     private static final DomainRef DOMAIN = new DomainRef(DOMAIN_ID, "imdb");
 
     @Mock
@@ -138,7 +135,7 @@ class PostServiceTest {
                     p.getBodyText(), p.getData(), null, null, List.of(), 0L, null);
         });
 
-        // resourceId=999 deliberately wrong/stale — should be ignored in favor of the parent's
+        // resourceId 999 must be ignored in favor of the parent's.
         PostCreateRequest request = new PostCreateRequest("jdoe", 999L, 3L, "a reply", null, null, null);
         PostCreateResponse response = postService.createPost(request, DOMAIN);
 

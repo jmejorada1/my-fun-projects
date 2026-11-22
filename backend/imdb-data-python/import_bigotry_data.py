@@ -2,21 +2,8 @@
 """Seed the imdb/bigotry domain with resources plus mock users, posts, replies,
 and post_flag rows, for local/dev testing of the bigotry-flagging UI.
 
-Reuses import_resources.py's TSV parsing for the resource-import step (same
-title.basics.tsv row range), then layers on synthetic posts/replies authored
-by three mock users (user1/user2/user3 — see USER_WEIGHTS below for the
-post-count ratio between them) and flags a portion of them with post_type
-rows (racism/sexism/lgbtq-phobic/no-bigotry).
-
-Unlike import_resources.py, the resource-import step here is idempotent:
-tconsts already present in the domain are skipped rather than aborting the
-run, so this script can be re-run to layer on more mock posts without
-re-seeding resources. Posts/replies/flags are NOT idempotent — each run adds
-another batch on top of whatever already exists.
-
-Config precedence: CLI flags override bigotry-config.yaml, which overrides
-the built-in defaults below (none — every value must come from one of the
-two).
+Re-runnable: existing resources are skipped, but each run adds another batch
+of posts, replies and flags. CLI flags override bigotry-config.yaml.
 """
 
 import argparse
@@ -50,8 +37,6 @@ REQUIRED_KEYS = (
     "db_password",
 )
 
-# user1 posts least, user3 posts most — ratio applied to total_posts via
-# split_by_weight(). Override the counts by editing user_weights in config.
 USERNAMES = ("user1", "user2", "user3")
 DEFAULT_USER_WEIGHTS = (1, 2, 3)
 

@@ -25,11 +25,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-/**
- * Deliberately no {@code @OneToMany(mappedBy = "parentPost") List<Post> replies}
- * collection — a post can have an unbounded reply subtree, so replies are
- * fetched explicitly (and paginated) through {@code PostRepository}.
- */
+/** No replies collection: a reply tree is unbounded, so replies are paginated queries. */
 @Entity
 @Table(name = "post")
 @Getter
@@ -47,11 +43,7 @@ public class Post {
     @EqualsAndHashCode.Include
     private Long id;
 
-    /**
-     * Derived from {@code resource}'s domain, never set independently by a
-     * client — enforced via composite FKs to {@code resource (id, domain_id)}
-     * and {@code app_user (id, domain_id)} (design-spec.md §4.3).
-     */
+    /** Must match the resource's and user's domain; composite FKs enforce it (design-spec.md §4.3). */
     @Column(name = "domain_id", nullable = false)
     private Long domainId;
 

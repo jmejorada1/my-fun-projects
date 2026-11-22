@@ -19,12 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Temporary, dev-only (architecture.md §5). Unblocks
- * manual testing until real registration/auth exists — delete this
- * controller (and AppUserService, if nothing else needs it by then) once it
- * does. Guarded so it can't accidentally ship live.
- */
+/** Placeholder until real auth (architecture.md §5); disabled under the prod profile. */
 @RestController
 @RequestMapping("/dev/users")
 @Profile("!prod")
@@ -33,7 +28,7 @@ public class AppUserController {
 
     private final AppUserService appUserService;
 
-    /** Register (§19): always creates a new account; 409 on a duplicate username/email. */
+    /** 409 on a duplicate username or email. */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public AppUserResponse create(@Valid @RequestBody AppUserCreateRequest request,
@@ -41,7 +36,6 @@ public class AppUserController {
         return appUserService.create(request, domain);
     }
 
-    /** Login (§19): looks up an existing account by username; 404 if none exists. */
     @GetMapping("/by-username/{username}")
     public AppUserResponse findByUsername(@PathVariable String username, @CurrentDomain DomainRef domain) {
         return appUserService.findByUsername(username, domain);

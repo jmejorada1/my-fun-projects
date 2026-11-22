@@ -17,18 +17,8 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 /**
- * Every handler logs before responding. Nothing in this service used to
- * log at all, so a constraint violation — any of the dozen-plus
- * constraints in the schema — produced an opaque 409 with no server-side
- * record of which one fired. Expected 4xx outcomes log without a stack
- * trace (they're client errors, not incidents); anything unhandled logs at
- * {@code error} with the exception.
- *
- * <p>Extends {@link ResponseEntityExceptionHandler} so that Spring's own
- * MVC exceptions — a missing {@code X-Domain} header, unparseable JSON, a
- * non-numeric path variable, an unsupported method — keep their correct
- * 4xx statuses. Without it the {@link #handleUnexpected} catch-all below
- * would match them first and report every one as a 500.
+ * Every handler logs; 4xx without a stack trace. Extends {@link ResponseEntityExceptionHandler} so
+ * Spring's MVC exceptions keep their 4xx statuses instead of hitting the 500 catch-all.
  */
 @Slf4j
 @RestControllerAdvice
@@ -46,26 +36,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
     }
 
-    /**
-     * Only our own {@link InvalidRequestException} maps to 400 here.
-     * {@code IllegalArgumentException} used to, which meant any of the
-     * many {@code IllegalArgumentException}s thrown by Spring, Hibernate
-     * or the JDK to signal a *programmer* error was reported to the client
-     * as a bad request, with the internal message as the body. Those now
-     * fall through to {@link #handleUnexpected} as a 500, which is what
-     * they are.
-     */
+    /** Not IllegalArgumentException: libraries throw that for programmer errors, which are 500s. */
     @ExceptionHandler(InvalidRequestException.class)
     public ProblemDetail handleInvalidRequest(InvalidRequestException ex) {
         log.debug("Invalid request: {}", ex.getMessage());
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
-    /**
-     * The response stays deliberately generic — which constraint was
-     * violated is an internal schema detail — but the cause is now logged
-     * so a 409 in production is diagnosable.
-     */
+    /** Generic response so schema details don't leak; the cause is logged. */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException ex) {
         log.warn("Data integrity violation", ex);
@@ -73,12 +51,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.CONFLICT, "The request conflicts with an existing resource or constraint");
     }
 
-    /**
-     * Catch-all so an unexpected failure is logged with its stack trace and
-     * answered with a 500 that leaks nothing, rather than falling through
-     * to the container's default error handling. The inherited handlers for
-     * Spring's own MVC exceptions are more specific, so they still win.
-     */
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleUnexpected(Exception ex) {
         log.error("Unhandled exception", ex);
@@ -104,7 +76,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.badRequest().body(problem);
     }
 
-    /** One place to log every exception {@link ResponseEntityExceptionHandler} handles. */
+    /** Logs every exception the inherited handlers handle. */
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(Exception ex, Object body, HttpHeaders headers,
                                                               HttpStatusCode statusCode, WebRequest request) {

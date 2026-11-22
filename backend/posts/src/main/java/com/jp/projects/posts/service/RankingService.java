@@ -24,12 +24,7 @@ public class RankingService {
     private final PostFlagRepository postFlagRepository;
     private final PostTypeMapper postTypeMapper;
 
-    /**
-     * {@code GET /rankings} (architecture.md §5) — one entry per
-     * {@code post_type} in the domain (even ones with no flags yet, which
-     * get an empty {@code resources} list), each with its top-5 ranked
-     * resources.
-     */
+    /** One entry per post type, including types with no flags (empty {@code resources}). */
     public List<PostTypeRankingResponse> getRankings(DomainRef domain) {
         Long domainId = domain.id();
 

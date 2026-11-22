@@ -1,10 +1,6 @@
 import { Directive, ElementRef, effect, inject, input } from '@angular/core';
 
-/**
- * Scrolls the host element into view the moment its condition flips to
- * true — for drilling down from elsewhere in the app (e.g. the "My Posts"
- * panel) into one specific, possibly off-screen, row of a table.
- */
+/** Scrolls the host into view when the bound condition becomes true. */
 @Directive({
   selector: '[appScrollIntoViewOn]',
 })

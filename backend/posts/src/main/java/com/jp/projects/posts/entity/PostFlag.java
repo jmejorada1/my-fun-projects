@@ -42,11 +42,7 @@ public class PostFlag {
     @EqualsAndHashCode.Include
     private Long id;
 
-    /**
-     * Derived from {@code post}'s domain, never set independently by a
-     * client — enforced via composite FKs to {@code post (id, domain_id)}
-     * and {@code post_type (id, domain_id)} (design-spec.md §4.3).
-     */
+    /** Must match the post's and post type's domain; composite FKs enforce it (design-spec.md §4.3). */
     @Column(name = "domain_id", nullable = false)
     private Long domainId;
 

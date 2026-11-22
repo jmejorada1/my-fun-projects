@@ -20,15 +20,9 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
     Page<Post> findByDomainIdAndParentPostIdAndDeletedAtIsNull(Long domainId, Long parentPostId, Pageable pageable);
 
-    /** All posts (top-level + replies) authored by a user — architecture.md §5. */
     Page<Post> findByDomainIdAndUserIdAndDeletedAtIsNull(Long domainId, Long userId, Pageable pageable);
 
-    /**
-     * Batch variant for a page of posts (list endpoints): how many active
-     * replies each has, in one grouped query rather than one COUNT per
-     * post. Parents with zero replies are simply absent from the result —
-     * PostService treats a missing entry as 0.
-     */
+    /** Posts with no replies are absent from the result. */
     @Query("SELECT p.parentPostId AS parentPostId, COUNT(p) AS replyCount FROM Post p "
             + "WHERE p.parentPostId IN :parentPostIds AND p.deletedAt IS NULL GROUP BY p.parentPostId")
     List<ReplyCount> countActiveRepliesByParentPostIdIn(@Param("parentPostIds") Collection<Long> parentPostIds);
@@ -39,12 +33,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
         Long getReplyCount();
     }
 
-    /**
-     * Batch variant for a page of search results: how many posts (top-level
-     * + replies) each resource has, in one grouped query. A resource with
-     * zero posts is simply absent — ResourceService treats a missing entry
-     * as 0.
-     */
+    /** Counts replies too. Resources with no posts are absent from the result. */
     @Query("SELECT p.resourceId AS resourceId, COUNT(p) AS postCount FROM Post p "
             + "WHERE p.resourceId IN :resourceIds AND p.deletedAt IS NULL GROUP BY p.resourceId")
     List<ResourcePostCount> countByResourceIdIn(@Param("resourceIds") Collection<Long> resourceIds);
@@ -55,12 +44,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
         Long getPostCount();
     }
 
-    /**
-     * Write-time recursive cascade (design-spec.md §6, resolved). Must always
-     * be called from within an existing {@code @Transactional} service
-     * method — {@code @Modifying} queries require one, and this shouldn't
-     * commit independently of the caller's ownership check.
-     */
+    /** Recursive cascade (design-spec.md decision #10). Call inside the caller's transaction. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
         WITH RECURSIVE subtree AS (

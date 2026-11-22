@@ -73,8 +73,7 @@ describe('MyPostsPanelComponent', () => {
     expect(fixture.componentInstance.topLevelPosts().map((p) => p.id)).toEqual([1]);
     expect(fixture.componentInstance.replies().map((p) => p.id)).toEqual([2]);
 
-    // Groups are collapsed by default, but their movie-title headers (the
-    // only thing distinguishing the two posts here) are always visible.
+    // Groups start collapsed, but their movie headers always show.
     const el = fixture.nativeElement as HTMLElement;
     const sections = el.querySelectorAll('section');
     expect(sections[0].textContent).toContain('Carmencita');
@@ -317,8 +316,7 @@ describe('MyPostsPanelComponent', () => {
       const fixture = createWithPost(LONG_BODY, 42);
       const el = fixture.nativeElement as HTMLElement;
 
-      // The only post here is a reply, so "My Posts" has no groups at all —
-      // this is the "My Replies" section's own group header.
+      // The only post is a reply, so this header is in "My Replies".
       (el.querySelector('.tree-toggle') as HTMLElement).click();
       fixture.detectChanges();
 
@@ -343,7 +341,7 @@ describe('MyPostsPanelComponent', () => {
       fixture.detectChanges();
 
       TestBed.inject(PostActivityService).notifyPostOrReplyCreated();
-      TestBed.tick(); // flush the effect toObservable() uses internally
+      TestBed.tick(); // runs the effect behind toObservable()
 
       httpMock
         .expectOne((r) => r.url === `${API_BASE_URL}/users/1/posts`)
@@ -392,9 +390,7 @@ describe('MyPostsPanelComponent', () => {
         size: 20,
       });
       fixture.detectChanges();
-      // Movie groups are collapsed by default — expand the only one here
-      // (whichever of "My Posts"/"My Replies" actually has content) so the
-      // post/reply entry renders.
+      // Expand the only group so the entry renders.
       (fixture.nativeElement.querySelector('.tree-toggle') as HTMLElement).click();
       fixture.detectChanges();
       return fixture;
@@ -403,8 +399,7 @@ describe('MyPostsPanelComponent', () => {
     it('navigates to the resource page with the post id to highlight, no parent', () => {
       const fixture = createWithPost('A top-level post.', null);
       const router = TestBed.inject(Router);
-      // provideRouter([]) has no matching routes — stub the real navigation
-      // away so it doesn't reject; only the call itself is under test here.
+      // provideRouter([]) has no routes, so stub navigate() to keep it from rejecting.
       const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
       (fixture.nativeElement.querySelector('.post-entry') as HTMLElement).click();
