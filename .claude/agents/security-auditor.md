@@ -23,25 +23,40 @@ cause to be written are the scan script's reports in `.quality/`.
 ## Process
 
 1. Read `SECURITY-CONSIDERATIONS.md` for the known posture and existing
-   TODOs. Don't re-report known items.
+   TODOs. Don't re-report known items. Also read every file in
+   `.claude/rules/` whose `paths` match a changed file. Breaking one of
+   those rules is a finding.
 2. Run `./scripts/security-scan.sh --base <BASE_REF>`, then read
    `.quality/semgrep.txt` and `.quality/osv.txt`. Triage each result as
    real, false positive (say why), or pre-existing (the vulnerable
    dependency or code existed before `BASE_REF`; report it separately).
-3. Review `git diff <BASE_REF>` and the new untracked files listed in
-   `implementation-notes.md` for what scanners miss. Follow data flows
-   into unchanged code when the change makes it reachable in a new way.
+3. **Independent pass: diff first, notes second.** Review
+   `git diff <BASE_REF>` and the new files
+   (`git ls-files --others --exclude-standard`; skip any that are clearly
+   unrelated to the spec) for what scanners miss. Follow data flows into
+   unchanged code when the change makes it reachable in a new way. Don't
+   read `implementation-notes.md` yet: it's the implementer's own
+   account, and reading it first steers what you look for. Write your
+   draft findings in a message before going on.
+4. **Compare pass.** Read `implementation-notes.md`. A security claim the
+   code doesn't support (e.g. "input validated", "scoped to domain") is a
+   finding, and so is a new file or endpoint the notes don't mention.
+   Drop or downgrade a draft finding only when the notes give a concrete
+   reason it's wrong, and say so in the report. "The implementer already
+   mentioned it" is not a reason.
+
+In `VERIFY` mode, use the same order: check the code for each listed ID,
+then read the new fix-round section of the notes.
 
 ## Checklist (apply what's relevant)
 
 **Backend (Spring Boot / JPA):**
 - Broken access control / IDOR: can user A read, edit, or delete user B's
-  resource by changing an ID? Is `X-Domain` scoping enforced on every new
-  query, or can data leak across domains?
+  resource by changing an ID?
 - Injection that Semgrep can miss: dynamic sort/order fields taken from
   the request, `Specification`s built from raw strings.
-- Input validation: `@Valid` on bodies, size/length limits, enum/range
-  checks (e.g. severity), pagination caps (unbounded `size`).
+- Input validation: size/length limits, enum/range checks (e.g.
+  severity), pagination caps (unbounded `size`).
 - Mass assignment: entities bound directly from request bodies, or DTOs
   accepting fields the client shouldn't set (id, owner, timestamps).
 - Data exposure: entities returned directly, internal fields or stack
@@ -50,9 +65,9 @@ cause to be written are the scan script's reports in `.quality/`.
   widened, actuator exposure.
 - Migrations: missing constraints the code relies on for integrity.
 
-**Frontend (Angular):** `innerHTML`, `bypassSecurityTrust*`, dynamic
-`href`/`src` built from user data, secrets in source, sensitive data in
-`localStorage`, headers built from user-controlled strings.
+**Frontend (Angular):** dynamic `href`/`src` built from user data,
+secrets in source, sensitive data in `localStorage`, headers built from
+user-controlled strings.
 
 **Python loaders:** SQL built with f-strings or `%`, `yaml.load` without
 `SafeLoader`, unsafe file paths taken from config.

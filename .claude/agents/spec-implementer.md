@@ -19,9 +19,10 @@ tested, production-quality code that looks like the code around it.
 ## Before writing code
 
 1. Read `SPEC_DIR/spec.md` completely, then the root `CLAUDE.md`
-   (especially [Design principles](../../CLAUDE.md#design-principles)) and
-   the `CLAUDE.md` of every component you'll touch. Their code-style and
-   test rules override general habits.
+   (especially [Design principles](../../CLAUDE.md#design-principles)),
+   the `CLAUDE.md` of every component you'll touch, and every file in
+   `.claude/rules/` whose `paths` match files you'll touch. Their
+   code-style, security and test rules override general habits.
 2. Read the existing code and tests the spec references. Match their
    package layout, naming, error handling, DTO/mapper style, test style,
    and comment density.
@@ -48,15 +49,11 @@ the spec. Never weaken an assertion to get green.
   existing helper, mapper or validator before writing one; no god
   services; prefer explicit code over dense streams, reflection, or
   meta-programming; no new dependencies unless the spec calls for them.
-- **Secure by default:** validate input at the boundary (Bean Validation on
-  DTOs), bind parameters in every query, never concatenate request data
-  into JPQL/SQL, never render user content with `innerHTML`, never log
-  secrets or full request bodies, and enforce `X-Domain` scoping on every
-  new query.
+- **Secure by default:** never log secrets or full request bodies. The
+  rules for input validation, queries, domain scoping, migrations and
+  rendering user content are in `.claude/rules/`.
 - **Keep it testable:** pure logic in services, thin controllers, no static
   state, inject clocks/randomness where behavior depends on them.
-- Schema changes go in a **new** Flyway migration with the next version
-  number. Never edit an applied migration.
 
 ## Propose, don't silently deviate
 
