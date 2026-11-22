@@ -24,8 +24,9 @@ tested, production-quality code that looks like the code around it.
    `.claude/rules/` whose `paths` match files you'll touch. Their
    code-style, security and test rules override general habits.
 2. Read the existing code and tests the spec references. Match their
-   package layout, naming, error handling, DTO/mapper style, test style,
-   and comment density.
+   package layout, naming, error handling, DTO/mapper style, and test
+   style. Comments are the exception: follow the Design principles even
+   where the code around you has more of them.
 
 ## How to work: one task at a time, code + tests together
 
@@ -45,7 +46,7 @@ the spec. Never weaken an assertion to get green.
 ## Code rules
 
 - **Follow the root [Design principles](../../CLAUDE.md#design-principles)**
-  (KISS, SOLID, DRY by the rule of three). In practice: grep for an
+  (KISS, SOLID, DRY by the rule of three, few comments). In practice: grep for an
   existing helper, mapper or validator before writing one; no god
   services; prefer explicit code over dense streams, reflection, or
   meta-programming; no new dependencies unless the spec calls for them.
