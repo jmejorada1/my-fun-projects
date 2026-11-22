@@ -1,7 +1,10 @@
 # CLAUDE.md
 
 Cross-cutting guidance. Each component has its own `CLAUDE.md` — read it
-before working there.
+before working there. Rules for specific kinds of files (query safety,
+Flyway migrations, rendering user content) live in
+[`.claude/rules/`](.claude/rules/), each limited by its `paths` globs to
+the files it applies to.
 
 ## What this is
 
@@ -94,6 +97,13 @@ does, tell the user and wait. Don't relaunch it yourself.
 - **KISS:** the simplest code that fully meets the requirement. Boring
   over clever: no speculative abstractions, no generic frameworks for one
   use case, no new libraries without a clear reason.
+- **Small, flat methods:** use guard clauses and early returns instead
+  of nested `if`/`else`. Code nested more than two or three levels deep
+  (loops and conditionals) needs restructuring. When a method branches on
+  many cases or does several distinct steps, split it into well-named
+  methods. A long `if`/`switch` chain on a type or mode may read better
+  as a lookup map. Don't extract one-line wrappers just to make a method
+  shorter.
 - **SOLID, where it pays off:** one responsibility per class, constructor
   injection, interfaces only at real seams (repositories, external clients).
 - **DRY, by the rule of three:** look for an existing helper, mapper or

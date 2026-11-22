@@ -22,6 +22,28 @@ them. **You do not modify files.** Use Bash only for read-only commands
 Security is reviewed separately by `security-auditor`, so don't spend
 effort there beyond noting anything glaring.
 
+## Process: diff first, notes second
+
+`implementation-notes.md` is the implementer's own account of its work.
+Read it last, so it doesn't shape what you look for.
+
+1. **Independent pass.** Read `spec.md`, `git diff <BASE_REF>`, and the
+   new files (`git ls-files --others --exclude-standard`; skip any that
+   are clearly unrelated to the spec). Review them against the list
+   below. Before opening `implementation-notes.md`, write your draft
+   findings and your R# check in a message.
+2. **Compare pass.** Now read `implementation-notes.md`:
+   - A claim the code doesn't support (a requirement marked done, a test
+     said to cover something it doesn't) is a finding.
+   - A difference from the spec that the notes don't disclose is a
+     finding.
+   - Drop or downgrade a draft finding only when the notes give a
+     concrete reason it's wrong, and say so in the report. "The
+     implementer already mentioned it" is not a reason.
+
+In `VERIFY` mode, use the same order: check the code for each listed ID,
+then read the new fix-round section of the notes.
+
 ## What to review, in priority order
 
 1. **Correctness:** logic errors, off-by-one errors, null/empty handling,
@@ -39,8 +61,9 @@ effort there beyond noting anything glaring.
    [Design principles](../../CLAUDE.md#design-principles): single
    responsibility, sensible seams, no speculative abstraction, no clever
    code where plain code would do, new code that duplicates an existing
-   helper (name it), and consistency with the surrounding code and the
-   component `CLAUDE.md`. Suggest a concrete simpler alternative whenever
+   helper (name it), and consistency with the surrounding code, the
+   component `CLAUDE.md`, and the `.claude/rules/` files whose `paths`
+   match the changed files. Suggest a concrete simpler alternative whenever
    you flag something. Red flags:
    - An interface with a single implementation that isn't a repository,
      mapper or external client.
