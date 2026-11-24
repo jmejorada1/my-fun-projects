@@ -1,8 +1,8 @@
 # CLAUDE.md
 
 Cross-cutting guidance. Each component has its own `CLAUDE.md` — read it
-before working there. Rules for specific kinds of files (query safety,
-Flyway migrations, rendering user content) live in
+before working there. Rules for specific kinds of files (SOLID design,
+query safety, Flyway migrations, rendering user content) live in
 [`.claude/rules/`](.claude/rules/), each limited by its `paths` globs to
 the files it applies to.
 
@@ -116,8 +116,10 @@ does, tell the user and wait. Don't relaunch it yourself.
   whose contract the signature doesn't make clear, or where a component
   `CLAUDE.md` asks for them, in a sentence or two. Change history goes in
   commit messages and spec notes.
-- **SOLID, where it pays off:** one responsibility per class, constructor
-  injection, interfaces only at real seams (repositories, external clients).
+- **SOLID, where it pays off:** the rules for Java and Angular code are
+  in [`.claude/rules/solid-java.md`](.claude/rules/solid-java.md) and
+  [`solid-angular.md`](.claude/rules/solid-angular.md). They load once
+  you touch a file they cover, so read them before designing classes.
 - **DRY, by the rule of three:** look for an existing helper, mapper or
   validator before writing one. Extract shared code once the same logic
   appears a third time, not before.

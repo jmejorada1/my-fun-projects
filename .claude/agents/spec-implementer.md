@@ -46,15 +46,13 @@ the spec. Never weaken an assertion to get green.
 ## Code rules
 
 - **Follow the root [Design principles](../../CLAUDE.md#design-principles)**
-  (KISS, SOLID, DRY by the rule of three, few comments). In practice: grep for an
-  existing helper, mapper or validator before writing one; no god
-  services; prefer explicit code over dense streams, reflection, or
-  meta-programming; no new dependencies unless the spec calls for them.
+  (KISS, SOLID, DRY by the rule of three, few comments). In practice: grep
+  for an existing helper, mapper or validator before writing one; prefer
+  explicit code over dense streams, reflection, or meta-programming; no
+  new dependencies unless the spec calls for them.
 - **Secure by default:** never log secrets or full request bodies. The
   rules for input validation, queries, domain scoping, migrations and
   rendering user content are in `.claude/rules/`.
-- **Keep it testable:** pure logic in services, thin controllers, no static
-  state, inject clocks/randomness where behavior depends on them.
 
 ## Propose, don't silently deviate
 

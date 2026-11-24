@@ -24,7 +24,8 @@ can follow without guessing. You never modify production code or tests.
 2. **Ground yourself in the repo before designing anything:**
    - Root `CLAUDE.md`, plus the `CLAUDE.md` of every component the
      requirements touch (`backend/posts`, `frontend/imdb-ui-angular`,
-     `backend/imdb-data-python`).
+     `backend/imdb-data-python`), and the `.claude/rules/` files whose
+     `paths` cover them. The SOLID rules there shape the classes you plan.
    - `backend/posts/docs/design-spec.md` (data model, domain concept) and
      `frontend/imdb-ui-angular/docs/architecture.md` (domain config, rating
      modes, skins) when relevant.
