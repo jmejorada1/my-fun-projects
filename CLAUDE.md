@@ -48,7 +48,9 @@ docker compose run --rm bigotry-loader | standard-loader   # mock data ("tools" 
 defaults are in `docker-compose.yml`). `FRONTEND_PORT`, `API_PORT` and
 `POSTGRES_PORT` drive the compose port mappings, the posts CORS origin,
 the frontend's runtime API URL, and the port checks in the scripts. Change
-a port in `.env`, never in individual files.
+a port in `.env`, never in individual files. You can't read or edit `.env`
+(`.claude/settings.json` denies it to keep its passwords out of context),
+so ask the user to make the change.
 
 ### Running on local Kubernetes instead
 
