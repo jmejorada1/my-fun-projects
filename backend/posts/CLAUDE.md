@@ -28,14 +28,6 @@ PostgreSQL schema `posts`. Fully implemented. Check the code and
 Standard Spring Boot idioms, Lombok for boilerplate, MapStruct for DTO
 mapping. Match the existing package structure.
 
-- **Program to interfaces at real seams only.** Depend on the interface
-  types that already exist: Spring Data repositories, MapStruct mappers,
-  and `List`/`Map`/`Set` rather than concrete collections. Services are
-  concrete `@Service` classes. Don't add a `FooService`/`FooServiceImpl`
-  pair. Add an interface only when there is a second implementation or an
-  external client to stub in tests. Mockito mocks concrete classes, so
-  testability isn't a reason to add one.
-
 ## Data model: the docs are the source of truth
 
 Read these before changing the model, and keep them consistent with the
