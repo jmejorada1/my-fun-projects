@@ -7,11 +7,11 @@ disable-model-invocation: true
 
 # Feature pipeline orchestrator
 
-You (the main session) are the orchestrator. Subagents can't spawn other
-subagents, so **you** launch each agent with the Agent tool and pass state
-through files in `SPEC_DIR`. Run agents in the foreground
-(`run_in_background: false`) unless a step says to run them in parallel.
-Full docs: `AGENT-PIPELINE.md`.
+You (the main session) are the orchestrator. **You** launch each agent with
+the Agent tool and pass state through files in `SPEC_DIR`. The pipeline
+agents don't have the Agent tool, so they can't launch agents themselves.
+Run agents in the foreground (`run_in_background: false`) unless a step
+says to run them in parallel. Full docs: `AGENT-PIPELINE.md`.
 
 Arguments: `$ARGUMENTS`
 

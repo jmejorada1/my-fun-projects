@@ -71,7 +71,11 @@ Design choices, and why:
   diffs are clean and throwing a run away is just `git branch -D`.
 - **The orchestrator is a skill,**
   [`.claude/skills/feature-pipeline/SKILL.md`](.claude/skills/feature-pipeline/SKILL.md),
-  because Claude Code subagents can't spawn other subagents.
+  so it runs in your main session. Claude Code subagents can spawn their
+  own subagents, up to a depth limit, but these four don't have the
+  `Agent` tool: their `tools` lists leave it out. One level of delegation
+  keeps every stage, the spec checkpoint and the gate results in front of
+  you.
 
 ## 3. The Agents
 
