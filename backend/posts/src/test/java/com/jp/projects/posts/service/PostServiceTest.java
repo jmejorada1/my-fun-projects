@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.jp.projects.posts.dto.post.PostCreateRequest;
@@ -12,6 +14,8 @@ import com.jp.projects.posts.dto.post.PostCreateResponse;
 import com.jp.projects.posts.dto.post.PostResponse;
 import com.jp.projects.posts.dto.post.PostUpdateRequest;
 import com.jp.projects.posts.dto.post.ReplyCreateRequest;
+import com.jp.projects.posts.dto.postflag.PostFlagCreateRequest;
+import com.jp.projects.posts.dto.postflag.PostFlagResponse;
 import com.jp.projects.posts.entity.AppUser;
 import com.jp.projects.posts.entity.Post;
 import com.jp.projects.posts.entity.Resource;
@@ -55,7 +59,7 @@ class PostServiceTest {
         Post parent = Post.builder().id(1L).domainId(DOMAIN_ID).resourceId(42L).userId(1L).bodyText("root").build();
         when(postRepository.findByIdAndDomainIdAndDeletedAtIsNull(1L, DOMAIN_ID)).thenReturn(Optional.of(parent));
         when(appUserRepository.findByIdAndDomainId(2L, DOMAIN_ID))
-                .thenReturn(Optional.of(AppUser.builder().id(2L).domainId(DOMAIN_ID).build()));
+                .thenReturn(Optional.of(AppUser.builder().id(2L).domainId(DOMAIN_ID).username("replier").build()));
         when(postRepository.save(any(Post.class))).thenAnswer(inv -> inv.getArgument(0));
         when(postMapper.toResponse(any(Post.class))).thenAnswer(inv -> {
             Post p = inv.getArgument(0);
@@ -68,6 +72,7 @@ class PostServiceTest {
 
         assertThat(response.resourceId()).isEqualTo(42L);
         assertThat(response.parentPostId()).isEqualTo(1L);
+        assertThat(response.username()).isEqualTo("replier");
         verify(postRepository).save(any(Post.class));
     }
 
@@ -101,6 +106,36 @@ class PostServiceTest {
     }
 
     @Test
+    void deletePost_nonOwner_throwsForbiddenAndDeletesNothing() {
+        Post post = Post.builder().id(1L).domainId(DOMAIN_ID).resourceId(1L).userId(1L).bodyText("root").build();
+        when(postRepository.findByIdAndDomainIdAndDeletedAtIsNull(1L, DOMAIN_ID)).thenReturn(Optional.of(post));
+
+        assertThatThrownBy(() -> postService.deletePost(1L, 999L, DOMAIN))
+                .isInstanceOf(ForbiddenOperationException.class);
+        verify(postRepository, never()).softDeleteSubtree(any());
+    }
+
+    @Test
+    void createPost_withPostType_flagsTheNewPostAsItsAuthor() {
+        AppUser author = AppUser.builder().id(7L).domainId(DOMAIN_ID).username("jdoe").build();
+        when(appUserRepository.findByDomainIdAndUsername(DOMAIN_ID, "jdoe")).thenReturn(Optional.of(author));
+        when(resourceRepository.findByIdAndDomainIdAndDeletedAtIsNull(5L, DOMAIN_ID))
+                .thenReturn(Optional.of(Resource.builder().id(5L).domainId(DOMAIN_ID).build()));
+        when(postRepository.save(any(Post.class))).thenAnswer(inv -> {
+            Post saved = inv.getArgument(0);
+            saved.setId(10L);
+            return saved;
+        });
+        PostFlagResponse flag = new PostFlagResponse(20L, 10L, null, (short) 3, null, null);
+        when(postFlagService.addOrUpdateFlag(10L, new PostFlagCreateRequest(7L, 2L, 3), DOMAIN)).thenReturn(flag);
+
+        PostCreateRequest request = new PostCreateRequest("jdoe", 5L, null, "hello", 2L, 3, null);
+        PostCreateResponse response = postService.createPost(request, DOMAIN);
+
+        assertThat(response.flag()).isEqualTo(flag);
+    }
+
+    @Test
     void createPost_topLevel_resolvesAuthorByUsername() {
         AppUser author = AppUser.builder().id(7L).domainId(DOMAIN_ID).username("jdoe").build();
         when(appUserRepository.findByDomainIdAndUsername(DOMAIN_ID, "jdoe")).thenReturn(Optional.of(author));
@@ -120,6 +155,7 @@ class PostServiceTest {
         assertThat(response.post().username()).isEqualTo("jdoe");
         assertThat(response.post().resourceId()).isEqualTo(5L);
         assertThat(response.flag()).isNull();
+        verifyNoInteractions(postFlagService);
     }
 
     @Test

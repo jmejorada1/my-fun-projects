@@ -56,6 +56,16 @@ describe('errorInterceptor', () => {
     expect((captured as AppHttpError).fieldErrors).toEqual({ name: 'must not be blank' });
   });
 
+  it('falls back to a status message when the error has no body', () => {
+    let captured: unknown;
+    http.get('/resources').subscribe({ error: (err) => (captured = err) });
+
+    httpMock.expectOne('/resources').flush(null, { status: 502, statusText: 'Bad Gateway' });
+
+    expect((captured as AppHttpError).message).toBe('Request failed (502).');
+    expect((captured as AppHttpError).fieldErrors).toBeUndefined();
+  });
+
   it('gives a network-failure message when status is 0', () => {
     let captured: unknown;
     http.get('/resources').subscribe({ error: (err) => (captured = err) });

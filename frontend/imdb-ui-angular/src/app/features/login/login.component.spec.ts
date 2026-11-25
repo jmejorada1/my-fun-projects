@@ -71,6 +71,36 @@ describe('LoginComponent', () => {
     expect(fixture.componentInstance.submitting()).toBe(false);
   });
 
+  it('ignores a second submit while the first login is in flight', () => {
+    const fixture = TestBed.createComponent(LoginComponent);
+    fixture.componentInstance.username.setValue('jdoe');
+
+    fixture.componentInstance.submit();
+    fixture.componentInstance.submit();
+
+    expect(fixture.componentInstance.submitting()).toBe(true);
+    httpMock
+      .expectOne(`${API_BASE_URL}/dev/users/by-username/jdoe`)
+      .flush({ id: 1, username: 'jdoe', email: 'jdoe@example.com', firstName: null, lastName: null });
+  });
+
+  it('clears the previous error when submitting again', () => {
+    const fixture = TestBed.createComponent(LoginComponent);
+    fixture.componentInstance.username.setValue('ghost');
+    fixture.componentInstance.submit();
+    httpMock
+      .expectOne(`${API_BASE_URL}/dev/users/by-username/ghost`)
+      .flush({ detail: 'not found' }, { status: 404, statusText: 'Not Found' });
+
+    fixture.componentInstance.submit();
+
+    expect(fixture.componentInstance.errorMessage()).toBeNull();
+    httpMock
+      .expectOne(`${API_BASE_URL}/dev/users/by-username/ghost`)
+      .flush({ detail: 'not found' }, { status: 404, statusText: 'Not Found' });
+    expect(fixture.componentInstance.submitting()).toBe(false);
+  });
+
   it('shows a not-found message when the username does not exist', () => {
     const fixture = TestBed.createComponent(LoginComponent);
     fixture.componentInstance.username.setValue('ghost');
