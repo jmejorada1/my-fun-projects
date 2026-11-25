@@ -7,6 +7,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY import_resources.py config.yaml import_bigotry_data.py bigotry-config.yaml import_standard_data.py standard-config.yaml ./
 COPY sample-data/ sample-data/
 
+# Run unprivileged: the loaders only read their files and write to Postgres.
+RUN groupadd --system --gid 1001 loader \
+    && useradd --system --uid 1001 --gid loader --no-create-home loader
+USER loader:loader
+
 # db_host/db_port in config.yaml/bigotry-config.yaml default to localhost,
 # which only makes sense on a host machine. Baking the container-network
 # host/port into ENTRYPOINT (not CMD) means they always apply but any args
