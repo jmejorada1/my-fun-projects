@@ -199,10 +199,18 @@
 				<artifactId>pitest-maven</artifactId>
 				<version>${pitest.version}</version>
 				<configuration>
+					<!-- No logic worth mutating: records, entities, Spring wiring (whose
+					     survivors are often false, as PIT reuses the cached test context),
+					     and queries that only a real database exercises. -->
 					<excludedClasses>
 						<param>*MapperImpl</param>
 						<param>com.jp.projects.posts.PostsApplication</param>
+						<param>com.jp.projects.posts.dto.*</param>
+						<param>com.jp.projects.posts.entity.*</param>
+						<param>com.jp.projects.posts.config.*</param>
+						<param>com.jp.projects.posts.repository.*</param>
 					</excludedClasses>
+					<failWhenNoMutations>false</failWhenNoMutations>
 					<outputFormats>
 						<param>XML</param>
 					</outputFormats>

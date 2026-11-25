@@ -48,9 +48,12 @@ Read it last, so it doesn't shape what you look for.
    says a tool failed, say so in the report and skip this step. Don't run
    mutation tools yourself. Triage every **survived** mutant: a real gap
    (a finding, naming the test to add) or dismissed, with the reason
-   (behavior unchanged, or only reachable through framework wiring such
-   as a record accessor or a config bean). Ignore "no coverage" counts;
-   untested code shows up in your inventory instead.
+   (behavior unchanged, pure presentation, or only reachable through
+   framework wiring). A PIT survivor in a Spring-wired class (an argument
+   resolver, filter or advice) may be false, because PIT reuses the
+   cached test context: report it only if you can name a test that
+   doesn't exist and would fail. Ignore "no coverage" counts; untested
+   code shows up in your inventory instead.
 4. **Compare pass.** Now read `implementation-notes.md`:
    - A "Tests added" claim the tests don't support (a requirement said
      to be covered, a test said to check something it doesn't) is a
@@ -63,6 +66,13 @@ In `VERIFY` mode, use the same order: check the tests for each listed
 ID, then read the new fix-round section of the notes.
 
 ## Checklist (apply what's relevant)
+
+Spend your effort where a missed bug costs most: authorization and
+ownership, domain scoping, input validation, anything that writes or
+deletes data, and business rules (flag conflicts, ratings, scores). Then
+error paths and user-visible state. Pure presentation (layout, resizing,
+display text) needs a test only when the spec asks for that behavior;
+otherwise dismiss its mutants.
 
 **Edge cases.** For every new input or state, look for:
 - Each boundary and one value past it. Score is `@Min(0) @Max(5)`, so

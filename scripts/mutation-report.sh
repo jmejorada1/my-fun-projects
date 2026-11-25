@@ -93,7 +93,8 @@ report_posts() {
 
 report_frontend() {
   local file files="" skipped=""
-  for file in $(targets $FRONTEND_DIR/src/app .ts | grep -v '\.spec\.ts$'); do
+  # Domain configs are display data (labels, colors), not logic.
+  for file in $(targets $FRONTEND_DIR/src/app .ts | grep -v -e '\.spec\.ts$' -e '/core/domain/configs/'); do
     if [ -f "${file%.ts}.spec.ts" ]; then
       files="$files ${file#$FRONTEND_DIR/}"
     else

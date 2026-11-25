@@ -163,8 +163,8 @@ survivor as a real gap or harmless. It's too slow for CI.
 
 | Component | Tool | Notes |
 |---|---|---|
-| `backend/posts` | [PIT](https://pitest.org) (`pitest-maven` in `pom.xml`) | Unit tests only: Testcontainers tests are too slow to rerun per mutant, so code they alone reach shows as "no coverage". About a minute for the whole backend |
-| `frontend/imdb-ui-angular` | [Stryker](https://stryker-mutator.io) ([`stryker.config.mjs`](frontend/imdb-ui-angular/stryker.config.mjs)) | Mutates files that have a matching `.spec.ts`; templates aren't mutated. Each mutant reruns `ng test`, so expect a few seconds per mutant. Builds with [`tsconfig.stryker.json`](frontend/imdb-ui-angular/tsconfig.stryker.json), because some mutants otherwise fail template type-checking and abort the run |
+| `backend/posts` | [PIT](https://pitest.org) (`pitest-maven` in `pom.xml`) | Unit tests only: Testcontainers tests are too slow to rerun per mutant, so code they alone reach shows as "no coverage". Skips `dto`, `entity`, `config` and `repository`: no logic worth mutating, and Spring-wired classes give false survivors. Under a minute for the whole backend |
+| `frontend/imdb-ui-angular` | [Stryker](https://stryker-mutator.io) ([`stryker.config.mjs`](frontend/imdb-ui-angular/stryker.config.mjs)) | Mutates files that have a matching `.spec.ts`, except `core/domain/configs/` (display data); templates aren't mutated. Each mutant reruns `ng test`, so expect a few seconds per mutant. Builds with [`tsconfig.stryker.json`](frontend/imdb-ui-angular/tsconfig.stryker.json), because some mutants otherwise fail template type-checking and abort the run |
 | `backend/imdb-data-python` | none | No tests yet |
 
 ## 5. Triggering Options
