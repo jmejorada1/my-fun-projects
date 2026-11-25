@@ -78,6 +78,18 @@ describe('DomainSelectionService', () => {
       TestBed.overrideProvider(DOMAIN_OPTIONS_TOKEN, { useValue: TWO_ENABLED_OPTIONS });
     });
 
+    it('restores a stored non-default domain', () => {
+      localStorage.setItem(STORAGE_KEY, 'imdb/standard');
+      const service = TestBed.inject(DomainSelectionService);
+      expect(service.selectedDomain()).toBe('imdb/standard');
+    });
+
+    it('ignores a stored value that matches no domain', () => {
+      localStorage.setItem(STORAGE_KEY, 'imdb/tampered');
+      const service = TestBed.inject(DomainSelectionService);
+      expect(service.selectedDomain()).toBe(DEFAULT_DOMAIN);
+    });
+
     it('switches the selected domain and persists it', () => {
       const service = TestBed.inject(DomainSelectionService);
 

@@ -1229,6 +1229,47 @@ describe('ResourceDetailComponent', () => {
       expect(fixture.componentInstance.conflictRemovalError()).toBe('boom');
       expect(fixture.componentInstance.conflictingPosts().length).toBe(1);
     });
+
+    it('ignores a second "keep previous" while the first discard is in flight', async () => {
+      const fixture = await createComponent([PRIOR_RACIST_POST], NO_BIGOTRY_TYPES);
+      postNoBigotry(fixture, 99);
+      httpMock.expectOne((r) => r.params.get('size') === '200').flush({
+        content: [PRIOR_RACIST_POST],
+        totalElements: 1, totalPages: 1, number: 0, size: 200,
+      });
+
+      fixture.componentInstance.keepPreviousFlags();
+      fixture.componentInstance.keepPreviousFlags();
+
+      httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/99` && r.method === 'DELETE').flush(null);
+      flushResourceRefresh();
+    });
+
+    it('ignores a second "remove" while the first removal is in flight', async () => {
+      const fixture = await createComponent([PRIOR_RACIST_POST], NO_BIGOTRY_TYPES);
+      postNoBigotry(fixture);
+      httpMock.expectOne((r) => r.params.get('size') === '200').flush({
+        content: [PRIOR_RACIST_POST],
+        totalElements: 1, totalPages: 1, number: 0, size: 200,
+      });
+
+      fixture.componentInstance.confirmRemoveConflictingPosts();
+      fixture.componentInstance.confirmRemoveConflictingPosts();
+
+      httpMock.expectOne((r) => r.url === `${API_BASE_URL}/posts/10` && r.method === 'DELETE').flush(null);
+      flushResourceRefresh();
+    });
+
+    it('does nothing on "keep previous" or "remove" when no conflict is pending', async () => {
+      const fixture = await createComponent([PRIOR_RACIST_POST], NO_BIGOTRY_TYPES);
+
+      fixture.componentInstance.keepPreviousFlags();
+      fixture.componentInstance.confirmRemoveConflictingPosts();
+
+      httpMock.expectNone((r) => r.method === 'DELETE');
+      // forkJoin([]) never emits, so without the guard the dialog would stay "removing" forever.
+      expect(fixture.componentInstance.removingConflicts()).toBe(false);
+    });
   });
 
   describe('imdb/standard (category-only rating domain)', () => {
