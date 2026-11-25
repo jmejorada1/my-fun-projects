@@ -1,0 +1,28 @@
+The goal of the app is to allow the user to document "wrong" behavior done to them either directly or indirectly. It will then provide a summary of documented behavior (using an llm) to provide proof (i.e. cya, cover-your-ass)
+
+
+Goal: create a diary app where I can log discrepencies/disagreements with people around me (coworkers, friends, family, etc.)
+
+- For example:
+    * document (with timestamps) instances/scenarios with co-workers where my work is devalued, or coworkers display inconsistent or hostile behavior
+        examples:
+            - coworkers team up together to discredit work, with no positive or actionable feedback. This can be a co-review session (if I am a software engineer)
+            - A meeting situation where my work is devalued with no actionable feedback 
+    * document (with timestamps) disagreements or actions with family-members/friends where i am mis-treated, disrepected, overlooked, unappreciated. Or family-members/friends display inconsistent or hostile behavior
+        examples:
+            - a family member or friend is gossipping about another family member or fried
+            - a family member is being distant, or expresses unappreciation for something i did 
+
+    All documented instances will have the option to provide screenshots as evidence to support documented claims.
+
+    For each documented instance, I can also document one or more of my own actions/reactions to it (e.g. how I reacted in the moment, and what I did afterwards).
+    Each action/reaction can be tagged/labeled with 1 or more categories, chosen from a starter list or added by me.
+        examples:
+            - positive: love, honesty, hard-work, sacrifice, etc.
+            - negative: anger, revenge, hate, fear, deception, etc.
+
+    I can also track my actions/reactions over time, with the goal of improving how I respond: to a particular incident, across incidents, and to future incidents.
+
+- Future state would be to pass the documentation/diary to an LLM for a summary.
+- Future state: the diary should also work with a mobile client.
+- Future state: visualize my incidents and my actions/reactions to them in an effective way.
