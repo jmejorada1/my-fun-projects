@@ -1,6 +1,6 @@
 ---
 name: feature-pipeline
-description: Run the requirements → spec → implement+tests → review → fix pipeline for a requirements text file, using the spec-planner, spec-implementer, security-auditor and code-reviewer subagents plus the scripted quality and security gates. Only run when the user invokes /feature-pipeline.
+description: Run the requirements → spec → implement+tests → review → fix pipeline for a requirements text file, using the spec-planner, spec-implementer, security-auditor, code-reviewer and test-reviewer subagents plus the scripted quality and security gates. Only run when the user invokes /feature-pipeline.
 argument-hint: <requirements-file> [--lite] [--auto] [--from=implement|review] [--coverage=85]
 disable-model-invocation: true
 ---
@@ -77,10 +77,14 @@ and escalate to the user.
 
 ## 3. Review
 
-**Full mode:** in one message, launch `security-auditor` and
-`code-reviewer` **in parallel** (both in the foreground), each with
-`SPEC_DIR` and `BASE_REF`. Record both agent IDs. Save each final reply
-verbatim to `SPEC_DIR/security-report.md` and `SPEC_DIR/code-review.md`.
+**Full mode:** first run `./scripts/mutation-report.sh --base <BASE_REF>`
+yourself. It's report-only and takes a few minutes (longer for frontend
+changes); `test-reviewer` reads its summary. Then, in one message, launch
+`security-auditor`,
+`code-reviewer` and `test-reviewer` **in parallel** (all in the
+foreground), each with `SPEC_DIR` and `BASE_REF`. Record all three agent
+IDs. Save each final reply verbatim to `SPEC_DIR/security-report.md`,
+`SPEC_DIR/code-review.md` and `SPEC_DIR/test-review.md`.
 
 **Lite mode:** run `./scripts/security-scan.sh --base <BASE_REF>`
 yourself. Treat any failing result that was introduced by this change as
@@ -92,12 +96,14 @@ pre-existing and don't block.
 Blocking findings are:
 - Security Critical, High, or Medium introduced by this change.
 - Code-review High or Medium.
+- Test-review High or Medium.
 - In lite mode, failing scan results introduced by this change.
 
 If any exist:
 1. SendMessage them to the **same implementer**, with the report paths
    and the IDs to address. Send Low findings too, marked optional.
-2. When it replies, re-run `quality-gate.sh` yourself.
+2. When it replies, re-run `quality-gate.sh` yourself, and in full mode
+   `mutation-report.sh` too.
 3. SendMessage each reviewer with `VERIFY: <its finding IDs>`, in
    parallel. In lite mode, re-run `security-scan.sh` instead. Append the
    verification results to the report files.
@@ -116,7 +122,7 @@ resume), launch a fresh agent and tell it to read
   vs. target), review (findings by severity: found / fixed / deferred /
   disputed), and fix rounds used.
 - Links to `spec.md`, `implementation-notes.md`, `security-report.md`,
-  `code-review.md`, and the `.quality/` reports.
+  `code-review.md`, `test-review.md`, and the `.quality/` reports.
 - Assumptions made under `--auto`, deviations, deferred and disputed
   findings, pre-existing issues found, and proposals awaiting a decision.
 - `git status --short`, plus a reminder that nothing is committed and the

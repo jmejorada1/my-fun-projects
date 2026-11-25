@@ -2,7 +2,7 @@
 
 A Claude Code multi-agent workflow that takes a plain-text requirements
 file through five steps: spec, implementation with tests, parallel
-security and code review, fixes, and a feature branch ready for your
+security, code and test review, fixes, and a feature branch ready for your
 review. Scripts, not agents, decide whether coverage and security pass,
 and the same scripts run in CI on every PR.
 
@@ -41,9 +41,10 @@ requirements.txt
   → [1] spec-planner (opus)      → spec.md                      ⏸ you approve / revise
   → [2] spec-implementer (sonnet) → code + tests, task by task
           └─ orchestrator runs scripts/quality-gate.sh  (red → SendMessage back, ≤2)
-  → [3] in parallel, read-only:
+  → [3] orchestrator runs scripts/mutation-report.sh (report-only), then in parallel, read-only:
           security-auditor (opus)  → runs scripts/security-scan.sh + logic review → security-report.md
-          code-reviewer (opus)     → correctness, spec, design, test quality     → code-review.md
+          code-reviewer (opus)     → correctness, spec, design                    → code-review.md
+          test-reviewer (opus)     → edge cases, assertion quality, mutants       → test-review.md
   → [4] findings → SendMessage to the SAME implementer → gate re-run → reviewers verify their IDs (≤2 rounds)
   → summary (links to all reports + git status)
 ```
@@ -53,15 +54,18 @@ Design choices, and why:
 - **Tests are written with the code, not after it.** The implementer
   writes each task's tests as it goes and gets them green, so it catches
   its own bugs while it still has the context to fix them. The planner
-  designs the tests up front in the spec's Test Plan, so the person
-  deciding what to test is still separate from the coder.
+  designs the tests up front in the spec's Test Plan, as concrete inputs
+  and expected results, so the person deciding what to test is still
+  separate from the coder. After implementation, the test reviewer
+  derives edge cases again from the code itself, because branches added
+  while coding aren't in the plan.
 - **Scripts decide pass/fail.** Coverage and scanner results are measured
   by `scripts/quality-gate.sh` and `scripts/security-scan.sh`, not judged
   by an LLM. The orchestrator re-runs them itself instead of trusting an
   agent's report, and CI runs them on every PR, including code written by
   hand.
-- **Reviewers are read-only.** Neither the security auditor nor the code
-  reviewer has Edit or Write tools, so neither approves its own fixes.
+- **Reviewers are read-only.** None of the three reviewers has Edit or
+  Write tools, so none approves its own fixes.
   All fixes go through the implementer, and the reviewers then verify
   them.
 - **Fix rounds keep context.** Findings go back to the same implementer
@@ -72,14 +76,14 @@ Design choices, and why:
 - **The orchestrator is a skill,**
   [`.claude/skills/feature-pipeline/SKILL.md`](.claude/skills/feature-pipeline/SKILL.md),
   so it runs in your main session. Claude Code subagents can spawn their
-  own subagents, up to a depth limit, but these four don't have the
+  own subagents, up to a depth limit, but these five don't have the
   `Agent` tool: their `tools` lists leave it out. One level of delegation
   keeps every stage, the spec checkpoint and the gate results in front of
   you.
 
 ## 3. The Agents
 
-All four live in [`.claude/agents/`](.claude/agents/). Each can also be
+All five live in [`.claude/agents/`](.claude/agents/). Each can also be
 used on its own (see [section 5](#5-triggering-options)).
 
 | Agent | Model | Tools | Job |
@@ -87,7 +91,8 @@ used on its own (see [section 5](#5-triggering-options)).
 | [`spec-planner`](.claude/agents/spec-planner.md) | opus | read + write the spec | Reads the requirements, the component `CLAUDE.md`s and the closest existing feature. Writes `spec.md`: requirements traceability, design, security notes, tasks (each with its tests), test plan, **alternatives and recommendations**, and open questions |
 | [`spec-implementer`](.claude/agents/spec-implementer.md) | sonnet | read + edit | Implements one task at a time, **code and tests together**, following the root [Design principles](CLAUDE.md#design-principles) (KISS, SOLID, DRY by the rule of three) and existing patterns. Works until the quality gate passes. In fix rounds it marks each finding Fixed, Disputed or Deferred |
 | [`security-auditor`](.claude/agents/security-auditor.md) | opus | **read-only** | Runs the security scan and triages every hit (real, false positive, or pre-existing). Then reviews what scanners can't see: IDOR, cross-domain `X-Domain` leaks, mass assignment, validation gaps, data exposure, security config |
-| [`code-reviewer`](.claude/agents/code-reviewer.md) | opus | **read-only** | Reviews correctness bugs, conformance to the spec's requirements, **test quality** (do tests assert behavior or just add coverage?), and design (simplicity, SOLID, duplication of existing code, consistency) |
+| [`code-reviewer`](.claude/agents/code-reviewer.md) | opus | **read-only** | Reviews correctness bugs, conformance to the spec's requirements, and design (simplicity, SOLID, duplication of existing code, consistency) |
+| [`test-reviewer`](.claude/agents/test-reviewer.md) | opus | **read-only** | Lists the edge cases each changed unit needs (boundaries, empty/null, max length, pagination, both domains and cross-domain, ownership, error paths, frontend states) and checks a test proves each one. Flags tests that can't fail: no assertions, mock-only, or passing with the implementation deleted. Triages each mutant that survived [`scripts/mutation-report.sh`](#scriptsmutation-reportsh-would-the-tests-catch-a-bug) |
 
 Sonnet does the implementing because that stage uses the most tokens and
 is following a detailed, approved spec. Opus handles the judgment-heavy
@@ -95,9 +100,10 @@ stages: planning and review.
 
 ## 4. The Gate Scripts
 
-Both scripts work locally, in the pipeline, and in CI
-([`.github/workflows/quality.yml`](.github/workflows/quality.yml)).
-Reports go to `.quality/`, which is gitignored.
+The two gate scripts work locally, in the pipeline, and in CI
+([`.github/workflows/quality.yml`](.github/workflows/quality.yml)). The
+mutation report runs only locally and in the pipeline. Reports go to
+`.quality/`, which is gitignored.
 
 ### `scripts/quality-gate.sh`: coverage of changed lines
 
@@ -139,6 +145,27 @@ locally:
 
 Scanners find patterns, not logic flaws. That's why the
 `security-auditor` still reviews authorization and domain scoping by hand.
+
+### `scripts/mutation-report.sh`: would the tests catch a bug?
+
+```bash
+./scripts/mutation-report.sh                       # changed files vs. main
+./scripts/mutation-report.sh --base <ref>
+./scripts/mutation-report.sh --all [posts|frontend] # whole-codebase baseline
+```
+
+Coverage shows which lines ran; mutation testing shows whether a test
+fails when the code is broken. The tool makes small changes (flips a
+`<`, drops a call, returns `null`) and reruns the tests. A change no test
+notices is a **survived** mutant. The script never fails on results: it
+writes `.quality/mutation-summary.md`, and `test-reviewer` triages each
+survivor as a real gap or harmless. It's too slow for CI.
+
+| Component | Tool | Notes |
+|---|---|---|
+| `backend/posts` | [PIT](https://pitest.org) (`pitest-maven` in `pom.xml`) | Unit tests only: Testcontainers tests are too slow to rerun per mutant, so code they alone reach shows as "no coverage". About a minute for the whole backend |
+| `frontend/imdb-ui-angular` | [Stryker](https://stryker-mutator.io) ([`stryker.config.mjs`](frontend/imdb-ui-angular/stryker.config.mjs)) | Mutates files that have a matching `.spec.ts`; templates aren't mutated. Each mutant reruns `ng test`, so expect a few seconds per mutant. Builds with [`tsconfig.stryker.json`](frontend/imdb-ui-angular/tsconfig.stryker.json), because some mutants otherwise fail template type-checking and abort the run |
+| `backend/imdb-data-python` | none | No tests yet |
 
 ## 5. Triggering Options
 
@@ -197,6 +224,7 @@ Each run produces `docs/specs/<slug>/`:
 | `implementation-notes.md` | spec-implementer | Files changed, tests per requirement, deviations, proposals, gate results, and a fix-round log per finding ID |
 | `security-report.md` | security-auditor (saved by orchestrator) | Findings (S1…), scanner triage, pre-existing issues, and what was checked |
 | `code-review.md` | code-reviewer (saved by orchestrator) | Findings (C1…), a requirements check, and optional improvements |
+| `test-review.md` | test-reviewer (saved by orchestrator) | Findings (TG1…), the edge-case inventory, mutation triage, and what was checked |
 
 ## 7. Writing a Requirements File
 

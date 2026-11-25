@@ -82,8 +82,10 @@ does, tell the user and wait. Don't relaunch it yourself.
   tests and fails if under 85% of lines changed since `main` are covered.
 - `./scripts/security-scan.sh`: Semgrep plus osv-scanner, run in Docker.
 - CI runs both on every PR.
+- `./scripts/mutation-report.sh [--all]`: report-only mutation testing
+  (PIT, Stryker) of changed files. Local and pipeline only, not CI.
 - `/feature-pipeline <requirements-file>` runs spec → implement+tests →
-  parallel security/code review → fixes, using `.claude/agents/`. See
+  parallel security/code/test review → fixes, using `.claude/agents/`. See
   [`AGENT-PIPELINE.md`](AGENT-PIPELINE.md#5-triggering-options).
 
 ## Repo-wide rules
