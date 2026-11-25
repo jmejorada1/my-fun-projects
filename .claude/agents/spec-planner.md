@@ -76,7 +76,13 @@ tests that prove it (the implementer writes them alongside the code):
 ## 7. Test Plan
 The behaviors to prove, per class/component: happy paths, edge cases,
 error paths, and security-relevant cases (cross-domain access, invalid
-input). Say which need Docker (Testcontainers) and which are pure unit
+input). Write each edge case as a concrete input and its expected
+result, not a category: `score = 0 and 5 → accepted`, `score = -1 or 6
+→ 400`, `65-char username (@Size max 64) → 400`, `size = 500 → capped
+at 100`, `post from the other domain → 404`, `non-owner delete → 403`.
+For every new input, cover each boundary and one value past it,
+empty/blank/null, maximum length, and both domains plus a cross-domain
+request. Say which need Docker (Testcontainers) and which are pure unit
 tests. `scripts/quality-gate.sh` enforces ≥85% coverage of changed
 lines, so plan tests for behavior, not for the number.
 ## 8. Alternatives & Recommendations

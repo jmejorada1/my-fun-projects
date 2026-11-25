@@ -1,0 +1,10 @@
+/* Mutation-testing builds only (stryker.config.mjs). A mutant such as
+   `() => undefined` widens a member's type to possibly-undefined, which
+   fails Angular's template type-check and aborts the whole run. Runtime
+   behavior is unchanged. */
+{
+  "extends": "./tsconfig.spec.json",
+  "compilerOptions": {
+    "strictNullChecks": false
+  }
+}
